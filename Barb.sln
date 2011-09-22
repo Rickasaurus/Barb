@@ -1,0 +1,38 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Barb", "Barb\Barb.fsproj", "{8909D27B-857D-4273-BA1A-C01236906FCA}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Barb.Tests", "Barb.Tests\Barb.Tests.fsproj", "{482B4B14-7FDA-4857-8021-BA599ABEC8EB}"
+EndProject
+Global
+	GlobalSection(TeamFoundationVersionControl) = preSolution
+		SccNumberOfProjects = 3
+		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
+		SccTeamFoundationServer = http://team-server:8080/tfs/bayardrock
+		SccLocalPath0 = .
+		SccProjectUniqueName1 = Barb\\Barb.fsproj
+		SccProjectName1 = Barb
+		SccLocalPath1 = Barb
+		SccProjectUniqueName2 = Barb.Tests\\Barb.Tests.fsproj
+		SccProjectName2 = Barb.Tests
+		SccLocalPath2 = Barb.Tests
+	EndGlobalSection
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8909D27B-857D-4273-BA1A-C01236906FCA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8909D27B-857D-4273-BA1A-C01236906FCA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8909D27B-857D-4273-BA1A-C01236906FCA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8909D27B-857D-4273-BA1A-C01236906FCA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{482B4B14-7FDA-4857-8021-BA599ABEC8EB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{482B4B14-7FDA-4857-8021-BA599ABEC8EB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{482B4B14-7FDA-4857-8021-BA599ABEC8EB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{482B4B14-7FDA-4857-8021-BA599ABEC8EB}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
