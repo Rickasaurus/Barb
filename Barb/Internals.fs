@@ -315,20 +315,6 @@ let inline (|TupleIndicator|_|) token =
     match token with
     | "," -> Some() | _ -> None
 
-let rec resolveTuples subExpr collected resolved inTuple =
-    match subExpr, collected with
-    | [], [] -> resolved, inTuple
-    | [], collected when inTuple -> resolveTuples [] [] (SubExpression collected :: resolved) inTuple
-    | [], cH :: cT when not inTuple -> resolveTuples [] cT (cH :: resolved) inTuple
-    | TupleSeparator :: rest, collected -> resolveTuples rest [] (SubExpression collected :: resolved) true
-    | SubExpression (exp) :: rest, collected -> let subResults, wasTuple = resolveTuples exp [] [] false 
-                                                let maybeTuple =
-                                                    let revSubResults = subResults
-                                                    if wasTuple then Tuple revSubResults else SubExpression revSubResults
-                                                resolveTuples rest (maybeTuple :: collected) resolved inTuple
-    | exprH :: exprT, collected -> resolveTuples exprT (exprH :: collected) resolved inTuple
-    | _ -> failwith (sprintf "Failed resolving tuples on %A -- %A" subExpr collected)
-
 type SubExpressionType =
     | StandardExpression
     | TupleExpression
