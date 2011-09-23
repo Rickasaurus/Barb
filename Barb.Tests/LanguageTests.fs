@@ -152,6 +152,6 @@ type OptionRecord = { OptionalName: string option; Age: int }
 [<Fact>]
 let ``predicate language shouldn't choke on option types`` () =
     let testRecord = { OptionalName = Some "Dude"; Age = 20 }
-    let dudePredicate = buildExpr<OptionRecord,bool> "Name = Dude"
+    let dudePredicate = buildExpr<OptionRecord,bool> "OptionalName = Dude"
     let result = dudePredicate testRecord
     Assert.True(result)    

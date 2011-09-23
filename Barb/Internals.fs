@@ -26,6 +26,7 @@ type ExprTypes =
     | BoolToBool of (bool -> bool)
     | Bool of bool
     | Obj of obj
+    | Returned of obj
     | Infix of ExprTypes
     | UnresolvedInstanceType of UnresolvedInstanceTypes
     | Method of MethodSig
@@ -134,16 +135,31 @@ let convertToTargetType (ttype: Type) (param: obj) =
         | true -> Some <| des.ConvertFrom(param)
         | false -> None            
 
-let resolveResultType (output: obj) = 
-    match output with
-    | :? bool as boolinstance -> Bool boolinstance
-    | other -> Obj other
+let (|DecomposeOption|_|) (o: obj) = 
+    if o = null then Some null
+    else
+        let genericOptionType = typedefof<_ option>
+        let bindingFlags = BindingFlags.GetProperty ||| BindingFlags.Instance ||| BindingFlags.Public      
+        match o.GetType() with
+        | t when t.IsGenericType -> 
+            let gt = t.GetGenericTypeDefinition()
+            if gt = genericOptionType then
+                Some <| t.InvokeMember("Value", bindingFlags, null, o, Array.empty)
+            else None
+        | _ -> None        
+
+let resolveResultType = 
+    fun (output: obj) ->
+        match output with
+        | :? bool as boolinstance -> Bool boolinstance
+        | DecomposeOption contents -> Obj contents
+        | other -> Obj other
 
 let executeUnitMethod (sigs: MethodSig) =
     sigs 
     |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = 0)
     |> Option.bind (fun (exec, paramTypes) -> Some <| exec Array.empty)
-    |> Option.map resolveResultType
+    |> Option.map Returned
 
 let executeOneParamMethod (sigs: MethodSig) (param: obj) =
     sigs
@@ -152,7 +168,7 @@ let executeOneParamMethod (sigs: MethodSig) (param: obj) =
         convertToTargetType (paramTypes.[0]) param 
         |> Option.map (fun converted -> exec, converted))
     |> Option.map (fun (exec, converted) -> exec [| converted |])
-    |> Option.map resolveResultType
+    |> Option.map Returned
 
 let executeParameterizedMethod (sigs: MethodSig) (prms: ExprTypes list) =
     let arrayPrms = 
@@ -166,9 +182,17 @@ let executeParameterizedMethod (sigs: MethodSig) (prms: ExprTypes list) =
         |> Array.map (fun (tType, param) -> convertToTargetType tType param)
         |> Array.map (function | Some rParam -> rParam | None -> failwith (sprintf "Unable to resolve method parameters: %A -> %A" arrayPrms paramTypes))
         |> fun rParams -> exec rParams)
-    |> Option.map resolveResultType
+    |> Option.map Returned
 
-let attemptToResolvePair =
+let rec (|ResolveSingle|_|) =
+    function 
+    | Returned o -> Some <| resolveResultType o
+    | Tuple tc -> 
+        let resolvedTp = tc |> List.collect (fun t -> resolve [] [t]) |> List.rev |> ResolvedTuple
+        Some resolvedTp
+    | _ -> None
+
+and attemptToResolvePair =
     function
     | ObjToObj l, Obj r -> Some <| Obj (l r)
     | Obj l, (Infix (ObjToObjToBool r)) -> Some <| ObjToBool (r l)
@@ -182,17 +206,15 @@ let attemptToResolvePair =
     | Method l, ResolvedTuple r -> executeParameterizedMethod l r 
     | _ -> None
 
-let rec resolve left right =
+and resolve left right =
     match left, right with
     | [], r :: rt -> resolve [r] rt
+    | (ResolveSingle resolved :: lt), right -> resolve lt (resolved :: right)
     | (SubExpression exp :: lt), right ->
         let resolvedSub = resolve [] exp
         resolve lt (resolvedSub @ right)
-    | (Tuple exps :: lt), right ->
-        let resolvedTp = exps |> List.collect (fun t -> resolve [] [t]) |> List.rev |> ResolvedTuple
-        resolve lt (resolvedTp :: right)
     | l :: [], [] -> [l]
-    | l :: lt, r :: rt ->
+    | l :: lt, r :: rt ->        
         match attemptToResolvePair (l, r) with
         | Some (rToken) -> resolve lt (rToken :: rt)
         | None -> resolve (r :: l :: lt) rt
@@ -360,7 +382,7 @@ let buildExpression (localType: Type) (predicate: string) : (obj -> obj) =
         let appliedParsedTokens = 
             let rec resolveInstanceType instanceType =
                 match instanceType with
-                | PropertyCall (call) -> Obj (call input)
+                | PropertyCall (call) -> Returned (call input)
                 | MethodCall (call) -> let resolved = call input in Method resolved
                 | DynamicCall (name) -> resolveInstanceType (getDelayedMember name input)
 
