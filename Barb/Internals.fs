@@ -195,9 +195,7 @@ and attemptToResolvePair =
     function
     | ObjToObj l, Obj r -> Some <| Obj (l r)
     | Obj l, (Infix (ObjToObjToBool r)) -> Some <| ObjToBool (r l)
-    | (Infix (ObjToObjToBool l)), Obj r -> Some <| ObjToBool (fun e -> l e r)
     | Bool l, (Infix (BoolToBoolToBool r)) -> Some <| BoolToBool (r l)
-    | (Infix (BoolToBoolToBool l)), Bool r -> Some <| BoolToBool (fun e -> l e r)
     | ObjToBool l, Obj r -> Some <| Bool (l r)
     | BoolToBool l, Bool r -> Some <| Bool (l r)
     | Method l, Unit -> executeUnitMethod l
