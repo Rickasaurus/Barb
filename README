@@ -1,0 +1,20 @@
+Barb is a small dynamic scripting language for .NET
+
+--
+
+I created Barb because I needed a user language for my applications but yet no existing .NET language hosted nicely inside of my application.  This was my criteria:
+
+- Simple/Terse Syntax
+- Expression Oriented
+- No casting necessary 
+- Transparent type conversions
+- Native .NET type system
+- Tries really hard to do what a non-technical user would expect
+
+Dynamic Linq, IronPython and IronRuby all failed for one of these reasons or another.
+
+The current implementation is still young and a bit rough around the edges. I needed to get something out fast for my product and as of writing this the first line of code was written three days ago.  Right now it's useful for writing one-line expressions along these lines:
+
+"(Name.Contains "John" or Name.Contains "Mary") and (Age > 20 or Weight > 200)"
+
+Maybe it's early to share it, but I thought it might be useful to others in its current form.

@@ -134,6 +134,13 @@ let ``predicate language should support single argument methods`` () =
     Assert.True(result)
 
 [<Fact>] 
+let ``predicate language should support single argument methods with no parens`` () =
+    let testRecord = { Name = "Dude Duderson"; Age = 20 }
+    let dudePredicate = buildExpr<DudeRecordWithInt,bool> "Name.Contains \"Dude Duderson\""
+    let result = dudePredicate testRecord
+    Assert.True(result)
+
+[<Fact>] 
 let ``predicate language should support multi-argument methods`` () =
     let testRecord = { Name = "Dude Duderson"; Age = 20 }
     let dudePredicate = buildExpr<DudeRecordWithInt,bool> "Name.Substring(0, 4) = Dude"
