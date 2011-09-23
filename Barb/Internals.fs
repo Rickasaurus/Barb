@@ -35,6 +35,11 @@ type ExprTypes =
     | Tuple of ExprTypes list
     | ResolvedTuple of ExprTypes list    
 
+let nullableToOption res =
+    match res with
+    | null -> None
+    | item -> Some item
+
 let rec resolveMembers (rtype: System.Type) (parentName: string) (getter: obj -> obj) =
     let properties = rtype.GetProperties()
     let methodCollections = rtype.GetMethods()
@@ -72,9 +77,9 @@ let rec resolveMembers (rtype: System.Type) (parentName: string) (getter: obj ->
                     let parentResult = getter instance
                     prop.GetValue(parentResult, null)
             yield fullName, PropertyCall getPropFunc
-            yield! resolveMembers prop.PropertyType fullName getPropFunc
     }     
 
+// This is awful and needs to be rewritten I know, just a temp fix for now
 let internal getCachedDelayedMembers (baseMemberCache: ConcurrentDictionary<_,_>) =
     let cachedChildren = new HashSet<_>() 
     let memberCache = new ConcurrentDictionary<_, _>(baseMemberCache)
@@ -89,29 +94,37 @@ let internal getCachedDelayedMembers (baseMemberCache: ConcurrentDictionary<_,_>
                 let parentName = memberName.Substring(0, i)
                 let childName = memberName.Substring(i + 1, memberName.Length - 1 - i)
                 parentName, childName, memberCache.[parentName])
-     
-    let updateCacheWithNewType memberName instance =
-        let parent, child, parentMember = findLowestCommonMember memberName |> Option.get
+    
+    let rec updateCacheWithNewType memberName instance =
+        let parent, child, parentMember = 
+            match findLowestCommonMember memberName with
+            | Some (result) -> result            
+            | None -> failwith (sprintf "Base member not found: %s" memberName)          
+
         if not <| cachedChildren.Contains(parent) then 
             let parentProp = 
                 parentMember 
                 |> function 
                    | PropertyCall (call) -> call 
                    | other -> failwith (sprintf "Expected a property, but got a member while doing a dynamic lookup for: %s" memberName)
+
             let childInstance = parentProp instance
+
             resolveMembers (childInstance.GetType()) parent parentProp
             |> Seq.iter (fun (k,v) -> memberCache.TryAdd(k,v) |> ignore)
             cachedChildren.Add(parent) |> ignore
+            
+            getFromCache memberName instance
         else
             failwith (sprintf "Delayed lookup failed on parent (%s) and child (%s), member not found in type" parent child)
 
-    fun memberName instance ->
-        let rec matchMember () = 
-            match memberCache.TryGetValue memberName with
-            | true, foundMember -> foundMember
-            | false, _ -> updateCacheWithNewType memberName instance
-                          matchMember ()
-        matchMember()
+    and getFromCache memberName instance =
+        match memberCache.TryGetValue memberName with
+        | true, foundMember -> foundMember
+        | false, _ -> updateCacheWithNewType memberName instance
+
+    getFromCache
+
                    
 let convertToTargetType (ttype: Type) (param: obj) = 
     if param = null then Some null

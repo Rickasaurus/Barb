@@ -25,16 +25,6 @@ let ``getCachedProperties should work on single depth lookup`` () =
     Assert.Equal(2, (getProperyOrFail lookupCache "Two") testInstance :?> int)
 
 [<Fact>]
-let ``getCachedProperties should work on double depth lookup`` () =
-    let lookupCache = getCachedMembers typeof<testLayerTwo>
-    let testSubInstance = { One = 1; Two = 2 }
-    let testInstance = { LOne = testSubInstance; Name = "Hello" } :> obj
-    let loneOneVal = getProperyOrFail lookupCache "LOne.One" testInstance
-    Assert.Equal(1, loneOneVal :?> int)
-    Assert.Equal(2, (getProperyOrFail lookupCache "LOne.Two") testInstance :?> int)
-    Assert.Equal("Hello", (getProperyOrFail lookupCache "Name") testInstance :?> string)
-
-[<Fact>]
 let ``tokenizeString should correctly tokenize a simple string`` () =
     let tokens = tokenizeString "Hello = World"
     Assert.Equal(3, tokens.Length)

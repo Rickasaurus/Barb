@@ -146,3 +146,12 @@ let ``predicate language should support comparing null values`` () =
     let dudePredicate = buildExpr<DudeRecordWithInt,bool> "Name = null"
     let result = dudePredicate testRecord
     Assert.True(result)
+
+type OptionRecord = { OptionalName: string option; Age: int }
+
+[<Fact>]
+let ``predicate language shouldn't choke on option types`` () =
+    let testRecord = { OptionalName = Some "Dude"; Age = 20 }
+    let dudePredicate = buildExpr<OptionRecord,bool> "Name = Dude"
+    let result = dudePredicate testRecord
+    Assert.True(result)    

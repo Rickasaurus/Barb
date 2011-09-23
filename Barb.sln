@@ -6,18 +6,6 @@ EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Barb.Tests", "Barb.Tests\Barb.Tests.fsproj", "{482B4B14-7FDA-4857-8021-BA599ABEC8EB}"
 EndProject
 Global
-	GlobalSection(TeamFoundationVersionControl) = preSolution
-		SccNumberOfProjects = 3
-		SccEnterpriseProvider = {4CA58AB2-18FA-4F8D-95D4-32DDF27D184C}
-		SccTeamFoundationServer = http://team-server:8080/tfs/bayardrock
-		SccLocalPath0 = .
-		SccProjectUniqueName1 = Barb\\Barb.fsproj
-		SccProjectName1 = Barb
-		SccLocalPath1 = Barb
-		SccProjectUniqueName2 = Barb.Tests\\Barb.Tests.fsproj
-		SccProjectName2 = Barb.Tests
-		SccLocalPath2 = Barb.Tests
-	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
