@@ -32,7 +32,6 @@ type ExprTypes =
     | Method of MethodSig
     | Unit
     | SubExpression of ExprTypes list
-    | TupleSeparator
     | Tuple of ExprTypes list
     | ResolvedTuple of ExprTypes list    
 
@@ -314,7 +313,7 @@ let inline (|EndSubExpression|_|) token =
 
 let inline (|TupleIndicator|_|) token =
     match token with
-    | "," -> Some TupleSeparator | _ -> None
+    | "," -> Some() | _ -> None
 
 let rec resolveTuples subExpr collected resolved inTuple =
     match subExpr, collected with
@@ -330,31 +329,44 @@ let rec resolveTuples subExpr collected resolved inTuple =
     | exprH :: exprT, collected -> resolveTuples exprT (exprH :: collected) resolved inTuple
     | _ -> failwith (sprintf "Failed resolving tuples on %A -- %A" subExpr collected)
 
+type SubExpressionType =
+    | StandardExpression
+    | TupleExpression
+
 let parseTokens getMember tokens = 
-    let rec parseTokensInner tokens (result: ExprTypes list) = 
-        match tokens with
-        | [] -> result |> List.rev, []
-        | head :: rest -> 
+    let rec parseTokensInner tokens (collectedResult: ExprTypes list) (result: ExprTypes list) expressionType = 
+        match tokens, collectedResult with
+        | [], [] -> result, [], expressionType
+        | [], ch :: ct -> parseTokensInner [] ct (ch :: result) expressionType
+        | head :: rest, collected -> 
             let contents, tokenType = head
             match tokenType with
-            | Quoted -> parseTokensInner rest (Obj contents :: result)
+            | Quoted -> parseTokensInner rest (Obj contents :: collectedResult) result expressionType
             | Normal -> 
                 match contents with
                 | BeginSubExpression -> 
-                    let exprs, unused = parseTokensInner rest [] 
-                    match exprs with
-                    | [] -> parseTokensInner unused (Unit :: result)
-                    | contents -> parseTokensInner unused (SubExpression exprs :: result)
-                | EndSubExpression -> result |> List.rev, rest
+                    let exprs, unused, returnedExprType = parseTokensInner rest [] [] StandardExpression
+                    match exprs, returnedExprType with
+                    | [], StandardExpression -> parseTokensInner unused (Unit :: collectedResult) result expressionType
+                    | contents, StandardExpression -> parseTokensInner unused (SubExpression exprs :: collectedResult) result expressionType
+                    | contents, TupleExpression -> parseTokensInner unused (Tuple exprs :: collectedResult) result expressionType
+                | EndSubExpression -> 
+                    match expressionType with
+                    | StandardExpression -> collectedResult |> List.rev, rest, expressionType
+                    | TupleExpression -> 
+                        let revCollected = collectedResult |> List.rev
+                        (SubExpression revCollected :: result), rest, expressionType
+                | TupleIndicator ->
+                    let reversedResult = collectedResult |> List.rev 
+                    parseTokensInner rest [] (SubExpression reversedResult :: result) TupleExpression
                 | ResolveConstants op
-                | TupleIndicator op
                 | BooleanOperation op
                 | NotOperation op
                 | CompareOperation op 
-                | GetOperation getMember op -> parseTokensInner rest (op :: result)
-                | unrecognized -> parseTokensInner rest (Obj unrecognized :: result)
+                | GetOperation getMember op -> parseTokensInner rest (op :: collectedResult) result expressionType
+                | unrecognized -> parseTokensInner rest (Obj unrecognized :: collectedResult) result expressionType
                 | _ -> failwith (sprintf "Unexpected Token: %A" head)
-    parseTokensInner tokens []
+    parseTokensInner tokens [] [] StandardExpression
 
 let buildExpression (localType: Type) (predicate: string) : (obj -> obj) =
 
@@ -373,10 +385,13 @@ let buildExpression (localType: Type) (predicate: string) : (obj -> obj) =
 
     let tokens = tokenizeString predicate
 
+    //printf "%A" tokens
+
     let parsedTokens = 
         parseTokens getMember tokens
-        |> (fun (res, remainder) -> resolveTuples res [] [] false)
-        |> (fun (res, wasTuple) -> res)
+        |> (fun (res, remainder, expType) -> res)
+
+    //printf "%A" parsedTokens
 
     let calculateResult input = 
         let appliedParsedTokens = 
