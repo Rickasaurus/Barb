@@ -18,3 +18,18 @@ The current implementation is still young and a bit rough around the edges. I ne
 "(Name.Contains "John" or Name.Contains "Mary") and (Age > 20 or Weight > 200)"
 
 Maybe it's early to share it, but I thought it might be useful to others in its current form.
+
+------------------------------------
+--- Extra Nerdy Stuff Under Here ---
+------------------------------------
+
+Barb aims to accomplish the above goals through two somewhat non-traditional design decisions:
+
+- Expression lists instead of expression trees
+- Composition instead of IL or code generation
+
+Expression lists allow for tuple-wise reductions to a result, instead of standard code generation or expression building.  Decisions can be made at runtime based on the contents of these tuples and their neighbors. 
+
+Function/Value composition isn't strictly necessary but it sure makes the whole process easier.
+
+In this way it's kind of Scheme-like under the hood, but on the surface it's very C#/F#ish.
