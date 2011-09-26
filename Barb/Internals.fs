@@ -35,12 +35,14 @@ let memoizeBy inputToKey f =
 type MethodSig = ((obj array -> obj) * Type array) list
 
 type MemberTypes = 
-    | PropertyCall of (obj -> obj)    
+    | PropertyCall of (obj -> obj)
+    | IndexedPropertyCall of (obj -> ((obj array -> obj) * Type array) list)
     | MethodCall of (obj -> ((obj array -> obj) * Type array) list)
 
 type ExprTypes = 
     | ParentProperty of (obj -> obj)
     | Method of MethodSig
+    | IndexedProperty of MethodSig
     | ObjToObjToBool of (obj -> obj -> bool)
     | BoolToBoolToBool of (bool -> bool -> bool) 
     | ObjToObj of (obj -> obj)  
@@ -54,6 +56,8 @@ type ExprTypes =
     | SubExpression of ExprTypes list
     | Tuple of ExprTypes list
     | ResolvedTuple of ExprTypes list
+    | IndexArgs of ExprTypes
+    | ResolvedIndexArgs of ExprTypes
     | Invoke
     | AppliedInvoke of string
     | Unknown of string
@@ -67,8 +71,12 @@ let resolveMember (rtype: System.Type) (memberName: string) =
     let resolveProp () = 
         rtype.GetProperty(memberName) |> nullableToOption
         |> function
-           | Some prop -> Some <| PropertyCall (fun obj -> prop.GetValue(obj, null))
            | None -> None
+           | Some prop -> match prop.GetIndexParameters() with
+                          | [||] -> Some <| PropertyCall (fun obj -> prop.GetValue(obj, null))
+                          | prms ->
+                                let typeArgs = prms |> Array.map (fun pi -> pi.ParameterType)
+                                Some <| IndexedPropertyCall (fun obj -> [(fun args -> prop.GetValue(obj, args)), typeArgs])
     let resolveMethod () = 
        rtype.GetMethods()
        |> Array.filter (fun mi -> mi.Name = memberName) |> Array.toList
@@ -148,7 +156,8 @@ let resolveInvoke (o: obj) (memberName: string) =
     else cachedResolveMember (o.GetType(), memberName)
          |> Option.map (function
                         | PropertyCall pc -> Returned (pc o)
-                        | MethodCall mc -> Method (mc o))
+                        | MethodCall mc -> Method (mc o)
+                        | IndexedPropertyCall ipc -> IndexedProperty (ipc o))
 
 let executeUnitMethod (sigs: MethodSig) =
     sigs 
@@ -210,6 +219,7 @@ let resolveExpression exprs =
         | Method l, ResolvedTuple r -> executeParameterizedMethod l r 
         | Invoke, Unknown r -> Some <| AppliedInvoke r
         | Obj r, AppliedInvoke l -> resolveInvoke r l
+        | IndexedProperty l, ResolvedIndexArgs (Obj r) -> executeOneParamMethod l r
         | _ -> None
 
     and reduceExpressions left right =
@@ -219,6 +229,11 @@ let resolveExpression exprs =
         | (SubExpression exp :: lt), right ->
             let resolvedSub = reduceExpressions [] exp
             reduceExpressions lt (resolvedSub @ right)
+        | (IndexArgs exp :: lt), right ->
+            match reduceExpressions [] [exp] with
+            | [] -> failwith (sprintf "No indexer found in [ ]")
+            | h :: [] -> reduceExpressions lt (ResolvedIndexArgs h :: right)
+            | other -> failwith (sprintf "Multi-indexing not currently supported")
         | l :: [], [] -> [l]
         | l :: lt, r :: rt ->        
             match attemptToResolvePair (l, r) with
@@ -252,7 +267,8 @@ type StringTokenType =
 
 let tokenizeString (str: string) = 
     let whitespace = [| yield ' '; yield! Environment.NewLine |]
-    let tokenChars = [| ','; ')'; '('; '.' |]
+    let tokenChars = [| ','; ')'; '('; '.'; '['; ']' |]
+    let quoteChars = [| '"'; ''' |]
     let rec findTokens currentIndex beginIndex quoteMode pairs = 
         match currentIndex, beginIndex with
         | -1, -1 -> pairs
@@ -263,9 +279,9 @@ let tokenizeString (str: string) =
             if bi = -1 then findTokens (ci - 1) -1 false (paramToken :: pairs)
             else findTokens (ci - 1) -1 false (paramToken :: (ci + 1, beginIndex, quoteMode) :: pairs)
         // Close Quote
-        | ci, -1 when str.[ci] = '\"' -> findTokens (ci - 1) (ci - 1) true pairs
+        | ci, -1 when quoteChars.Contains (str.[ci]) -> findTokens (ci - 1) (ci - 1) true pairs
         // Open Quote
-        | ci, bi when str.[ci] = '\"' && quoteMode = true -> findTokens (ci - 1) -1 false ((ci + 1, beginIndex, quoteMode) :: pairs)
+        | ci, bi when quoteChars.Contains (str.[ci]) && quoteMode = true -> findTokens (ci - 1) -1 false ((ci + 1, beginIndex, quoteMode) :: pairs)
         // Non-Quoted Token Start
         | ci, -1 when not <| whitespace.Contains str.[ci] -> findTokens (ci - 1) ci false pairs
         // Non-Quoted Token End
@@ -307,6 +323,14 @@ let inline (|BooleanOperation|_|) token =
 
 let inline (|GetOperation|_|) getMember (token: string) = 
     getMember token
+
+let inline (|BeginIndexer|_|) token =
+    match token with
+    | "[" -> Some() | _ -> None
+
+let inline (|EndIndexer|_|) token =
+    match token with
+    | "]" -> Some() | _ -> None
 
 let inline (|BeginSubExpression|_|) token =
     match token with
@@ -354,6 +378,11 @@ let parseTokens getMember tokens =
                 | TupleIndicator ->
                     let reversedResult = collectedResult |> List.rev 
                     parseTokensInner rest [] (SubExpression reversedResult :: result) TupleExpression
+                | BeginIndexer -> 
+                    let exprs, unused, returnedExprType = parseTokensInner rest [] [] StandardExpression
+                    parseTokensInner unused (IndexArgs (SubExpression exprs) :: collectedResult) result expressionType
+                | EndIndexer ->
+                    collectedResult |> List.rev, rest, expressionType
                 | CallIndicator op
                 | ResolveConstants op
                 | BooleanOperation op
@@ -381,19 +410,19 @@ let buildExpression (localType: Type) (predicate: string) : (obj -> obj) =
 
     let tokens = tokenizeString predicate
 
-    //printfn "T: %A" tokens
+    // printfn "T: %A" tokens
 
     let parsedTokens = 
         parseTokens getMember tokens
         |> (fun (res, remainder, expType) -> res)
 
-    //printfn "PT: %A" parsedTokens
+    // printfn "PT: %A" parsedTokens
 
     let calculateResult input = 
 
         let appliedParsedTokens = applyInstanceState input parsedTokens
         
-        //printfn "APT: %A" appliedParsedTokens
+        // printfn "APT: %A" appliedParsedTokens
         
         match resolveExpression appliedParsedTokens with
         | Obj (res) :: [] -> res

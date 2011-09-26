@@ -160,3 +160,27 @@ let ``predicate language should support invoking a method on the results of a su
     let dudePredicate = buildExpr<DudeRecordWithInt,bool> "(Name.Substring(0, 4)).Length = 4"
     let result = dudePredicate testRecord
     Assert.True(result)
+
+[<Fact>]
+let ``predicate language should support object indexers`` () =
+    let testRecord = { Name = "Dude Duderson"; Age = 20 }
+    let dudePredicate = buildExpr<DudeRecordWithInt,bool> "Name[0] = 'D'"
+    let result = dudePredicate testRecord
+    Assert.True(result)
+
+type PropIndexerTester<'a,'b when 'a : comparison> (map: Map<'a,'b>) = 
+    member this.Item
+        with get(indexer: 'a) : 'b = map |> Map.find indexer
+
+type IndexerRecord<'a,'b when 'a : comparison> = 
+    {
+        Name: string
+        Table: PropIndexerTester<'a,'b>
+    }
+
+[<Fact>]
+let ``predicate language should support property indexers`` () = 
+    let testRecord = { Name = "Dude Duderson"; Table = new PropIndexerTester<int,int>([0..5] |> List.map (fun i -> i, i) |> Map.ofList) }
+    let dudePredicate = buildExpr<IndexerRecord<int,int>,bool> "Table.Item[0] = 0"
+    let result = dudePredicate testRecord
+    Assert.True(result)    
