@@ -215,7 +215,6 @@ let callIndexedProperty (target: obj) (indexVal: obj) =
                 | None -> failwith (sprintf "No conversion found from %s to %s" (string indexVal) ttype.FullName)                
             | other -> failwith (sprintf "MultiIndexed objects are not currently supported: %s" ttype.FullName)
 
-
 let rec applyInstanceState (input: obj) exprs =
     let rec resolveInstanceType expr =
             match expr with 
