@@ -188,12 +188,41 @@ let executeParameterizedMethod (sigs: MethodSig) (prms: ExprTypes list) =
         |> fun rParams -> exec rParams)
     |> Option.map Returned
 
+let resolveObjectIndexer (rtype: System.Type) =
+    let indexers = rtype.GetCustomAttributes(typeof<DefaultMemberAttribute>, true) |> Array.map (fun t -> t :?> DefaultMemberAttribute)
+    match indexers with
+    | [| |] -> None 
+    | attrs -> let memberName = attrs.[0].MemberName    
+               let pi = rtype.GetProperty(memberName) in Some (pi, pi.GetIndexParameters())
+
+let cachedResolveObjectIndexer = 
+    let inputToKey (rtype: System.Type) = rtype.FullName
+    let resolveValue rtype = resolveObjectIndexer rtype
+    memoizeBy inputToKey resolveValue
+
+let callIndexedProperty (target: obj) (indexVal: obj) =
+    if target = null then Some <| Obj null
+    else
+        let ttype = target.GetType()
+        match cachedResolveObjectIndexer ttype with
+        | None -> None
+        | Some (propInfo, paramInfos) -> 
+            match paramInfos with
+            | [| |] -> failwith (sprintf "Expected an indexed object, but got non-indexed: %s" ttype.FullName)
+            | [| arg |] -> 
+                match convertToTargetType (arg.ParameterType) indexVal with
+                | Some (converted) -> Some <| (Returned (propInfo.GetValue(target, [| converted |])))
+                | None -> failwith (sprintf "No conversion found from %s to %s" (string indexVal) ttype.FullName)                
+            | other -> failwith (sprintf "MultiIndexed objects are not currently supported: %s" ttype.FullName)
+
+
 let rec applyInstanceState (input: obj) exprs =
     let rec resolveInstanceType expr =
             match expr with 
             | ParentProperty (call) -> Returned (call input)
             | SubExpression (subEx) -> SubExpression (applyInstanceState input subEx)
             | Tuple (tuple) -> Tuple (applyInstanceState input tuple) 
+            | IndexArgs (argEx) -> IndexArgs (resolveInstanceType argEx)
             | other -> other
     exprs |> List.map (fun expr -> resolveInstanceType expr)
     
@@ -218,8 +247,9 @@ let resolveExpression exprs =
         | Method l, Obj r -> executeOneParamMethod l r
         | Method l, ResolvedTuple r -> executeParameterizedMethod l r 
         | Invoke, Unknown r -> Some <| AppliedInvoke r
-        | Obj r, AppliedInvoke l -> resolveInvoke r l
+        | Obj l, AppliedInvoke r -> resolveInvoke l r
         | IndexedProperty l, ResolvedIndexArgs (Obj r) -> executeOneParamMethod l r
+        | Obj l, ResolvedIndexArgs (Obj r) -> callIndexedProperty l r
         | _ -> None
 
     and reduceExpressions left right =
