@@ -246,6 +246,7 @@ let resolveExpression exprs =
         | Method l, Obj r -> executeOneParamMethod l r
         | Method l, ResolvedTuple r -> executeParameterizedMethod l r 
         | Invoke, Unknown r -> Some <| AppliedInvoke r
+        | Invoke, IndexArgs r -> Some <| IndexArgs r //Here for F#-like indexing (if you want it)
         | Obj l, AppliedInvoke r -> resolveInvoke l r
         | IndexedProperty l, ResolvedIndexArgs (Obj r) -> executeOneParamMethod l r
         | Obj l, ResolvedIndexArgs (Obj r) -> callIndexedProperty l r
