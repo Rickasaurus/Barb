@@ -168,7 +168,7 @@ let executeOneParamMethod (sigs: MethodSig) (param: obj) =
 let executeParameterizedMethod (sigs: MethodSig) (prms: ExprTypes list) =
     let arrayPrms = 
         prms 
-        |> List.map (function | Obj o -> o | Unknown o -> o :> obj | ohno -> failwith (sprintf "Unexpected parameter type: %A" ohno))
+        |> List.map (function | Obj o -> o | ohno -> failwith (sprintf "Unexpected parameter type: %A" ohno))
         |> List.toArray
     sigs
     |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = arrayPrms.Length)
