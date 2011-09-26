@@ -7,33 +7,6 @@ open Xunit
 type testLayerOne = { One: int; Two: int }
 type testLayerTwo = { LOne: testLayerOne; Name: string }
 
-let getProperyOrFail lookupCache name = 
-    match lookupCache name with
-    | Some (PropertyCall call) -> call
-    | badResult -> failwith (sprintf "Bad result in propety lookup: %A" badResult)
-
-let getCachedMembers ttype =     
-    let memberMap = resolveMembers ttype "" id |> Map.ofSeq
-    fun memberName -> 
-        memberMap |> Map.tryFind memberName
-
-[<Fact>]
-let ``getCachedProperties should work on single depth lookup`` () =
-    let lookupCache = getCachedMembers typeof<testLayerOne>
-    let testInstance = { One = 1; Two = 2 } :> obj
-    Assert.Equal(1, (getProperyOrFail lookupCache "One") testInstance :?> int)
-    Assert.Equal(2, (getProperyOrFail lookupCache "Two") testInstance :?> int)
-
-[<Fact>]
-let ``getCachedProperties should work on double depth lookup`` () =
-    let lookupCache = getCachedMembers typeof<testLayerTwo>
-    let testSubInstance = { One = 1; Two = 2 }
-    let testInstance = { LOne = testSubInstance; Name = "Hello" } :> obj
-    let loneOneVal = getProperyOrFail lookupCache "LOne.One" testInstance
-    Assert.Equal(1, loneOneVal :?> int)
-    Assert.Equal(2, (getProperyOrFail lookupCache "LOne.Two") testInstance :?> int)
-    Assert.Equal("Hello", (getProperyOrFail lookupCache "Name") testInstance :?> string)
-
 [<Fact>]
 let ``tokenizeString should correctly tokenize a simple string`` () =
     let tokens = tokenizeString "Hello = World"

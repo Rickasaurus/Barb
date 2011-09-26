@@ -146,3 +146,17 @@ let ``predicate language should support comparing null values`` () =
     let dudePredicate = buildExpr<DudeRecordWithInt,bool> "Name = null"
     let result = dudePredicate testRecord
     Assert.True(result)
+
+[<Fact>]
+let ``predicate language should support invoking a method on the results of a method call`` () =
+    let testRecord = { Name = "Dude Duderson"; Age = 20 }
+    let dudePredicate = buildExpr<DudeRecordWithInt,bool> "Name.Substring(0, 4).Length = 4"
+    let result = dudePredicate testRecord
+    Assert.True(result)
+
+[<Fact>]
+let ``predicate language should support invoking a method on the results of a subexpression`` () =
+    let testRecord = { Name = "Dude Duderson"; Age = 20 }
+    let dudePredicate = buildExpr<DudeRecordWithInt,bool> "(Name.Substring(0, 4)).Length = 4"
+    let result = dudePredicate testRecord
+    Assert.True(result)
