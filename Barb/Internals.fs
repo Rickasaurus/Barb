@@ -187,7 +187,7 @@ let rec (|ResolveSingle|_|) =
     function 
     | Returned o -> Some <| resolveResultType o
     | Tuple tc -> 
-        let resolvedTp = tc |> List.collect (fun t -> resolve [] [t]) |> List.rev |> ResolvedTuple
+        let resolvedTp = tc |> List.collect (fun t -> reduceExpressions [] [t]) |> List.rev |> ResolvedTuple
         Some resolvedTp
     | _ -> None
 
@@ -203,18 +203,18 @@ and attemptToResolvePair =
     | Method l, ResolvedTuple r -> executeParameterizedMethod l r 
     | _ -> None
 
-and resolve left right =
+and reduceExpressions left right =
     match left, right with
-    | [], r :: rt -> resolve [r] rt
-    | (ResolveSingle resolved :: lt), right -> resolve lt (resolved :: right)
+    | [], r :: rt -> reduceExpressions [r] rt
+    | (ResolveSingle resolved :: lt), right -> reduceExpressions lt (resolved :: right)
     | (SubExpression exp :: lt), right ->
-        let resolvedSub = resolve [] exp
-        resolve lt (resolvedSub @ right)
+        let resolvedSub = reduceExpressions [] exp
+        reduceExpressions lt (resolvedSub @ right)
     | l :: [], [] -> [l]
     | l :: lt, r :: rt ->        
         match attemptToResolvePair (l, r) with
-        | Some (rToken) -> resolve lt (rToken :: rt)
-        | None -> resolve (r :: l :: lt) rt
+        | Some (rToken) -> reduceExpressions lt (rToken :: rt)
+        | None -> reduceExpressions (r :: l :: lt) rt
     | catchall -> failwith (sprintf "Unexpected case: %A" catchall)
 
 let compareAsSameType obj1 obj2 func =
@@ -352,6 +352,18 @@ let parseTokens getMember tokens =
                 | _ -> failwith (sprintf "Unexpected Token: %A" head)
     parseTokensInner tokens [] [] StandardExpression
 
+let rec applyInstanceState getDelayedMember (input: obj) exprs =
+    let rec resolveInstanceType expr =
+            match expr with 
+            | UnresolvedInstanceType (PropertyCall (call)) -> Returned (call input)
+            | UnresolvedInstanceType (MethodCall (call)) -> let resolved = call input in Method resolved
+            | UnresolvedInstanceType (DynamicCall (name)) -> resolveInstanceType (UnresolvedInstanceType <| getDelayedMember name input)
+            | SubExpression (subEx) -> SubExpression (applyInstanceState getDelayedMember input subEx)
+            | Tuple (tuple) -> Tuple (applyInstanceState getDelayedMember input tuple) 
+            | other -> other
+    exprs |> List.map (fun expr -> resolveInstanceType expr)
+
+
 let buildExpression (localType: Type) (predicate: string) : (obj -> obj) =
 
     let memberMap =
@@ -369,32 +381,21 @@ let buildExpression (localType: Type) (predicate: string) : (obj -> obj) =
 
     let tokens = tokenizeString predicate
 
-    //printf "%A" tokens
+    printfn "T: %A" tokens
 
     let parsedTokens = 
         parseTokens getMember tokens
         |> (fun (res, remainder, expType) -> res)
 
-    //printf "%A" parsedTokens
+    printfn "PT: %A" parsedTokens
 
     let calculateResult input = 
-        let appliedParsedTokens = 
-            let rec resolveInstanceType instanceType =
-                match instanceType with
-                | PropertyCall (call) -> Returned (call input)
-                | MethodCall (call) -> let resolved = call input in Method resolved
-                | DynamicCall (name) -> resolveInstanceType (getDelayedMember name input)
 
-            let rec resolveParams exprs = 
-                exprs 
-                |> List.map (function 
-                             | UnresolvedInstanceType (itype) -> resolveInstanceType itype
-                             | SubExpression (subEx) -> SubExpression (resolveParams subEx)
-                             | Tuple (tuple) -> Tuple (resolveParams tuple)
-                             | other -> other)
-            resolveParams parsedTokens
+        let appliedParsedTokens = applyInstanceState getDelayedMember input parsedTokens
         
-        match resolve [] appliedParsedTokens with
+        printfn "APT: %A" appliedParsedTokens
+        
+        match reduceExpressions [] appliedParsedTokens with
         | Obj (res) :: [] -> res
         | Bool (res) :: [] -> box res
         | otherToken -> failwith (sprintf "Unexpected result: %A" otherToken)
