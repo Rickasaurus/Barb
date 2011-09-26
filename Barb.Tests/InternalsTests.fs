@@ -13,7 +13,7 @@ let getProperyOrFail lookupCache name =
     | badResult -> failwith (sprintf "Bad result in propety lookup: %A" badResult)
 
 let getCachedMembers ttype =     
-    let memberMap = resolveMembers ttype "" id |> Map.ofSeq
+    let memberMap = resolveAllProperties ttype "" id |> Map.ofSeq
     fun memberName -> 
         memberMap |> Map.tryFind memberName
 

@@ -11,14 +11,34 @@ open System.Collections.Generic
 
 open Microsoft.FSharp.Reflection
 
-type UnresolvedInstanceTypes = 
-    | PropertyCall of (obj -> obj)    
-    | MethodCall of (obj -> ((obj array -> obj) * Type array) list)
-    | DynamicCall of string
+// Helpers
+
+module Option =
+    let tryResolve (func: unit -> _ option) (opt: _ option) =
+        match opt with
+        | Some value -> Some value
+        | None -> func()
+
+let memoizeBy inputToKey f =
+    let cache = ConcurrentDictionary<_, _>()
+    fun x ->
+        let k = inputToKey x
+        if cache.ContainsKey(k) then cache.[k]
+        else 
+            let res = f x
+            cache.[k] <- res
+            res
+
+
+// Actual Implementation
 
 type MethodSig = ((obj array -> obj) * Type array) list
 
 type ExprTypes = 
+    | ScopeProperty of (obj -> obj)
+    | PropertyCall of (obj -> obj)    
+    | MethodCall of (obj -> ((obj array -> obj) * Type array) list)
+    | Method of MethodSig
     | ObjToObjToBool of (obj -> obj -> bool)
     | BoolToBoolToBool of (bool -> bool -> bool) 
     | ObjToObj of (obj -> obj)  
@@ -28,46 +48,58 @@ type ExprTypes =
     | Obj of obj
     | Returned of obj
     | Infix of ExprTypes
-    | UnresolvedInstanceType of UnresolvedInstanceTypes
-    | Method of MethodSig
     | Unit
     | SubExpression of ExprTypes list
     | Tuple of ExprTypes list
-    | ResolvedTuple of ExprTypes list    
+    | ResolvedTuple of ExprTypes list
+    | Invoke
+    | AppliedInvoke of obj
+    | Unknown of string
 
 let nullableToOption res =
     match res with
     | null -> None
     | item -> Some item
 
-let rec resolveMembers (rtype: System.Type) (parentName: string) (getter: obj -> obj) =
-    let properties = rtype.GetProperties()
-    let methodCollections = rtype.GetMethods()
-                            |> Seq.groupBy (fun mi -> mi.Name)                                        
-    seq {
-        for methodName, methodInfos in methodCollections do
-            let fullName =
-                if String.IsNullOrEmpty parentName then methodName 
-                else String.Format("{0}.{1}", parentName, methodName)
-            let methodInstances = 
-                methodInfos 
-                |> Seq.toList
-                |> List.map (fun mi -> 
+let resolveMember (rtype: System.Type) (memberName: string) =
+    let resolveProp () = 
+        rtype.GetProperty(memberName) |> nullableToOption
+        |> function
+           | Some prop -> Some <| PropertyCall (fun obj -> prop.GetValue(obj, null))
+           | None -> None
+    let resolveMethod () = 
+       rtype.GetMethods()
+       |> Array.filter (fun mi -> mi.Name = memberName) |> Array.toList
+       |> function
+          | [] -> None
+          | list -> 
+            let methodsWithParams = 
+                list |> List.map (fun mi -> 
                                 let methodParams = 
                                     mi.GetParameters()
                                     |> Array.map (fun pi -> pi.ParameterType)
                                 mi, methodParams)
             let globallyResolvedMethods instance =
-                methodInstances
+                methodsWithParams
                 |> List.map (fun (mi, mp) ->
                                 let callMethod = 
                                     fun args ->
-                                        let methodParent = getter instance
-                                        if methodParent <> null then mi.Invoke(methodParent, args)
+                                        if instance <> null then mi.Invoke(instance, args)
                                         else null
                                 callMethod, mp)
-            yield fullName, MethodCall (globallyResolvedMethods)
+            Some <| MethodCall (globallyResolvedMethods)
+    let resolveField () = 
+        rtype.GetField(memberName) |> nullableToOption
+        |> function
+            | Some fld -> Some <| PropertyCall (fun obj -> fld.GetValue(obj, null))
+            | None -> None  
+    resolveProp () |> Option.tryResolve resolveMethod |> Option.tryResolve resolveField
 
+let rec resolveAllProperties (rtype: System.Type) (parentName: string) (getter: obj -> obj) =
+    let properties = rtype.GetProperties()
+    let methodCollections = rtype.GetMethods()
+                            |> Seq.groupBy (fun mi -> mi.Name)                                        
+    seq {
         for prop in properties do
             let fullName =
                 if String.IsNullOrEmpty parentName then prop.Name 
@@ -110,7 +142,7 @@ let internal getCachedDelayedMembers (baseMemberCache: ConcurrentDictionary<_,_>
 
             let childInstance = parentProp instance
 
-            resolveMembers (childInstance.GetType()) parent parentProp
+            resolveAllProperties (childInstance.GetType()) parent parentProp
             |> Seq.iter (fun (k,v) -> memberCache.TryAdd(k,v) |> ignore)
             cachedChildren.Add(parent) |> ignore
             
@@ -124,7 +156,6 @@ let internal getCachedDelayedMembers (baseMemberCache: ConcurrentDictionary<_,_>
         | false, _ -> updateCacheWithNewType memberName instance
 
     getFromCache
-
                    
 let convertToTargetType (ttype: Type) (param: obj) = 
     if param = null then Some null
@@ -154,6 +185,19 @@ let resolveResultType =
         | DecomposeOption contents -> Obj contents
         | other -> Obj other
 
+let cachedResolveMember = 
+    let inputToKey (rtype: System.Type, caseName) = rtype.FullName + "~" + caseName
+    let resolveMember (rtype, caseName) = resolveMember rtype caseName
+    memoizeBy inputToKey resolveMember
+
+let resolveInvoke (o: obj) (memberName: string) =
+    if o = null then None
+    else cachedResolveMember (o.GetType(), memberName)
+         |> Option.map (function
+                        | PropertyCall pc -> Obj (pc o)
+                        | MethodCall mc -> Method (mc o)
+                        | other -> failwith (sprintf "Unexpected Return Type after resolving member: %A" other))
+
 let executeUnitMethod (sigs: MethodSig) =
     sigs 
     |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = 0)
@@ -172,7 +216,7 @@ let executeOneParamMethod (sigs: MethodSig) (param: obj) =
 let executeParameterizedMethod (sigs: MethodSig) (prms: ExprTypes list) =
     let arrayPrms = 
         prms 
-        |> List.map (function | Obj o -> o | ohno -> failwith (sprintf "Unexpected parameter type: %A" ohno))
+        |> List.map (function | Obj o -> o | Unknown o -> o :> obj | ohno -> failwith (sprintf "Unexpected parameter type: %A" ohno))
         |> List.toArray
     sigs
     |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = arrayPrms.Length)
@@ -183,39 +227,57 @@ let executeParameterizedMethod (sigs: MethodSig) (prms: ExprTypes list) =
         |> fun rParams -> exec rParams)
     |> Option.map Returned
 
-let rec (|ResolveSingle|_|) =
-    function 
-    | Returned o -> Some <| resolveResultType o
-    | Tuple tc -> 
-        let resolvedTp = tc |> List.collect (fun t -> reduceExpressions [] [t]) |> List.rev |> ResolvedTuple
-        Some resolvedTp
-    | _ -> None
+let rec applyInstanceState getDelayedMember (input: obj) exprs =
+    let rec resolveInstanceType expr =
+            match expr with 
+            | PropertyCall (call) -> Returned (call input)
+            | MethodCall (call) -> let resolved = call input in Method resolved
+            | SubExpression (subEx) -> SubExpression (applyInstanceState getDelayedMember input subEx)
+            | Tuple (tuple) -> Tuple (applyInstanceState getDelayedMember input tuple) 
+            | other -> other
+    exprs |> List.map (fun expr -> resolveInstanceType expr)
+    
+let resolveExpression exprs = 
+    let rec (|ResolveSingle|_|) =
+        function 
+        | Returned o -> Some <| resolveResultType o
+        | Tuple tc -> 
+            let resolvedTp = tc |> List.collect (fun t -> reduceExpressions [] [t]) |> List.rev |> ResolvedTuple
+            Some resolvedTp
+        | _ -> None
 
-and attemptToResolvePair =
-    function
-    | ObjToObj l, Obj r -> Some <| Obj (l r)
-    | Obj l, (Infix (ObjToObjToBool r)) -> Some <| ObjToBool (r l)
-    | Bool l, (Infix (BoolToBoolToBool r)) -> Some <| BoolToBool (r l)
-    | ObjToBool l, Obj r -> Some <| Bool (l r)
-    | BoolToBool l, Bool r -> Some <| Bool (l r)
-    | Method l, Unit -> executeUnitMethod l
-    | Method l, Obj r -> executeOneParamMethod l r
-    | Method l, ResolvedTuple r -> executeParameterizedMethod l r 
-    | _ -> None
+    and attemptToResolvePair =
+        function
+        | ObjToObj l, Obj r -> Some <| Obj (l r)
+        | ObjToObj l, Unknown r -> Some <| Obj (l r)
+        | Obj l, (Infix (ObjToObjToBool r)) -> Some <| ObjToBool (r l)
+        | Unknown l, (Infix (ObjToObjToBool r)) -> Some <| ObjToBool (r l)
+        | Bool l, (Infix (BoolToBoolToBool r)) -> Some <| BoolToBool (r l)
+        | ObjToBool l, Obj r -> Some <| Bool (l r)
+        | ObjToBool l, Unknown r -> Some <| Bool (l r)
+        | BoolToBool l, Bool r -> Some <| Bool (l r)
+        | Method l, Unit -> executeUnitMethod l
+        | Method l, Obj r -> executeOneParamMethod l r
+        | Method l, ResolvedTuple r -> executeParameterizedMethod l r 
+        | Obj l, Invoke -> Some <| AppliedInvoke l
+        | AppliedInvoke l, Unknown r -> resolveInvoke l r
+        | _ -> None
 
-and reduceExpressions left right =
-    match left, right with
-    | [], r :: rt -> reduceExpressions [r] rt
-    | (ResolveSingle resolved :: lt), right -> reduceExpressions lt (resolved :: right)
-    | (SubExpression exp :: lt), right ->
-        let resolvedSub = reduceExpressions [] exp
-        reduceExpressions lt (resolvedSub @ right)
-    | l :: [], [] -> [l]
-    | l :: lt, r :: rt ->        
-        match attemptToResolvePair (l, r) with
-        | Some (rToken) -> reduceExpressions lt (rToken :: rt)
-        | None -> reduceExpressions (r :: l :: lt) rt
-    | catchall -> failwith (sprintf "Unexpected case: %A" catchall)
+    and reduceExpressions left right =
+        match left, right with
+        | [], r :: rt -> reduceExpressions [r] rt
+        | (ResolveSingle resolved :: lt), right -> reduceExpressions lt (resolved :: right)
+        | (SubExpression exp :: lt), right ->
+            let resolvedSub = reduceExpressions [] exp
+            reduceExpressions lt (resolvedSub @ right)
+        | l :: [], [] -> [l]
+        | l :: lt, r :: rt ->        
+            match attemptToResolvePair (l, r) with
+            | Some (rToken) -> reduceExpressions lt (rToken :: rt)
+            | None -> reduceExpressions (r :: l :: lt) rt
+        | catchall -> failwith (sprintf "Unexpected case: %A" catchall)
+
+    reduceExpressions [] exprs
 
 let compareAsSameType obj1 obj2 func =
     let t1Des = TypeDescriptor.GetConverter(obj1.GetType())
@@ -241,7 +303,7 @@ type StringTokenType =
 
 let tokenizeString (str: string) = 
     let whitespace = [| yield ' '; yield! Environment.NewLine |]
-    let tokenChars = [| ','; ')'; '(' |]
+    let tokenChars = [| ','; ')'; '('; '.' |]
     let rec findTokens currentIndex beginIndex quoteMode pairs = 
         match currentIndex, beginIndex with
         | -1, -1 -> pairs
@@ -275,7 +337,7 @@ let inline (|ResolveConstants|_|) token =
   
 let inline (|CompareOperation|_|) token =
     match token with
-    | "=" -> Some <| Infix (ObjToObjToBool objectsEqual)
+    | "=" | "==" -> Some <| Infix (ObjToObjToBool objectsEqual)
     | "<>" | "!=" -> Some <| Infix (ObjToObjToBool (fun o1 o2 -> not (objectsEqual o1 o2)))
     | ">" -> Some <| Infix (ObjToObjToBool (compareObjects (>)))
     | "<" -> Some <| Infix (ObjToObjToBool (compareObjects (<)))
@@ -295,11 +357,7 @@ let inline (|BooleanOperation|_|) token =
     | _ -> None
 
 let inline (|GetOperation|_|) getMember (token: string) = 
-    match getMember token with
-    | Some (getter) -> Some <| (UnresolvedInstanceType getter)
-    | None -> if token.Contains(".") 
-                then Some <| (UnresolvedInstanceType <| DynamicCall token)
-                else None
+    getMember token
 
 let inline (|BeginSubExpression|_|) token =
     match token with
@@ -312,6 +370,10 @@ let inline (|EndSubExpression|_|) token =
 let inline (|TupleIndicator|_|) token =
     match token with
     | "," -> Some() | _ -> None
+
+let inline (|CallIndicator|_|) token =
+    match token with
+    | "." -> Some Invoke | _ -> None
 
 type SubExpressionType =
     | StandardExpression
@@ -343,32 +405,23 @@ let parseTokens getMember tokens =
                 | TupleIndicator ->
                     let reversedResult = collectedResult |> List.rev 
                     parseTokensInner rest [] (SubExpression reversedResult :: result) TupleExpression
+                | CallIndicator op
                 | ResolveConstants op
                 | BooleanOperation op
                 | NotOperation op
                 | CompareOperation op 
                 | GetOperation getMember op -> parseTokensInner rest (op :: collectedResult) result expressionType
-                | unrecognized -> parseTokensInner rest (Obj unrecognized :: collectedResult) result expressionType
+                | unrecognized -> parseTokensInner rest (Unknown unrecognized :: collectedResult) result expressionType
                 | _ -> failwith (sprintf "Unexpected Token: %A" head)
     parseTokensInner tokens [] [] StandardExpression
 
-let rec applyInstanceState getDelayedMember (input: obj) exprs =
-    let rec resolveInstanceType expr =
-            match expr with 
-            | UnresolvedInstanceType (PropertyCall (call)) -> Returned (call input)
-            | UnresolvedInstanceType (MethodCall (call)) -> let resolved = call input in Method resolved
-            | UnresolvedInstanceType (DynamicCall (name)) -> resolveInstanceType (UnresolvedInstanceType <| getDelayedMember name input)
-            | SubExpression (subEx) -> SubExpression (applyInstanceState getDelayedMember input subEx)
-            | Tuple (tuple) -> Tuple (applyInstanceState getDelayedMember input tuple) 
-            | other -> other
-    exprs |> List.map (fun expr -> resolveInstanceType expr)
 
 
 let buildExpression (localType: Type) (predicate: string) : (obj -> obj) =
 
     let memberMap =
         let keyValues = 
-            resolveMembers localType "" id
+            resolveAllProperties localType "" id
             |> Seq.map (fun (k,v) -> new KeyValuePair<_,_>(k,v))
         new ConcurrentDictionary<_, _>(keyValues)
 
@@ -381,21 +434,21 @@ let buildExpression (localType: Type) (predicate: string) : (obj -> obj) =
 
     let tokens = tokenizeString predicate
 
-    printfn "T: %A" tokens
+    //printfn "T: %A" tokens
 
     let parsedTokens = 
         parseTokens getMember tokens
         |> (fun (res, remainder, expType) -> res)
 
-    printfn "PT: %A" parsedTokens
+    //printfn "PT: %A" parsedTokens
 
     let calculateResult input = 
 
         let appliedParsedTokens = applyInstanceState getDelayedMember input parsedTokens
         
-        printfn "APT: %A" appliedParsedTokens
+        //printfn "APT: %A" appliedParsedTokens
         
-        match reduceExpressions [] appliedParsedTokens with
+        match resolveExpression appliedParsedTokens with
         | Obj (res) :: [] -> res
         | Bool (res) :: [] -> box res
         | otherToken -> failwith (sprintf "Unexpected result: %A" otherToken)
