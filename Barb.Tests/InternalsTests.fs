@@ -22,3 +22,11 @@ let ``tokenizeString should correctly tokenize a string with quotes`` () =
     Assert.Equal(("Good Morning", Quoted), tokens.[0])
     Assert.Equal(("=", Normal), tokens.[1])
     Assert.Equal(("World News", Quoted), tokens.[2])
+
+[<Fact>]
+let ``tokenizeString should ignore single quotes inside of double`` () =
+    let tokens = tokenizeString "\"Good Morn'\" = \"O'Reily News\""
+    Assert.Equal(3, tokens.Length)
+    Assert.Equal(("Good Morn'", Quoted), tokens.[0])
+    Assert.Equal(("=", Normal), tokens.[1])
+    Assert.Equal(("O'Reily News", Quoted), tokens.[2])
