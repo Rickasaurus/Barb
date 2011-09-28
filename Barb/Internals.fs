@@ -303,29 +303,31 @@ let tokenizeString (str: string) =
     let whitespace = [| yield ' '; yield! Environment.NewLine |]
     let tokenChars = [| ','; ')'; '('; '.'; '['; ']' |]
     let quoteChars = [| '"'; ''' |]
+    let endOfString = str.Length
     let rec findTokens currentIndex beginIndex parseMode pairs = 
         match currentIndex, beginIndex, parseMode with
-        | -1, -1, _ -> pairs
-        | -1, bi, Standard -> (0, bi, parseMode) :: pairs
+        | ci, -1, _ when ci = endOfString -> pairs
+        | ci, bi, Standard when ci = endOfString -> ((ci - 1), bi, parseMode) :: pairs
         // Parse out chars which always count as their own tokens (unless in quotes)
         | ci, bi, Standard when tokenChars.Contains str.[ci] -> 
             let paramToken = ci, ci, parseMode
-            if bi = -1 then findTokens (ci - 1) -1 Standard (paramToken :: pairs)
-            else findTokens (ci - 1) -1 Standard (paramToken :: (ci + 1, beginIndex, parseMode) :: pairs)   
+            if bi = -1 then findTokens (ci + 1) -1 Standard (paramToken :: pairs)
+            else findTokens (ci + 1) -1 Standard (paramToken :: (ci - 1, beginIndex, parseMode) :: pairs)   
         // Close Quote
-        | ci, -1, Standard when quoteChars.Contains (str.[ci]) -> findTokens (ci - 1) (ci - 1) (QuoteMode str.[ci]) pairs
+        | ci, -1, Standard when quoteChars.Contains (str.[ci]) -> findTokens (ci + 1) (ci + 1) (QuoteMode str.[ci]) pairs
         // Open Quote
-        | ci, bi, QuoteMode(qc) when qc = str.[ci] -> findTokens (ci - 1) -1 Standard ((ci + 1, beginIndex, parseMode) :: pairs)
+        | ci, bi, QuoteMode(qc) when qc = str.[ci] -> findTokens (ci + 1) -1 Standard ((ci - 1, beginIndex, parseMode) :: pairs)
         // Non-Quoted Token Start
-        | ci, -1, _ when not <| whitespace.Contains str.[ci] -> findTokens (ci - 1) ci Standard pairs
+        | ci, -1, _ when not <| whitespace.Contains str.[ci] -> findTokens (ci + 1) ci Standard pairs
         // Non-Quoted Token End
-        | ci, bi, Standard when whitespace.Contains str.[ci] && bi <> -1 -> findTokens (ci - 1) -1 Standard ((ci + 1, beginIndex, parseMode) :: pairs)
+        | ci, bi, Standard when whitespace.Contains str.[ci] && bi <> -1 -> findTokens (ci + 1) -1 Standard ((ci - 1, beginIndex, parseMode) :: pairs)
         // Continue
-        | ci, bi, _ -> findTokens (ci - 1) bi parseMode pairs
-    findTokens (str.Length - 1) -1 Standard [] 
-    |> List.map (fun (b, e, parseMode) -> let resString = str.Substring(b, e - b + 1) 
+        | ci, bi, _ -> findTokens (ci + 1) bi parseMode pairs
+    findTokens 0 -1 Standard [] 
+    |> List.map (fun (e, b, parseMode) -> let resString = str.Substring(b, e - b + 1) 
                                           let tokenType = match parseMode with | Standard -> Normal | QuoteMode (qc) -> Quoted
                                           resString, tokenType)
+    |> List.rev
 
 type TokenPair = string * StringTokenType
  
