@@ -298,35 +298,41 @@ type StringTokenType =
 type ParseMode =
     | Standard
     | QuoteMode of char
+    | Escaped of ParseMode
 
 let tokenizeString (str: string) = 
     let whitespace = [| yield ' '; yield! Environment.NewLine |]
     let tokenChars = [| ','; ')'; '('; '.'; '['; ']' |]
     let quoteChars = [| '"'; ''' |]
     let endOfString = str.Length
-    let rec findTokens currentIndex beginIndex parseMode pairs = 
-        match currentIndex, beginIndex, parseMode with
-        | ci, -1, _ when ci = endOfString -> pairs
-        | ci, bi, Standard when ci = endOfString -> ((ci - 1), bi, parseMode) :: pairs
-        // Parse out chars which always count as their own tokens (unless in quotes)
-        | ci, bi, Standard when tokenChars.Contains str.[ci] -> 
-            let paramToken = ci, ci, parseMode
-            if bi = -1 then findTokens (ci + 1) -1 Standard (paramToken :: pairs)
-            else findTokens (ci + 1) -1 Standard (paramToken :: (ci - 1, beginIndex, parseMode) :: pairs)   
-        // Close Quote
-        | ci, -1, Standard when quoteChars.Contains (str.[ci]) -> findTokens (ci + 1) (ci + 1) (QuoteMode str.[ci]) pairs
+    let rec findTokens index tokenAcc parseMode pairs = 
+        match index, tokenAcc, parseMode with
+        | ci, "", _ when ci = endOfString -> pairs
+        | ci, acc, Standard when ci = endOfString -> (acc, parseMode) :: pairs
+        // Parse out escaped chars
+        | ci, acc, Escaped(lastMode) -> findTokens (ci + 1) (acc + (string str.[ci])) lastMode pairs
+        // Set escape mode on \
+        | ci, acc, mode when str.[ci] = '\\' -> findTokens (ci + 1) acc (Escaped mode) pairs
+        // Parse out chars which always count as their own tokens (unless in quotes or escaped)
+        | ci, acc, Standard when tokenChars.Contains str.[ci] -> 
+            let paramToken = (string str.[ci]), parseMode
+            if acc = "" then findTokens (ci + 1) "" Standard (paramToken :: pairs)
+            else findTokens (ci + 1) "" Standard (paramToken :: (acc, parseMode) :: pairs)   
         // Open Quote
-        | ci, bi, QuoteMode(qc) when qc = str.[ci] -> findTokens (ci + 1) -1 Standard ((ci - 1, beginIndex, parseMode) :: pairs)
+        | ci, acc, Standard when quoteChars.Contains (str.[ci]) -> findTokens (ci + 1) acc (QuoteMode str.[ci]) pairs
+        // Close Quote
+        | ci, acc, QuoteMode(qc) when qc = str.[ci] -> findTokens (ci + 1) "" Standard ((acc, parseMode) :: pairs)
         // Non-Quoted Token Start
-        | ci, -1, _ when not <| whitespace.Contains str.[ci] -> findTokens (ci + 1) ci Standard pairs
+        | ci, acc, Standard when not <| whitespace.Contains str.[ci] && acc = "" -> findTokens (ci + 1) (acc + (string str.[ci])) Standard pairs
         // Non-Quoted Token End
-        | ci, bi, Standard when whitespace.Contains str.[ci] && bi <> -1 -> findTokens (ci + 1) -1 Standard ((ci - 1, beginIndex, parseMode) :: pairs)
+        | ci, acc, Standard when whitespace.Contains str.[ci] && acc <> "" -> findTokens (ci + 1) "" Standard ((acc, parseMode) :: pairs)
+        // Whitespace
+        | ci, acc, Standard when whitespace.Contains str.[ci] -> findTokens (ci + 1) "" parseMode pairs
         // Continue
-        | ci, bi, _ -> findTokens (ci + 1) bi parseMode pairs
-    findTokens 0 -1 Standard [] 
-    |> List.map (fun (e, b, parseMode) -> let resString = str.Substring(b, e - b + 1) 
-                                          let tokenType = match parseMode with | Standard -> Normal | QuoteMode (qc) -> Quoted
-                                          resString, tokenType)
+        | ci, acc, _ -> findTokens (ci + 1) (acc + (string str.[ci])) parseMode pairs
+    findTokens 0 "" Standard [] 
+    |> List.map (fun (token, parseMode) -> let tokenType = match parseMode with | Standard -> Normal | QuoteMode (qc) -> Quoted | _ -> failwith (sprintf "Unexepcted Token Type: %A" parseMode)
+                                           token, tokenType)
     |> List.rev
 
 type TokenPair = string * StringTokenType
@@ -446,20 +452,24 @@ let buildExpression (localType: Type) (predicate: string) : (obj -> obj) =
 
     let tokens = tokenizeString predicate
 
-    // printfn "T: %A" tokens
+#if DEBUG
+    printfn "T: %A" tokens
+#endif
 
     let parsedTokens = 
         parseTokens getMember tokens
         |> (fun (res, remainder, expType) -> res)
 
-    // printfn "PT: %A" parsedTokens
+#if DEBUG
+    printfn "PT: %A" parsedTokens
+#endif
 
     let calculateResult input = 
 
         let appliedParsedTokens = applyInstanceState input parsedTokens
-        
-        // printfn "APT: %A" appliedParsedTokens
-        
+#if DEBUG        
+        printfn "APT: %A" appliedParsedTokens
+#endif
         match resolveExpression appliedParsedTokens with
         | Obj (res) :: [] -> res
         | Bool (res) :: [] -> box res
