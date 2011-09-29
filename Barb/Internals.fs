@@ -43,12 +43,12 @@ type ExprTypes =
     | ParentProperty of (obj -> obj)
     | Method of MethodSig
     | IndexedProperty of MethodSig
-    | ObjToObjToBool of (obj -> obj -> bool)
-    | BoolToBoolToBool of (bool -> bool -> bool) 
-    | ObjToObj of (obj -> obj)  
-    | ObjToBool of (obj -> bool)
+    | BoolToBoolToBool of (bool -> bool -> bool)
     | BoolToBool of (bool -> bool)
     | Bool of bool
+    | ObjToObjToBool of (obj -> obj -> bool)
+    | ObjToBool of (obj -> bool)
+    | ObjToObj of (obj -> obj)  
     | Obj of obj
     | Returned of obj
     | Infix of ExprTypes
@@ -225,7 +225,7 @@ let rec applyInstanceState (input: obj) exprs =
             | other -> other
     exprs |> List.map (fun expr -> resolveInstanceType expr)
     
-let resolveExpression exprs = 
+let resolveExpression exprs (failOnUnresolved: bool) = 
     let rec (|ResolveSingle|_|) =
         function 
         | Returned o -> Some <| resolveResultType o
@@ -257,7 +257,7 @@ let resolveExpression exprs =
         | [], r :: rt -> reduceExpressions [r] rt
         | (ResolveSingle resolved :: lt), right -> reduceExpressions lt (resolved :: right)
         | (SubExpression exp :: lt), right ->
-            let resolvedSub = reduceExpressions [] exp
+            let resolvedSub = reduceExpressions [] exp |> List.rev
             reduceExpressions lt (resolvedSub @ right)
         | (IndexArgs exp :: lt), right ->
             match reduceExpressions [] [exp] with
@@ -269,7 +269,8 @@ let resolveExpression exprs =
             match attemptToResolvePair (l, r) with
             | Some (rToken) -> reduceExpressions lt (rToken :: rt)
             | None -> reduceExpressions (r :: l :: lt) rt
-        | catchall -> failwith (sprintf "Unexpected case: %A" catchall)
+        | catchall when failOnUnresolved -> failwith (sprintf "Unexpected case: %A" catchall)
+        | left, [] -> left
 
     reduceExpressions [] exprs
 
@@ -464,13 +465,20 @@ let buildExpression (localType: Type) (predicate: string) : (obj -> obj) =
     printfn "PT: %A" parsedTokens
 #endif
 
+    let reducedExpression = 
+        resolveExpression parsedTokens false |> List.rev
+
+#if DEBUG
+    printfn "RE: %A" reducedExpression
+#endif
+
     let calculateResult input = 
 
-        let appliedParsedTokens = applyInstanceState input parsedTokens
+        let appliedParsedTokens = applyInstanceState input reducedExpression
 #if DEBUG        
         printfn "APT: %A" appliedParsedTokens
 #endif
-        match resolveExpression appliedParsedTokens with
+        match resolveExpression appliedParsedTokens true with
         | Obj (res) :: [] -> res
         | Bool (res) :: [] -> box res
         | otherToken -> failwith (sprintf "Unexpected result: %A" otherToken)

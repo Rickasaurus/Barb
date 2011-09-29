@@ -34,6 +34,13 @@ let ``predicate language should support quoted values, even when they contain a 
     let result = dudePredicate testRecord
     Assert.True(result)
 
+[<Fact>] 
+let ``predicate language should support escaped quotes`` () =
+    let testRecord = { Name = "Dude\"Duderson"; Sex = 'f' }
+    let dudePredicate = buildExpr<DudeRecord,bool> "Name = \"Dude\\\"Duderson\" and Sex = f"
+    let result = dudePredicate testRecord
+    Assert.True(result)
+
 
 type DudeRecordWithInt = { Name: string; Age: int }
     with member t.GetAge() = t.Age
@@ -198,3 +205,4 @@ let ``predicate language should support property indexers with strings`` () =
     let dudePredicate = buildExpr<IndexerRecord<string,string>,bool> "Table.Item[\"two\"] = \"two\""
     let result = dudePredicate testRecord
     Assert.True(result)    
+
