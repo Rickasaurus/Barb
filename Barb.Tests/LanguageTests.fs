@@ -206,3 +206,19 @@ let ``predicate language should support property indexers with strings`` () =
     let result = dudePredicate testRecord
     Assert.True(result)    
 
+type BoolRec = { HasHat: bool; Name: string }
+
+[<Fact>]
+let ``predicate language should preserve left-to-right order of operations with record bool`` () = 
+    let testRecord = { HasHat = true; Name = "Howard" }
+    let dudePredicate = buildExpr<BoolRec,bool> "HasHat and Name = Howard"
+    let result = dudePredicate testRecord
+    Assert.True(result)    
+
+[<Fact>]
+let ``predicate language should preserve left-to-right order of operations with explicit bool`` () = 
+    let testRecord = { HasHat = false; Name = "Don" }
+    let dudePredicate = buildExpr<BoolRec,bool> "HasHat = false and Name = Don"
+    let result = dudePredicate testRecord
+    Assert.True(result)    
+

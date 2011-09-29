@@ -61,6 +61,7 @@ type ExprTypes =
     | Invoke
     | AppliedInvoke of string
     | Unknown of string
+    | Binding of string * ExprTypes
 
 let nullableToOption res =
     match res with
@@ -239,31 +240,34 @@ let resolveExpression exprs (failOnUnresolved: bool) =
         function
         | ObjToObj l, Obj r -> Some <| Obj (l r)
         | Obj l, (Infix (ObjToObjToBool r)) -> Some <| ObjToBool (r l)
+        | Bool l, (Infix (ObjToObjToBool r)) -> Some <| ObjToBool (r l)
         | Bool l, (Infix (BoolToBoolToBool r)) -> Some <| BoolToBool (r l)
         | ObjToBool l, Obj r -> Some <| Bool (l r)
+        | ObjToBool l, Bool r -> Some <| Bool (l r)
         | BoolToBool l, Bool r -> Some <| Bool (l r)
         | Method l, Unit -> executeUnitMethod l
         | Method l, Obj r -> executeOneParamMethod l r
         | Method l, ResolvedTuple r -> executeParameterizedMethod l r 
         | Invoke, Unknown r -> Some <| AppliedInvoke r
-        | Invoke, IndexArgs r -> Some <| IndexArgs r //Here for F#-like indexing (if you want it)
+        | Invoke, ResolvedIndexArgs r -> Some <| ResolvedIndexArgs r //Here for F#-like indexing (if you want it)
         | Obj l, AppliedInvoke r -> resolveInvoke l r
         | IndexedProperty l, ResolvedIndexArgs (Obj r) -> executeOneParamMethod l r
         | Obj l, ResolvedIndexArgs (Obj r) -> callIndexedProperty l r
         | _ -> None
 
-    and reduceExpressions left right =
-        match left, right with
-        | [], r :: rt -> reduceExpressions [r] rt
+    and reduceExpressions lleft lright =
+        match lleft, lright with
         | (ResolveSingle resolved :: lt), right -> reduceExpressions lt (resolved :: right)
-        | (SubExpression exp :: lt), right ->
-            let resolvedSub = reduceExpressions [] exp |> List.rev
-            reduceExpressions lt (resolvedSub @ right)
-        | (IndexArgs exp :: lt), right ->
+        | left, (SubExpression exp :: rt) ->
+            match reduceExpressions [] exp |> List.rev with
+            | single :: [] -> reduceExpressions left (single :: rt)
+            | many -> reduceExpressions (SubExpression many :: left) rt
+        | left, (IndexArgs exp :: rt) ->
             match reduceExpressions [] [exp] with
             | [] -> failwith (sprintf "No indexer found in [ ]")
-            | h :: [] -> reduceExpressions lt (ResolvedIndexArgs h :: right)
+            | single :: [] -> reduceExpressions left (ResolvedIndexArgs single :: rt)
             | other -> failwith (sprintf "Multi-indexing not currently supported")
+        | [], r :: rt -> reduceExpressions [r] rt
         | l :: [], [] -> [l]
         | l :: lt, r :: rt ->        
             match attemptToResolvePair (l, r) with
@@ -275,8 +279,12 @@ let resolveExpression exprs (failOnUnresolved: bool) =
     reduceExpressions [] exprs
 
 let compareAsSameType obj1 obj2 func =
-    let t1Des = TypeDescriptor.GetConverter(obj1.GetType())
-    func obj1 (t1Des.ConvertFrom(obj2))
+    let converted = 
+        if obj1 <> null && obj2 <> null && obj1.GetType() = obj2.GetType() then obj2
+        else
+            let t1Des = TypeDescriptor.GetConverter(obj1.GetType())
+            t1Des.ConvertFrom(obj2)
+    func obj1 converted
             
 let objectsEqual (obj1: obj) (obj2: obj) = 
     if obj1 = null && obj2 = null then true
@@ -341,6 +349,8 @@ type TokenPair = string * StringTokenType
 let inline (|ResolveConstants|_|) token =
     match token with
     | "null" -> Some <| Obj null
+    | "true" -> Some <| Bool true
+    | "false" -> Some <| Bool false
     | _ -> None  
   
 let inline (|CompareOperation|_|) token =
@@ -358,14 +368,24 @@ let inline (|NotOperation|_|) token =
     | "!" | "not" -> Some <| (BoolToBool not) 
     | _ -> None
 
+let inline (|ScopedBooleanOperation|_|) token = 
+    match token with
+    | "and" -> Some <| Infix (BoolToBoolToBool (&&))
+    | "or"  -> Some <| Infix (BoolToBoolToBool (||))
+    | _ -> None
+
 let inline (|BooleanOperation|_|) token = 
     match token with
-    | "&" | "&&" | "and" -> Some <| Infix (BoolToBoolToBool (&&))
-    | "|" | "||" | "or"  -> Some <| Infix (BoolToBoolToBool (||))
+    | "&" | "&&" -> Some <| Infix (BoolToBoolToBool (&&))
+    | "|" | "||" -> Some <| Infix (BoolToBoolToBool (||))
     | _ -> None
 
 let inline (|GetOperation|_|) getMember (token: string) = 
     getMember token
+
+let inline (|BeginBinding|_|) getMember (token: string) =
+    match token with
+    | "let" -> Some() | _ -> None
 
 let inline (|BeginIndexer|_|) token =
     match token with
@@ -394,6 +414,7 @@ let inline (|CallIndicator|_|) token =
 type SubExpressionType =
     | StandardExpression
     | TupleExpression
+    | BindingExpression
 
 let parseTokens getMember tokens = 
     let rec parseTokensInner tokens (collectedResult: ExprTypes list) (result: ExprTypes list) expressionType = 
@@ -412,12 +433,14 @@ let parseTokens getMember tokens =
                     | [], StandardExpression -> parseTokensInner unused (Unit :: collectedResult) result expressionType
                     | contents, StandardExpression -> parseTokensInner unused (SubExpression exprs :: collectedResult) result expressionType
                     | contents, TupleExpression -> parseTokensInner unused (Tuple exprs :: collectedResult) result expressionType
+                    | _ -> failwith (sprintf "Unexpected Expression Type in SubExpression: %A" returnedExprType)
                 | EndSubExpression -> 
                     match expressionType with
                     | StandardExpression -> collectedResult |> List.rev, rest, expressionType
                     | TupleExpression -> 
                         let revCollected = collectedResult |> List.rev
                         (SubExpression revCollected :: result), rest, expressionType
+                    | _ -> failwith (sprintf "Unexpected Expression Type in SubExpression: %A" expressionType)
                 | TupleIndicator ->
                     let reversedResult = collectedResult |> List.rev 
                     parseTokensInner rest [] (SubExpression reversedResult :: result) TupleExpression
@@ -426,9 +449,13 @@ let parseTokens getMember tokens =
                     parseTokensInner unused (IndexArgs (SubExpression exprs) :: collectedResult) result expressionType
                 | EndIndexer ->
                     collectedResult |> List.rev, rest, expressionType
+                | ScopedBooleanOperation op -> 
+                    match collectedResult |> List.rev with
+                    | [] ->  parseTokensInner rest (op :: []) result expressionType
+                    | supExpr -> parseTokensInner rest (op :: SubExpression supExpr :: []) result expressionType
+                | BooleanOperation op
                 | CallIndicator op
                 | ResolveConstants op
-                | BooleanOperation op
                 | NotOperation op
                 | CompareOperation op 
                 | GetOperation getMember op -> parseTokensInner rest (op :: collectedResult) result expressionType
