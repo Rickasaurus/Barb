@@ -222,3 +222,10 @@ let ``predicate language should preserve left-to-right order of operations with 
     let result = dudePredicate testRecord
     Assert.True(result)    
 
+[<Fact>]
+let ``predicate language should evalute order of boolean ops correctly`` () = 
+    let testRecord = { HasHat = true; Name = "Don" }
+    let dudePredicate = buildExpr<BoolRec,bool> "true and HasHat or false"
+    let result = dudePredicate testRecord
+    Assert.True(result)    
+
