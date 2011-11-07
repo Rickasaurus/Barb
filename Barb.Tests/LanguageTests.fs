@@ -229,3 +229,18 @@ let ``predicate language should evalute order of boolean ops correctly`` () =
     let result = dudePredicate testRecord
     Assert.True(result)    
 
+//[<Fact>]
+//let ``predicate language should allow simple variable binding`` () = 
+//    let testRecord = { HasHat = true; Name = "Don" }
+//    let dudePredicate = buildExpr<BoolRec,bool> "let x = true in x = HasHat"
+//    let result = dudePredicate testRecord
+//    Assert.True(result)    
+
+type TestFloatRec = { Score: float }
+
+[<Fact>]
+let ``predicate language should properly parse floating point numbers`` () = 
+    let testRecord = { Score = 0.90 }
+    let dudePredicate = buildExpr<TestFloatRec,bool> "Score < 1.0"
+    let result = dudePredicate testRecord
+    Assert.True(result)    
