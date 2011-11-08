@@ -44,7 +44,12 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AssemblyInfo.fs" />
+    <Compile Include="Helpers.fs" />
+    <Compile Include="Representation.fs" />
+    <Compile Include="Interop.fs" />
     <Compile Include="Internals.fs" />
+    <Compile Include="Parse.fs" />
+    <Compile Include="Reduce.fs" />
     <Compile Include="Interface.fs" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\FSharp\1.0\Microsoft.FSharp.Targets" Condition="!Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
