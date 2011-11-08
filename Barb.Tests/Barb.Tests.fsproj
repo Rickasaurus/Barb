@@ -46,7 +46,6 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="InternalsTests.fs" />
     <Compile Include="LanguageTests.fs" />
   </ItemGroup>
   <ItemGroup>

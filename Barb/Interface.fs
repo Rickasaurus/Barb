@@ -25,16 +25,16 @@ module Compiler =
             | true, foundMember -> Some foundMember
             | false, _ -> None
 
-        let tokens = tokenizeString predicate
-
-    #if DEBUG
-        printfn "T: %A" tokens
-    #endif
-
-        let parsedTokens = 
-            parseTokens getMember tokens
-            |> (fun (res, remainder, expType) -> res)
-    //    let parsedTokens = parseProgram getMember predicate
+//        let tokens = tokenizeString predicate
+//
+//    #if DEBUG
+//        printfn "T: %A" tokens
+//    #endif
+//
+//        let parsedTokens = 
+//            parseTokens getMember tokens
+//            |> (fun (res, remainder, expType) -> res)
+        let parsedTokens = parseProgram getMember predicate
 
     #if DEBUG
         printfn "PT: %A" parsedTokens

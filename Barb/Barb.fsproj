@@ -47,7 +47,6 @@
     <Compile Include="Helpers.fs" />
     <Compile Include="Representation.fs" />
     <Compile Include="Interop.fs" />
-    <Compile Include="Internals.fs" />
     <Compile Include="Parse.fs" />
     <Compile Include="Reduce.fs" />
     <Compile Include="Interface.fs" />
