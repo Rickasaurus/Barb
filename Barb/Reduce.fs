@@ -40,7 +40,6 @@ let resolveExpression exprs (failOnUnresolved: bool) =
             else LambdaPartial consumeArg
         LambdaPartial consumeArg
             
-
     and (|ResolveSingle|_|) bindings =
         function 
         | Returned o -> Some <| resolveResultType o
@@ -52,9 +51,9 @@ let resolveExpression exprs (failOnUnresolved: bool) =
 
     and attemptToResolvePair =        
         function
-        | ObjToObj l, Obj r -> Some <| Obj (l r)
-        | Obj l, (Infix (ObjToObjToBool r)) -> Some <| ObjToBool (r l)
-        | Bool l, (Infix (ObjToObjToBool r)) -> Some <| ObjToBool (r l)
+        | ObjToObj l, Obj r -> Obj (l r) |> Some
+        | Obj l, (Infix (ObjToObjToBool r)) -> ObjToBool (r l) |> Some
+        | Bool l, (Infix (ObjToObjToBool r)) -> ObjToBool (r l) |> Some
         | Bool l, (Infix (BoolToBoolToBool r)) -> Some <| BoolToBool (r l)
         | ObjToBool l, ResolvedTuple r -> Some <| Bool (l (tupleToSequence r))
         | ObjToBool l, Obj r -> Some <| Bool (l r)

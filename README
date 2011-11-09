@@ -10,8 +10,7 @@ I created Barb because I needed a user language for my applications but yet no e
 
 - Simple/Terse Syntax
 - Expression Oriented
-- No casting necessary 
-- Transparent type conversions
+- No casting necessary and transparent type conversions
 - Native .NET type system
 - Tries really hard to do what a non-technical user would expect
 - Easy to maintain
@@ -28,13 +27,22 @@ It's seen some work since then but I'm not quite ready to put it out there.  In 
 However, I thought it might be useful to others in its current form.  If you do play with it I hope you'll let me know what you think.
 
 ------------------------------------
+---         Things To do         ---
+------------------------------------
+
+- Lambda interop with .NET
+- Extension method resolution
+- Recursive bindings
+- A resonable API with configuration options
+
+------------------------------------
 --- Extra Nerdy Stuff Under Here ---
 ------------------------------------
 
 Barb aims to accomplish the above goals through two somewhat non-traditional design decisions:
 
-- Compilation by n-tuple expression merging for reduction to a final result
-- Composition instead of IL or code generation
+- Compilation by n-tuple expression merging. This is done initially to pre-compute as much as possible and second time for each final result
+- Composition is used instead of IL or code generation, mainly function composition
 
 Expression lists allow for tuple-wise reductions to a result, instead of standard code generation or expression building.  Decisions can be made at runtime based on the contents of these tuples and their neighbors. This allows for a huge amount of flexibility in deciding what to do.
 
