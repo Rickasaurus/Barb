@@ -91,6 +91,7 @@ let captureTypes =
         { Begin = "(";   Delim = Some ",";   End = ")";  Func = (fun exprs -> Tuple exprs) }
         { Begin = "[";   Delim = None;       End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
         { Begin = "let"; Delim = Some "=";   End = "in"; Func = bindFunction }
+        { Begin = "var"; Delim = Some "=";   End = "in"; Func = bindFunction }
     ]
 
 let (|CaptureDelim|_|) currentCaptures (text: string) =

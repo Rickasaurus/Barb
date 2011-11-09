@@ -239,9 +239,16 @@ let ``predicate language should properly parse floating point numbers`` () =
     Assert.True(result)    
 
 [<Fact>]
-let ``predicate language should allow simple variable binding`` () = 
+let ``predicate language should allow simple variable binding with let`` () = 
     let testRecord = { HasHat = true; Name = "Don" }
     let dudePredicate = buildExpr<BoolRec,bool> "let x = true in x = HasHat"
+    let result = dudePredicate testRecord
+    Assert.True(result)    
+
+[<Fact>]
+let ``predicate language should allow simple variable binding with var`` () = 
+    let testRecord = { HasHat = true; Name = "Don" }
+    let dudePredicate = buildExpr<BoolRec,bool> "var x = true in x = HasHat"
     let result = dudePredicate testRecord
     Assert.True(result)    
 
@@ -249,6 +256,22 @@ let ``predicate language should allow simple variable binding`` () =
 let ``predicate language should follow scoping rules for bound variables`` () = 
     let testRecord = { HasHat = true; Name = "Don" }
     Assert.Throws(typeof<System.Exception>, new Assert.ThrowsDelegate(fun () -> buildExpr<BoolRec,bool> "(let x = true in x = HasHat) && x = true" |> ignore))
+
+type TestArrayRec<'T> = { Nums: 'T list }
+
+[<Fact>] 
+let ``predicate language tuples should compare correctly with reference type lists`` () = 
+    let testRecord = { Nums = ["one";"two";"three"] }
+    let dudePredicate = buildExpr<TestArrayRec<string>,bool> "Nums = (\"one\",\"two\",\"three\")"
+    let result = dudePredicate testRecord
+    Assert.True(result)    
+
+[<Fact>] 
+let ``predicate language tuples should compare correctly with value-type lists`` () = 
+    let testRecord = { Nums = [1;2;3;4;5] }
+    let dudePredicate = buildExpr<TestArrayRec<int>,bool> "Nums = (1,2,3,4,5)"
+    let result = dudePredicate testRecord
+    Assert.True(result)    
 
 //[<Fact>]
 //let ``predicate language should support internal use of lambdas`` () = 

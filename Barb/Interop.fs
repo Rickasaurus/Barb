@@ -164,15 +164,21 @@ let callIndexedProperty (target: obj) (indexVal: obj) =
                 | None -> failwith (sprintf "No conversion found from %s to %s" (string indexVal) ttype.FullName)                
             | other -> failwith (sprintf "MultiIndexed objects are not currently supported: %s" ttype.FullName)
 
-let compareAsSameType obj1 obj2 func =
+let rec convertToSameType (obj1: obj) (obj2: obj) : (obj * obj) = 
     try
-        let converted = 
-            if obj1 <> null && obj2 <> null && obj1.GetType() = obj2.GetType() then obj2
-            else
-                let t1Des = TypeDescriptor.GetConverter(obj1.GetType())
-                t1Des.ConvertFrom(obj2)
-        func obj1 converted
-    with _ -> failwith (sprintf "Failed to find a conversion for %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))
+        if obj1 <> null && obj2 <> null && obj1.GetType() = obj2.GetType() then obj1, obj2
+        else
+            let t1Des = TypeDescriptor.GetConverter(obj1.GetType())
+            if t1Des.CanConvertFrom(obj2.GetType()) then obj1, t1Des.ConvertFrom(obj2)
+            else match obj1, obj2 with
+                    | (:? seq<obj> as ie1), (:? seq<obj> as ie2) -> List.zip (ie1 |> Seq.toList) (ie2 |> Seq.toList) |> List.map (fun (one, two) -> convertToSameType one two) 
+                                                                    |> List.unzip |> (fun (l1, l2) -> l1 :> obj, l2 :> obj)
+                    | _ -> failwith (sprintf "Failed to find a conversion for %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))   
+    with _ -> failwith (sprintf "Failed to find a conversion for %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))   
+
+let compareAsSameType obj1 obj2 func =
+    let cobj1, cobj2 = convertToSameType obj1 obj2     
+    func cobj1 cobj2
      
 let objectsEqual (obj1: obj) (obj2: obj) = 
     if obj1 = null && obj2 = null then true
@@ -188,5 +194,5 @@ let compareObjects op =
         | null, null -> false
         | null, _ | _, null -> false
         | (:? IComparable as comp1), (:? IComparable as comp2) when obj1.GetType() = obj2.GetType() -> op comp1 comp2
-        | (:? IComparable as comp1), obj2 -> compareAsSameType comp1 obj2 (fun o1 o2 -> op o1 (o2 :?> IComparable))
+        | (:? IComparable as comp1), obj2 -> compareAsSameType comp1 obj2 (fun o1 o2 -> op (o1 :?> IComparable) (o2 :?> IComparable))
         | _ -> failwith (sprintf "Unable to compare %A and %A" obj1 obj2)

@@ -7,6 +7,15 @@ open System.Collections.Concurrent
 open Barb.Interop
 open Barb.Representation
 
+let tupleToSequence (tuple: ExprTypes list) = 
+    seq {
+        for t in tuple do
+            match t with
+            | Obj v -> yield v
+            | Unknown v -> yield v :> obj
+            | what -> failwith (sprintf "Cannot resolve the given tuple-internal expression to a object type: %A" what)
+    }
+
 let rec applyInstanceState (input: obj) exprs =
     let rec resolveInstanceType expr =
             match expr with 
@@ -29,12 +38,13 @@ let resolveExpression exprs (failOnUnresolved: bool) =
                          | None -> Some (Obj unk)
         | _ -> None
 
-    and attemptToResolvePair =
+    and attemptToResolvePair =        
         function
         | ObjToObj l, Obj r -> Some <| Obj (l r)
         | Obj l, (Infix (ObjToObjToBool r)) -> Some <| ObjToBool (r l)
         | Bool l, (Infix (ObjToObjToBool r)) -> Some <| ObjToBool (r l)
         | Bool l, (Infix (BoolToBoolToBool r)) -> Some <| BoolToBool (r l)
+        | ObjToBool l, ResolvedTuple r -> Some <| Bool (l (tupleToSequence r))
         | ObjToBool l, Obj r -> Some <| Bool (l r)
         | ObjToBool l, Bool r -> Some <| Bool (l r)
         | BoolToBool l, Bool r -> Some <| Bool (l r)
