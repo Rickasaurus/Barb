@@ -9,35 +9,35 @@ type DudeRecord = { Name: string; Sex: char }
 [<Fact>] 
 let ``predicate language should work with a simple predicate`` () =
     let testRecord = { Name = "Dude"; Sex = 'm' }
-    let dudePredicate = buildExpr<DudeRecord,bool> "Name = Dude"
+    let dudePredicate = buildExpr<DudeRecord,bool> "Name = \"Dude\""
     let result = dudePredicate testRecord
     Assert.True(result)
 
 [<Fact>] 
 let ``predicate language should work with a compound predicate`` () =
     let testRecord = { Name = "Dude"; Sex = 'f' }
-    let dudePredicate = buildExpr<DudeRecord,bool> "Name = Dude and Sex = f"
+    let dudePredicate = buildExpr<DudeRecord,bool> "Name = \"Dude\" and Sex = 'f'"
     let result = dudePredicate testRecord
     Assert.True(result)
 
 [<Fact>] 
 let ``predicate language should support quoted values`` () =
     let testRecord = { Name = "Dude Duderson"; Sex = 'f' }
-    let dudePredicate = buildExpr<DudeRecord,bool> "Name = \"Dude Duderson\" and Sex = f"
+    let dudePredicate = buildExpr<DudeRecord,bool> "Name = \"Dude Duderson\" and Sex = 'f'"
     let result = dudePredicate testRecord
     Assert.True(result)
 
 [<Fact>] 
 let ``predicate language should support quoted values, even when they contain a .`` () =
     let testRecord = { Name = "Dude.Duderson"; Sex = 'f' }
-    let dudePredicate = buildExpr<DudeRecord, bool> "Name = \"Dude.Duderson\" and Sex = f"
+    let dudePredicate = buildExpr<DudeRecord, bool> "Name = \"Dude.Duderson\" and Sex = 'f'"
     let result = dudePredicate testRecord
     Assert.True(result)
 
 [<Fact>] 
 let ``predicate language should support escaped quotes`` () =
     let testRecord = { Name = "Dude\"Duderson"; Sex = 'f' }
-    let dudePredicate = buildExpr<DudeRecord,bool> "Name = \"Dude\\\"Duderson\" and Sex = f"
+    let dudePredicate = buildExpr<DudeRecord,bool> "Name = \"Dude\\\"Duderson\" and Sex = 'f'"
     let result = dudePredicate testRecord
     Assert.True(result)
 
@@ -143,7 +143,7 @@ let ``predicate language should support single argument methods`` () =
 [<Fact>] 
 let ``predicate language should support multi-argument methods`` () =
     let testRecord = { Name = "Dude Duderson"; Age = 20 }
-    let dudePredicate = buildExpr<DudeRecordWithInt,bool> "Name.Substring(0, 4) = Dude"
+    let dudePredicate = buildExpr<DudeRecordWithInt,bool> "Name.Substring(0, 4) = \"Dude\""
     let result = dudePredicate testRecord
     Assert.True(result)
 
@@ -211,14 +211,14 @@ type BoolRec = { HasHat: bool; Name: string }
 [<Fact>]
 let ``predicate language should preserve left-to-right order of operations with record bool`` () = 
     let testRecord = { HasHat = true; Name = "Howard" }
-    let dudePredicate = buildExpr<BoolRec,bool> "HasHat and Name = Howard"
+    let dudePredicate = buildExpr<BoolRec,bool> "HasHat and Name = \"Howard\""
     let result = dudePredicate testRecord
     Assert.True(result)    
 
 [<Fact>]
 let ``predicate language should preserve left-to-right order of operations with explicit bool`` () = 
     let testRecord = { HasHat = false; Name = "Don" }
-    let dudePredicate = buildExpr<BoolRec,bool> "HasHat = false and Name = Don"
+    let dudePredicate = buildExpr<BoolRec,bool> "HasHat = false and Name = \"Don\""
     let result = dudePredicate testRecord
     Assert.True(result)    
 
@@ -255,7 +255,10 @@ let ``predicate language should allow simple variable binding with var`` () =
 [<Fact>]
 let ``predicate language should follow scoping rules for bound variables`` () = 
     let testRecord = { HasHat = true; Name = "Don" }
-    Assert.Throws(typeof<System.Exception>, new Assert.ThrowsDelegate(fun () -> buildExpr<BoolRec,bool> "(let x = true in x = HasHat) && x = true" |> ignore))
+    Assert.Throws(typeof<System.Exception>, new Assert.ThrowsDelegate(fun () -> 
+        let func = buildExpr<BoolRec,bool> "(let x = true in x = HasHat) && x = true"
+        let res = func(testRecord)
+        res |> ignore))
 
 type TestListRec<'T> = { Nums: 'T list }
 
@@ -273,9 +276,9 @@ let ``predicate language tuples should compare correctly with value-type lists``
     let result = dudePredicate testRecord
     Assert.True(result)    
 
-//[<Fact>]
-//let ``predicate language should support internal use of lambdas`` () = 
-//    let testRecord = { HasHat = false; Name = "Don" }
-//    let dudePredicate = buildExpr<BoolRec,bool> "let fx = (fun x -> x = \"Don\") in fx Name"
-//    let result = dudePredicate testRecord
-//    Assert.True(result) 
+[<Fact>]
+let ``predicate language should support internal use of lambdas`` () = 
+    let testRecord = { HasHat = false; Name = "Don" }
+    let dudePredicate = buildExpr<BoolRec,bool> "let fx = (fun x -> x = \"Don\") in fx Name"
+    let result = dudePredicate testRecord
+    Assert.True(result) 

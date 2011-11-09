@@ -88,7 +88,7 @@ let bindFunction =
 
 let generateLambda = 
     function 
-    | h :: SubExpression(names) :: [] -> Lambda (names, h) 
+    | h :: SubExpression(names) :: [] -> LambdaDef (names, h) 
     | list -> failwith (sprintf "Incorrect lambda binding syntax: %A" list)
 
 let captureTypes = 

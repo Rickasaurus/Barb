@@ -16,6 +16,8 @@ let tupleToSequence (tuple: ExprTypes list) =
             | what -> failwith (sprintf "Cannot resolve the given tuple-internal expression to a object type: %A" what)
     }
 
+
+
 let rec applyInstanceState (input: obj) exprs =
     let rec resolveInstanceType expr =
             match expr with 
@@ -27,15 +29,25 @@ let rec applyInstanceState (input: obj) exprs =
     exprs |> List.map (fun expr -> resolveInstanceType expr)
     
 let resolveExpression exprs (failOnUnresolved: bool) = 
-    let rec (|ResolveSingle|_|) bindings =
+    let rec buildLambdaFunction (arguments: ExprTypes list) (body: ExprTypes list) =
+        let args = arguments |> List.map (function | Unknown str -> str | other -> failwith (sprintf "Unexpected lambda argument type: %A" other))
+        let inputs = ref []
+        let rec consumeArg arg = 
+            inputs := (arg :: !inputs)
+            if List.length !inputs = List.length arguments then
+                let bindings = List.zip args (List.rev !inputs) |> Map.ofList
+                SubExpression (reduceExpressions [] body bindings)
+            else LambdaPartial consumeArg
+        LambdaPartial consumeArg
+            
+
+    and (|ResolveSingle|_|) bindings =
         function 
         | Returned o -> Some <| resolveResultType o
         | Tuple tc -> 
             let resolvedTp = tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> ResolvedTuple
             Some resolvedTp
-        | Unknown unk -> match bindings |> Map.tryFind unk with 
-                         | Some var -> Some var 
-                         | None -> Some (Obj unk)
+        | Unknown unk -> bindings |> Map.tryFind unk
         | _ -> None
 
     and attemptToResolvePair =        
@@ -56,11 +68,15 @@ let resolveExpression exprs (failOnUnresolved: bool) =
         | Obj l, AppliedInvoke r -> resolveInvoke l r
         | IndexedProperty l, ResolvedIndexArgs (Obj r) -> executeOneParamMethod l r
         | Obj l, ResolvedIndexArgs (Obj r) -> callIndexedProperty l r
+        | LambdaPartial l, Obj r -> Some <| (l (Obj r))
         | _ -> None
 
     // Always looks on the left and moves to the right first, then tries to merge left and right
     and reduceExpressions lleft lright bindings =
         match lleft, lright with
+        | (LambdaDef (names, expr) :: lt), right -> let lambdaExpr = reduceExpressions [] [expr] bindings
+                                                    let lambdaResult = buildLambdaFunction names lambdaExpr
+                                                    reduceExpressions lt (lambdaResult :: right) bindings 
         | (Binding (name, expr) :: lt), right -> let newbindings = bindings |> Map.add name expr in reduceExpressions lt right newbindings
         | (ResolveSingle bindings resolved :: lt), right -> reduceExpressions lt (resolved :: right) bindings
         | left, (SubExpression exp :: rt) ->

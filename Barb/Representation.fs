@@ -32,5 +32,5 @@ type ExprTypes =
     | AppliedInvoke of string
     | Unknown of string
     | Binding of string * ExprTypes
-    | Lambda of ExprTypes list * ExprTypes
-    | ResovledLambda of ExprTypes list * ExprTypes * Map<String,ExprTypes>
+    | LambdaDef of ExprTypes list * ExprTypes
+    | LambdaPartial of (ExprTypes -> ExprTypes)
