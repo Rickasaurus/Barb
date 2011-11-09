@@ -48,6 +48,7 @@ let resolveExpression exprs (failOnUnresolved: bool) =
         | Obj l, ResolvedIndexArgs (Obj r) -> callIndexedProperty l r
         | _ -> None
 
+    // Always looks on the left and moves to the right first, then tries to merge left and right
     and reduceExpressions lleft lright bindings =
         match lleft, lright with
         | (Binding (name, expr) :: lt), right -> let newbindings = bindings |> Map.add name expr in reduceExpressions lt right newbindings

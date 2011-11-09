@@ -249,3 +249,10 @@ let ``predicate language should allow simple variable binding`` () =
 let ``predicate language should follow scoping rules for bound variables`` () = 
     let testRecord = { HasHat = true; Name = "Don" }
     Assert.Throws(typeof<System.Exception>, new Assert.ThrowsDelegate(fun () -> buildExpr<BoolRec,bool> "(let x = true in x = HasHat) && x = true" |> ignore))
+
+//[<Fact>]
+//let ``predicate language should support internal use of lambdas`` () = 
+//    let testRecord = { HasHat = true; Name = "Don" }
+//    let dudePredicate = buildExpr<BoolRec,bool> "let x = true in x = HasHat"
+//    let result = dudePredicate testRecord
+//    Assert.True(result) 

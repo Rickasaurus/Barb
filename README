@@ -1,4 +1,8 @@
-Barb is a small dynamic scripting language for .NET
+Barb is a small dynamic scripting language for .NET with the following properties:
+
+- Fully expression oriented (Whitespace is completely ignored)
+- Paren based scoping rules (Lisp-like)
+- Syntax that makes both F# and C# devs feel at home
 
 --
 
@@ -10,14 +14,18 @@ I created Barb because I needed a user language for my applications but yet no e
 - Transparent type conversions
 - Native .NET type system
 - Tries really hard to do what a non-technical user would expect
+- Easy to maintain
+- Fast Execution (I use it to script over sets of records in the millions range)
 
 Dynamic Linq, IronPython and IronRuby all failed for one of these reasons or another.
 
-The current implementation is still young and a bit rough around the edges. I needed to get something out fast for my product and as of writing this the first line of code was written three days ago.  Right now it's useful for writing one-line expressions along these lines:
+The current implementation is still young and a bit rough around the edges. I needed to get something out fast for my product in about three days time.  After that period it was useful only for writing one-line expressions along these lines:
 
 "(Name.Contains "John" or Name.Contains "Mary") and (Age > 20 or Weight > 200)"
 
-Maybe it's early to share it, but I thought it might be useful to others in its current form.
+It's seen some work since then but I'm not quite ready to put it out there.  In particular, it needs better error messages and some extra work into making a friendly API for hosting.
+
+However, I thought it might be useful to others in its current form.  If you do play with it I hope you'll let me know what you think.
 
 ------------------------------------
 --- Extra Nerdy Stuff Under Here ---
@@ -25,11 +33,11 @@ Maybe it's early to share it, but I thought it might be useful to others in its 
 
 Barb aims to accomplish the above goals through two somewhat non-traditional design decisions:
 
-- Expression lists instead of expression trees
+- Compilation by n-tuple expression merging for reduction to a final result
 - Composition instead of IL or code generation
 
-Expression lists allow for tuple-wise reductions to a result, instead of standard code generation or expression building.  Decisions can be made at runtime based on the contents of these tuples and their neighbors. 
+Expression lists allow for tuple-wise reductions to a result, instead of standard code generation or expression building.  Decisions can be made at runtime based on the contents of these tuples and their neighbors. This allows for a huge amount of flexibility in deciding what to do.
 
-Function/Value composition isn't strictly necessary but it sure makes the whole process easier.
+Function/Value composition allows for fast code to be built out of existing .NET constructs and eliminates the complexity of a intermediate representation.
 
-In this way it's kind of Scheme-like under the hood, but on the surface it's very C#/F#ish.
+It's kind of Scheme-like under the hood, but I've worked hard to make it very C#/F#ish on the surface.
