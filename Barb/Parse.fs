@@ -9,6 +9,7 @@ open System.Linq
 open System.Collections.Concurrent
 open System.Collections.Generic
 
+open Barb.Helpers
 open Barb.Interop
 open Barb.Representation
 
@@ -82,35 +83,44 @@ let (|FreeToken|_|) (endTokens: string list) (text: string) =
 
 let bindFunction = 
     function 
-    | h :: SubExpression([Unknown(t)]) :: [] -> Binding (t, h) 
+    | h :: SubExpression([Unknown(name)]) :: [] -> Binding (name, h) 
     | list -> failwith (sprintf "Incorrect let binding syntax: %A" list)
+
+let generateLambda = 
+    function 
+    | h :: SubExpression(names) :: [] -> Lambda (names, h) 
+    | list -> failwith (sprintf "Incorrect lambda binding syntax: %A" list)
 
 let captureTypes = 
     [
-        { Begin = "(";   Delim = None;       End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
-        { Begin = "(";   Delim = Some ",";   End = ")";  Func = (fun exprs -> Tuple exprs) }
-        { Begin = "[";   Delim = None;       End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
-        { Begin = "let"; Delim = Some "=";   End = "in"; Func = bindFunction }
-        { Begin = "var"; Delim = Some "=";   End = "in"; Func = bindFunction }
+        { Begin = "(";    Delim = None;       End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
+        { Begin = "(";    Delim = Some ",";   End = ")";  Func = (fun exprs -> Tuple exprs) }
+        { Begin = "[";    Delim = None;       End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
+        { Begin = "let";  Delim = Some "=";   End = "in"; Func = bindFunction }
+        { Begin = "var";  Delim = Some "=";   End = "in"; Func = bindFunction }
+        { Begin = "(fun"; Delim = Some "->";  End = ")";  Func = generateLambda }
     ]
 
 let (|CaptureDelim|_|) currentCaptures (text: string) =
-    match [ for cc in currentCaptures do if cc.Delim.IsSome && text.StartsWith cc.Delim.Value then yield cc ] with
+    let matches, str = [ for cc in currentCaptures do if cc.Delim.IsSome && text.StartsWith cc.Delim.Value then yield cc ] |> List.allMaxBy (fun ct -> ct.Delim.Value.Length)
+    match matches with
     | [] -> None
     | onecap :: [] -> Some ([onecap], text.Substring(onecap.Delim.Value.Length))
-    | caps -> Some (caps, text.Substring(1))
+    | caps -> Some (caps, text.Substring(str))
 
 let (|CaptureEnd|_|) currentCaptures (text: string) =
-    match [ for cc in currentCaptures do if text.StartsWith cc.End then yield cc ] with
+    let matches, str = [ for cc in currentCaptures do if text.StartsWith cc.End then yield cc ] |> List.allMaxBy (fun ct -> ct.End.Length) 
+    match matches with
     | [] -> None
     | onecap :: [] -> Some ([onecap], text.Substring(onecap.End.Length))
-    | caps -> Some (caps, text.Substring(1))
+    | caps -> Some (caps, text.Substring(str))
 
 let (|CaptureBegin|_|) (text: string) =
-    match [ for ct in captureTypes do if text.StartsWith ct.Begin then yield ct ] with
+    let matches, str = [ for ct in captureTypes do if text.StartsWith ct.Begin then yield ct ] |> List.allMaxBy (fun ct -> ct.Begin.Length)
+    match matches with
     | [] -> None
     | onecap :: [] -> Some ([onecap], text.Substring(onecap.Begin.Length))
-    | caps -> Some (caps, text.Substring(1))
+    | caps -> Some (caps, text.Substring(str))
 
 let parseProgram (getMember: string -> ExprTypes option) (startText: string) = 
     let rec parseProgramInner (str: string) (result: ExprTypes list) (currentCaptures: CaptureParams list) =
@@ -128,8 +138,10 @@ let parseProgram (getMember: string -> ExprTypes option) (startText: string) =
         | CaptureDelim currentCaptures (cParams, crem) -> 
             let subExprs, rem, captures = parseProgramInner crem [] cParams
             [SubExpression (result |> List.rev)] @ subExprs, rem, captures 
-        | CaptureEnd currentCaptures (cParams, crem) ->
-            [SubExpression (result |> List.rev)], crem, cParams 
+        | CaptureEnd currentCaptures (cParams, crem) ->  
+            match result with
+            | [] -> result, crem, cParams
+            | results -> [SubExpression (results |> List.rev)], crem, cParams 
         | SkipToken " " res
         | TokenToVal "." Invoke res
         | TokenToVal "()" Unit res

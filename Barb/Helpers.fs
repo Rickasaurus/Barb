@@ -27,3 +27,12 @@ let memoizeBy inputToKey f =
             cache.[k] <- res
             res
 
+module List =
+    let allMaxBy (func: 'a -> int) (list: 'a list) =
+        list 
+        |> List.fold (fun (wins,str) i ->
+            let newstr = func i
+            if newstr > str then [i], newstr
+            elif newstr = str then i :: wins, str
+            else wins, str) 
+            ([], 0) 
