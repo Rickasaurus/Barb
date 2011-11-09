@@ -11,7 +11,7 @@ let tupleToSequence (tuple: ExprTypes list) =
     seq {
         for t in tuple do
             match t with
-            | Obj v -> yield v
+            | Obj v -> yield box v
             | Unknown v -> yield v :> obj
             | what -> failwith (sprintf "Cannot resolve the given tuple-internal expression to a object type: %A" what)
     }

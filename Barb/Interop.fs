@@ -164,15 +164,22 @@ let callIndexedProperty (target: obj) (indexVal: obj) =
                 | None -> failwith (sprintf "No conversion found from %s to %s" (string indexVal) ttype.FullName)                
             | other -> failwith (sprintf "MultiIndexed objects are not currently supported: %s" ttype.FullName)
 
-let rec convertToSameType (obj1: obj) (obj2: obj) : (obj * obj) = 
+let rec inline convertSequence seq1 seq2 = 
+    List.zip (seq1 |> Seq.toList) (seq2 |> Seq.toList) 
+    |> List.map (fun (one, two) -> convertToSameType one two) 
+    |> List.unzip |> (fun (l1, l2) -> l1 :> obj, l2 :> obj)
+
+and convertToSameType (obj1: obj) (obj2: obj) : (obj * obj) = 
     try
         if obj1 <> null && obj2 <> null && obj1.GetType() = obj2.GetType() then obj1, obj2
         else
             let t1Des = TypeDescriptor.GetConverter(obj1.GetType())
             if t1Des.CanConvertFrom(obj2.GetType()) then obj1, t1Des.ConvertFrom(obj2)
             else match obj1, obj2 with
-                    | (:? seq<obj> as ie1), (:? seq<obj> as ie2) -> List.zip (ie1 |> Seq.toList) (ie2 |> Seq.toList) |> List.map (fun (one, two) -> convertToSameType one two) 
-                                                                    |> List.unzip |> (fun (l1, l2) -> l1 :> obj, l2 :> obj)
+                    // Compares reference-typed lists
+                    // NOTE: This will break with any version of .NET lower than 4.0
+                    | (:? seq<obj> as ie1), (:? seq<obj> as ie2) -> convertSequence ie1 ie2
+                    | (:? System.Collections.IEnumerable as ie1), (:? System.Collections.IEnumerable as ie2) -> convertSequence (ie1 |> Seq.cast) (ie2 |> Seq.cast)
                     | _ -> failwith (sprintf "Failed to find a conversion for %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))   
     with _ -> failwith (sprintf "Failed to find a conversion for %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))   
 
