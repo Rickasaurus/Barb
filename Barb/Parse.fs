@@ -29,9 +29,9 @@ let (|TokensToVal|_|) (mStrs: string list) (result: ExprTypes) (text: string) =
 
 type CaptureParams = 
     {
-        Begin: char
-        Delim: char option
-        End: char
+        Begin: string
+        Delim: string option
+        End: string
         Func: ExprTypes list -> ExprTypes
     }
 
@@ -80,32 +80,55 @@ let (|FreeToken|_|) (endTokens: string list) (text: string) =
         let remainder = text.Substring(index)
         Some (tokenText, remainder) 
 
+let bindFunction = 
+    function 
+    | h :: SubExpression([Unknown(t)]) :: [] -> Binding (t, h) 
+    | list -> failwith (sprintf "Incorrect let binding syntax: %A" list)
+
+let captureTypes = 
+    [
+        { Begin = "(";   Delim = None;       End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
+        { Begin = "(";   Delim = Some ",";   End = ")";  Func = (fun exprs -> Tuple exprs) }
+        { Begin = "[";   Delim = None;       End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
+        { Begin = "let"; Delim = Some "=";   End = "in"; Func = bindFunction }
+    ]
+
+let (|CaptureDelim|_|) currentCaptures (text: string) =
+    match [ for cc in currentCaptures do if cc.Delim.IsSome && text.StartsWith cc.Delim.Value then yield cc ] with
+    | [] -> None
+    | onecap :: [] -> Some ([onecap], text.Substring(onecap.Delim.Value.Length))
+    | caps -> Some (caps, text.Substring(1))
+
+let (|CaptureEnd|_|) currentCaptures (text: string) =
+    match [ for cc in currentCaptures do if text.StartsWith cc.End then yield cc ] with
+    | [] -> None
+    | onecap :: [] -> Some ([onecap], text.Substring(onecap.End.Length))
+    | caps -> Some (caps, text.Substring(1))
+
+let (|CaptureBegin|_|) (text: string) =
+    match [ for ct in captureTypes do if text.StartsWith ct.Begin then yield ct ] with
+    | [] -> None
+    | onecap :: [] -> Some ([onecap], text.Substring(onecap.Begin.Length))
+    | caps -> Some (caps, text.Substring(1))
+
 let parseProgram (getMember: string -> ExprTypes option) (startText: string) = 
-    let captureTypes = 
-        [
-            { Begin = '('; Delim = None;     End = ')'; Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
-            { Begin = '('; Delim = Some ','; End = ')'; Func = (fun exprs -> Tuple exprs) }
-            { Begin = '['; Delim = None;     End = ']'; Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
-        ]
-
-    let (|CaptureDelim|_|) currentCaptures (text: string) =
-        match [ for cc in currentCaptures do if cc.Delim.IsSome && text.[0] = cc.Delim.Value then yield cc ] with
-        | [] -> None
-        | caps -> Some (caps, text.Substring(1))
-
-    let (|CaptureEnd|_|) currentCaptures (text: string) =
-        match [ for cc in currentCaptures do if text.[0] = cc.End then yield cc ] with
-        | [] -> None
-        | caps -> Some (caps, text.Substring(1))
-
-    let (|CaptureBegin|_|) (text: string) =
-        match [ for ct in captureTypes do if text.[0] = ct.Begin then yield ct ] with
-        | [] -> None
-        | caps -> Some (caps, text.Substring(1))
-
     let rec parseProgramInner (str: string) (result: ExprTypes list) (currentCaptures: CaptureParams list) =
         match str with
         | "" -> result, "", currentCaptures
+        | CaptureBegin (cParams, crem) -> 
+            let subExprs, rem, captures = parseProgramInner crem [] cParams
+            let exprConstraint = 
+                match captures with
+                | [] -> failwith "Unexpected end of subexpression"
+                | h :: [] -> h
+                | list -> list |> List.filter (fun cap -> cap.Delim.IsNone) |> (function | h :: [] -> h | _ -> failwith "Ambiguous end of subexpression")
+            let value = subExprs |> List.rev |> exprConstraint.Func 
+            parseProgramInner rem (value :: result) currentCaptures
+        | CaptureDelim currentCaptures (cParams, crem) -> 
+            let subExprs, rem, captures = parseProgramInner crem [] cParams
+            [SubExpression (result |> List.rev)] @ subExprs, rem, captures 
+        | CaptureEnd currentCaptures (cParams, crem) ->
+            [SubExpression (result |> List.rev)], crem, cParams 
         | SkipToken " " res
         | TokenToVal "." Invoke res
         | TokenToVal "()" Unit res
@@ -128,20 +151,6 @@ let parseProgram (getMember: string -> ExprTypes option) (startText: string) =
             match v with
             | Some value -> parseProgramInner rem (value :: result) currentCaptures
             | None -> parseProgramInner rem result currentCaptures
-        | CaptureBegin (cParams, crem) -> 
-            let subExprs, rem, captures = parseProgramInner crem [] cParams
-            let exprConstraint = 
-                match captures with
-                | [] -> failwith "Unexpected end of subexpression"
-                | h :: [] -> h
-                | list -> list |> List.filter (fun cap -> cap.Delim.IsNone) |> (function | h :: [] -> h | _ -> failwith "Ambiguous end of subexpression")
-            let value = subExprs |> List.rev |> exprConstraint.Func 
-            parseProgramInner rem (value :: result) currentCaptures
-        | CaptureDelim currentCaptures (cParams, crem) -> 
-            let subExprs, rem, captures = parseProgramInner crem [] cParams
-            [SubExpression (result |> List.rev)] @ subExprs, rem, captures 
-        | CaptureEnd currentCaptures (cParams, crem) ->
-            [SubExpression (result |> List.rev)], crem, cParams 
         | FreeToken ["."; " "; "("; ")"; ","; "."; "]"; "["] (token, rem) ->
             let memberToken = 
                 match getMember token with

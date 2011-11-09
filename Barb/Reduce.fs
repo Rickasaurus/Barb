@@ -18,13 +18,15 @@ let rec applyInstanceState (input: obj) exprs =
     exprs |> List.map (fun expr -> resolveInstanceType expr)
     
 let resolveExpression exprs (failOnUnresolved: bool) = 
-    let rec (|ResolveSingle|_|) =
+    let rec (|ResolveSingle|_|) bindings =
         function 
         | Returned o -> Some <| resolveResultType o
         | Tuple tc -> 
-            let resolvedTp = tc |> List.collect (fun t -> reduceExpressions [] [t]) |> List.rev |> ResolvedTuple
+            let resolvedTp = tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> ResolvedTuple
             Some resolvedTp
-        | Unknown unk -> Some <| Obj unk
+        | Unknown unk -> match bindings |> Map.tryFind unk with 
+                         | Some var -> Some var 
+                         | None -> Some (Obj unk)
         | _ -> None
 
     and attemptToResolvePair =
@@ -46,28 +48,29 @@ let resolveExpression exprs (failOnUnresolved: bool) =
         | Obj l, ResolvedIndexArgs (Obj r) -> callIndexedProperty l r
         | _ -> None
 
-    and reduceExpressions lleft lright =
+    and reduceExpressions lleft lright bindings =
         match lleft, lright with
-        | (ResolveSingle resolved :: lt), right -> reduceExpressions lt (resolved :: right)
+        | (Binding (name, expr) :: lt), right -> let newbindings = bindings |> Map.add name expr in reduceExpressions lt right newbindings
+        | (ResolveSingle bindings resolved :: lt), right -> reduceExpressions lt (resolved :: right) bindings
         | left, (SubExpression exp :: rt) ->
-            match reduceExpressions [] exp |> List.rev with
-            | single :: [] -> reduceExpressions left (single :: rt)
-            | many -> reduceExpressions (SubExpression many :: left) rt
+            match reduceExpressions [] exp bindings |> List.rev with
+            | single :: [] -> reduceExpressions left (single :: rt) bindings
+            | many -> reduceExpressions (SubExpression many :: left) rt bindings
         | left, (IndexArgs exp :: rt) ->
-            match reduceExpressions [] [exp] with
+            match reduceExpressions [] [exp] bindings with
             | [] -> failwith (sprintf "No indexer found in [ ]")
-            | single :: [] -> reduceExpressions left (ResolvedIndexArgs single :: rt)
+            | single :: [] -> reduceExpressions left (ResolvedIndexArgs single :: rt) bindings
             | other -> failwith (sprintf "Multi-indexing not currently supported")
-        | [], r :: rt -> reduceExpressions [r] rt
+        | [], r :: rt -> reduceExpressions [r] rt bindings
         | l :: [], [] -> [l]
         | l :: lt, r :: rt ->        
             match attemptToResolvePair (l, r) with
-            | Some (rToken) -> reduceExpressions lt (rToken :: rt)
-            | None -> reduceExpressions (r :: l :: lt) rt
+            | Some (rToken) -> reduceExpressions lt (rToken :: rt) bindings
+            | None -> reduceExpressions (r :: l :: lt) rt bindings
         | catchall when failOnUnresolved -> failwith (sprintf "Unexpected case: %A" catchall)
         | left, [] -> left
 
-    reduceExpressions [] exprs
+    reduceExpressions [] exprs Map.empty
 
 
 
