@@ -165,13 +165,15 @@ let callIndexedProperty (target: obj) (indexVal: obj) =
             | other -> failwith (sprintf "MultiIndexed objects are not currently supported: %s" ttype.FullName)
 
 let compareAsSameType obj1 obj2 func =
-    let converted = 
-        if obj1 <> null && obj2 <> null && obj1.GetType() = obj2.GetType() then obj2
-        else
-            let t1Des = TypeDescriptor.GetConverter(obj1.GetType())
-            t1Des.ConvertFrom(obj2)
-    func obj1 converted
-            
+    try
+        let converted = 
+            if obj1 <> null && obj2 <> null && obj1.GetType() = obj2.GetType() then obj2
+            else
+                let t1Des = TypeDescriptor.GetConverter(obj1.GetType())
+                t1Des.ConvertFrom(obj2)
+        func obj1 converted
+    with _ -> failwith (sprintf "Failed to find a conversion for %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))
+     
 let objectsEqual (obj1: obj) (obj2: obj) = 
     if obj1 = null && obj2 = null then true
     elif obj1 = null || obj2 = null then false
