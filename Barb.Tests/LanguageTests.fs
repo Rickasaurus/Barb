@@ -285,7 +285,12 @@ let ``predicate language should support internal use of lambdas`` () =
 
 [<Fact>]
 let ``predicate language should support basic addition`` () = 
-    let testRecord = { HasHat = false; Name = "Don" }
-    let dudePredicate = buildExpr<BoolRec,bool> "1 + 2 = 3"
-    let result = dudePredicate testRecord
+    let dudePredicate = buildExpr<unit,bool> "1 + 2 = 3"
+    let result = dudePredicate ()
+    Assert.True(result) 
+
+[<Fact>]
+let ``predicate language should support basic subtraction`` () = 
+    let dudePredicate = buildExpr<unit,bool> "2 - 2 = 0"
+    let result = dudePredicate ()
     Assert.True(result) 

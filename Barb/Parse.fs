@@ -162,6 +162,9 @@ let parseProgram (getMember: string -> ExprTypes option) (startText: string) =
         | TokensToVal ["&"; "&&"; "and"] (Infix (BoolToBoolToBool (&&))) res
         | TokensToVal ["|"; "||"; "or"] (Infix (BoolToBoolToBool (||))) res 
         | TokenToVal "+" (Infix (ObjToObjToObj (addObjects))) res 
+        | TokenToVal "-" (Infix (ObjToObjToObj (subObjects))) res
+        | TokenToVal "/" (Infix (ObjToObjToObj (divideObjects))) res
+        | TokenToVal "*" (Infix (ObjToObjToObj (multObjects))) res
         | TextCapture '"' res
         | TextCapture ''' res 
         | Num res ->
