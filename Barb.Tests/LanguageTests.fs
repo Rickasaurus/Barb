@@ -284,13 +284,50 @@ let ``predicate language should support internal use of lambdas`` () =
     Assert.True(result) 
 
 [<Fact>]
-let ``predicate language should support basic addition`` () = 
+let ``predicate language should support int addition`` () = 
     let dudePredicate = buildExpr<unit,bool> "1 + 2 = 3"
     let result = dudePredicate ()
     Assert.True(result) 
 
 [<Fact>]
-let ``predicate language should support basic subtraction`` () = 
+let ``predicate language should support int subtraction`` () = 
     let dudePredicate = buildExpr<unit,bool> "2 - 2 = 0"
     let result = dudePredicate ()
+    Assert.True(result)
+    
+[<Fact>]
+let ``predicate language should support int division`` () = 
+    let dudePredicate = buildExpr<unit,bool> "4 / 2 = 2"
+    let result = dudePredicate ()
     Assert.True(result) 
+
+[<Fact>]
+let ``predicate language should support int multiplication`` () = 
+    let dudePredicate = buildExpr<unit,bool> "2 * 2 = 4"
+    let result = dudePredicate ()
+    Assert.True(result)  
+
+
+[<Fact>]
+let ``predicate language should support decimal addition`` () = 
+    let dudePredicate = buildExpr<unit,bool> "1.0 + 2.0 = 3.0"
+    let result = dudePredicate ()
+    Assert.True(result) 
+
+[<Fact>]
+let ``predicate language should support decimal subtraction`` () = 
+    let dudePredicate = buildExpr<unit,bool> "2.0 - 2.0 = 0"
+    let result = dudePredicate ()
+    Assert.True(result)
+    
+[<Fact>]
+let ``predicate language should support decimal division`` () = 
+    let dudePredicate = buildExpr<unit,bool> "4.0 / 2.0 = 2.0"
+    let result = dudePredicate ()
+    Assert.True(result) 
+
+[<Fact>]
+let ``predicate language should support decimal multiplication`` () = 
+    let dudePredicate = buildExpr<unit,bool> "2.0 * 2.0 = 4.0"
+    let result = dudePredicate ()
+    Assert.True(result)  
