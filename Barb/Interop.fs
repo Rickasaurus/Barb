@@ -67,13 +67,32 @@ let rec resolveAllProperties (rtype: System.Type) (parentName: string) (getter: 
             yield fullName, ParentProperty getPropFunc
     }     
 
+let rec inline convertSequence seq1 seq2 = 
+    List.zip (seq1 |> Seq.toList) (seq2 |> Seq.toList) 
+    |> List.map (fun (one, two) -> convertToSameType one two) 
+    |> List.unzip |> (fun (l1, l2) -> l1 :> obj, l2 :> obj)
+
+and convertToSameType (obj1: obj) (obj2: obj) : (obj * obj) = 
+    try
+        if obj1 <> null && obj2 <> null && obj1.GetType() = obj2.GetType() then obj1, obj2
+        else
+            let t1Des = TypeDescriptor.GetConverter(obj1.GetType())
+            if t1Des.CanConvertFrom(obj2.GetType()) then obj1, t1Des.ConvertFrom(obj2)
+            else match obj1, obj2 with
+                    // Compares reference-typed lists
+                    // NOTE: This will break with any version of .NET lower than 4.0
+                    | (:? seq<obj> as ie1), (:? seq<obj> as ie2) -> convertSequence ie1 ie2
+                    | (:? System.Collections.IEnumerable as ie1), (:? System.Collections.IEnumerable as ie2) -> convertSequence (ie1 |> Seq.cast) (ie2 |> Seq.cast)
+                    | _ -> obj1, System.Convert.ChangeType(obj2, obj1.GetType())
+    with _ -> failwith (sprintf "Failed to find a conversion for %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))   
+
 let convertToTargetType (ttype: Type) (param: obj) = 
     if param = null then Some null
     else
         let des = TypeDescriptor.GetConverter(ttype)
         match des.CanConvertFrom(param.GetType()) with
         | true -> Some <| des.ConvertFrom(param)
-        | false -> None            
+        | false -> try Some <| System.Convert.ChangeType(param, ttype) with _ -> None
 
 let (|DecomposeOption|_|) (o: obj) = 
     if o = null then Some null
@@ -86,14 +105,31 @@ let (|DecomposeOption|_|) (o: obj) =
             if gt = genericOptionType then
                 Some <| t.InvokeMember("Value", bindingFlags, null, o, Array.empty)
             else None
-        | _ -> None        
+        | _ -> None  
+       
+let (|SupportedNumberType|_|) (input: obj) =
+    match input with
+    | (:? byte as num) -> Some (int64 (int num) :> obj)
+    | (:? sbyte as num) -> Some (int64 (int num) :> obj)
+    | (:? int16 as num) -> Some (int64 (int32 num) :> obj)
+    | (:? uint16 as num) -> Some (int64 (uint32 num) :> obj)
+    | (:? int32 as num) -> Some (int64 num :> obj)
+    | (:? uint32 as num) -> Some (int64 num :> obj)
+//    | (:? int64 as num) -> Some (int64 num :> obj)
+    | (:? uint64 as num) -> Some (int64 num :> obj)
+    | (:? nativeint as num) -> Some (int64 (int64 num) :> obj)
+    | (:? unativeint as num) -> Some (int64 (uint64 num) :> obj)
+    | (:? float as num) -> Some (decimal num :> obj)
+    | (:? single as num) -> Some (decimal num :> obj)
+    | value -> None
 
-let resolveResultType = 
-    fun (output: obj) ->
-        match output with
-        | :? bool as boolinstance -> Bool boolinstance
-        | DecomposeOption contents -> Obj contents
-        | other -> Obj other
+let rec resolveResultType (output: obj) = 
+    match output with
+    | null -> Obj null
+    | :? bool as boolinstance -> Bool boolinstance
+    | DecomposeOption contents -> resolveResultType contents
+    | SupportedNumberType contents -> Obj contents
+    | other -> Obj other
 
 let cachedResolveMember = 
     let inputToKey (rtype: System.Type, caseName) = rtype.FullName + "~" + caseName
@@ -161,27 +197,9 @@ let callIndexedProperty (target: obj) (indexVal: obj) =
             | [| arg |] -> 
                 match convertToTargetType (arg.ParameterType) indexVal with
                 | Some (converted) -> Some <| (Returned (propInfo.GetValue(target, [| converted |])))
-                | None -> failwith (sprintf "No conversion found from %s to %s" (string indexVal) ttype.FullName)                
+                | None -> failwith (sprintf "No conversion found from %s of %s to %s" (string indexVal) (indexVal.GetType().ToString()) (arg.ParameterType.ToString()))                
             | other -> failwith (sprintf "MultiIndexed objects are not currently supported: %s" ttype.FullName)
 
-let rec inline convertSequence seq1 seq2 = 
-    List.zip (seq1 |> Seq.toList) (seq2 |> Seq.toList) 
-    |> List.map (fun (one, two) -> convertToSameType one two) 
-    |> List.unzip |> (fun (l1, l2) -> l1 :> obj, l2 :> obj)
-
-and convertToSameType (obj1: obj) (obj2: obj) : (obj * obj) = 
-    try
-        if obj1 <> null && obj2 <> null && obj1.GetType() = obj2.GetType() then obj1, obj2
-        else
-            let t1Des = TypeDescriptor.GetConverter(obj1.GetType())
-            if t1Des.CanConvertFrom(obj2.GetType()) then obj1, t1Des.ConvertFrom(obj2)
-            else match obj1, obj2 with
-                    // Compares reference-typed lists
-                    // NOTE: This will break with any version of .NET lower than 4.0
-                    | (:? seq<obj> as ie1), (:? seq<obj> as ie2) -> convertSequence ie1 ie2
-                    | (:? System.Collections.IEnumerable as ie1), (:? System.Collections.IEnumerable as ie2) -> convertSequence (ie1 |> Seq.cast) (ie2 |> Seq.cast)
-                    | _ -> failwith (sprintf "Failed to find a conversion for %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))   
-    with _ -> failwith (sprintf "Failed to find a conversion for %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))   
 
 let compareAsSameType obj1 obj2 func =
     let cobj1, cobj2 = convertToSameType obj1 obj2     
@@ -203,3 +221,16 @@ let compareObjects op =
         | (:? IComparable as comp1), (:? IComparable as comp2) when obj1.GetType() = obj2.GetType() -> op comp1 comp2
         | (:? IComparable as comp1), obj2 -> compareAsSameType comp1 obj2 (fun o1 o2 -> op (o1 :?> IComparable) (o2 :?> IComparable))
         | _ -> failwith (sprintf "Unable to compare %A and %A" obj1 obj2)
+
+open System.Numerics
+
+let addObjects (obj1: obj) (obj2: obj) =
+    if obj1 = null || obj2 = null then failwith "Unexpected null in addition"
+    match obj1, obj2 with
+    | (:? decimal as d1), (:? decimal as d2) -> (d1 + d2) :> obj
+    | (:? int64 as b1), (:? int64 as b2) -> (b1 + b2) :> obj
+    | (:? decimal as d1), (:? int64 as b2) -> (d1 + decimal b2) :> obj
+    | (:? int64 as b1), (:? decimal as d2) -> (decimal b1 + d2) :> obj
+    | _ -> failwith (sprintf "Cannot add %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))
+
+        

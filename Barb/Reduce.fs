@@ -16,8 +16,6 @@ let tupleToSequence (tuple: ExprTypes list) =
             | what -> failwith (sprintf "Cannot resolve the given tuple-internal expression to a object type: %A" what)
     }
 
-
-
 let rec applyInstanceState (input: obj) exprs =
     let rec resolveInstanceType expr =
             match expr with 
@@ -52,6 +50,7 @@ let resolveExpression exprs (failOnUnresolved: bool) =
     and attemptToResolvePair =        
         function
         | ObjToObj l, Obj r -> Obj (l r) |> Some
+        | Obj l, (Infix (ObjToObjToObj r)) -> Some <| ObjToObj (r l)
         | Obj l, (Infix (ObjToObjToBool r)) -> ObjToBool (r l) |> Some
         | Bool l, (Infix (ObjToObjToBool r)) -> ObjToBool (r l) |> Some
         | Bool l, (Infix (BoolToBoolToBool r)) -> Some <| BoolToBool (r l)

@@ -18,7 +18,8 @@ type ExprTypes =
     | Bool of bool
     | ObjToObjToBool of (obj -> obj -> bool)
     | ObjToBool of (obj -> bool)
-    | ObjToObj of (obj -> obj)  
+    | ObjToObjToObj of (obj -> obj -> obj) 
+    | ObjToObj of (obj -> obj)    
     | Obj of obj
     | Returned of obj
     | Infix of ExprTypes
@@ -34,3 +35,4 @@ type ExprTypes =
     | Binding of string * ExprTypes
     | LambdaDef of ExprTypes list * ExprTypes
     | LambdaPartial of (ExprTypes -> ExprTypes)
+

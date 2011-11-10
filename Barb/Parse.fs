@@ -36,24 +36,28 @@ type CaptureParams =
         Func: ExprTypes list -> ExprTypes
     }
 
+open System.Numerics
+
 let (|Num|_|) (text: string) =
     let numChars = [| '0'; '1'; '2'; '3'; '4'; '5'; '6'; '7'; '8'; '9' |]
     let sb = new StringBuilder()
     if numChars.Contains(text.[0]) then
         let rec inner = 
             function
-            | i, _ when i >= text.Length -> i
-            | i, true when text.[i] = '.' -> i
+            | i, dot when i >= text.Length -> i, dot
+            | i, true when text.[i] = '.' -> i, true
             | i, false when text.[i] = '.' -> sb.Append(text.[i]) |> ignore; inner (i+1, true)
             | i, dotSeen when numChars.Contains(text.[i]) -> sb.Append(text.[i]) |> ignore; inner (i+1, dotSeen)
-            | i, _ -> i
-        let resi = inner (0, false)
-        let tokenStr = Some (Obj (sb.ToString() :> obj))
+            | i, dot -> i, dot
+        let resi, dot = inner (0, false)
+        let tokenStr = 
+            let resultStr = sb.ToString()
+            if dot then match Decimal.TryParse(resultStr) with | true, num -> Obj num | _ -> Obj resultStr
+            else match Int64.TryParse(resultStr) with | true, num -> Obj num | _ -> Obj resultStr
         let rest = text.Substring(resi)
-        Some (tokenStr, rest)
+        Some (Some (tokenStr), rest)
     else None
         
-
 let (|TextCapture|_|) (b: char) (text: string) = 
     if text.[0] = b then 
         let sb = new StringBuilder()
@@ -157,6 +161,7 @@ let parseProgram (getMember: string -> ExprTypes option) (startText: string) =
         | TokensToVal ["!"; "not"] (BoolToBool not) res
         | TokensToVal ["&"; "&&"; "and"] (Infix (BoolToBoolToBool (&&))) res
         | TokensToVal ["|"; "||"; "or"] (Infix (BoolToBoolToBool (||))) res 
+        | TokenToVal "+" (Infix (ObjToObjToObj (addObjects))) res 
         | TextCapture '"' res
         | TextCapture ''' res 
         | Num res ->
