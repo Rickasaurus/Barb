@@ -44,16 +44,22 @@ let resolveExpression exprs (failOnUnresolved: bool) =
         | Tuple tc -> 
             let resolvedTp = tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> ResolvedTuple
             Some resolvedTp
-        | Unknown unk -> bindings |> Map.tryFind unk
+        | Unknown unk -> bindings |> Map.tryFind unk       
         | _ -> None
+    
+//    and attemptToResolveTriple bindings =
+//        function
+//        | (Infix (lp, (ObjToObjToObj lf))), Obj r, (Infix (rp, (ObjToObjToObj rf))) ->
+//            if lp > rp then lf
+//        | _ -> None
 
     and attemptToResolvePair =        
         function
         | ObjToObj l, Obj r -> Obj (l r) |> Some
-        | Obj l, (Infix (ObjToObjToObj r)) -> Some <| ObjToObj (r l)
-        | Obj l, (Infix (ObjToObjToBool r)) -> ObjToBool (r l) |> Some
-        | Bool l, (Infix (ObjToObjToBool r)) -> ObjToBool (r l) |> Some
-        | Bool l, (Infix (BoolToBoolToBool r)) -> Some <| BoolToBool (r l)
+        | Obj l, (Infix (_,(ObjToObjToObj r))) -> Some <| ObjToObj (r l)
+        | Obj l, (Infix (_,(ObjToObjToBool r))) -> ObjToBool (r l) |> Some
+        | Bool l, (Infix (_,(ObjToObjToBool r))) -> ObjToBool (r l) |> Some
+        | Bool l, (Infix (_,(BoolToBoolToBool r))) -> Some <| BoolToBool (r l)
         | ObjToBool l, ResolvedTuple r -> Some <| Bool (l (tupleToSequence r))
         | ObjToBool l, Obj r -> Some <| Bool (l r)
         | ObjToBool l, Bool r -> Some <| Bool (l r)

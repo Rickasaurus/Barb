@@ -22,7 +22,8 @@ type ExprTypes =
     | ObjToObj of (obj -> obj)    
     | Obj of obj
     | Returned of obj
-    | Infix of ExprTypes
+    | Infix of int * ExprTypes
+    | Postfix of (obj -> obj)
     | Unit
     | SubExpression of ExprTypes list
     | Tuple of ExprTypes list

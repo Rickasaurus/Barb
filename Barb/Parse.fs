@@ -152,19 +152,19 @@ let parseProgram (getMember: string -> ExprTypes option) (startText: string) =
         | TokenToVal "null" (Obj null) res
         | TokenToVal "true" (Bool true) res 
         | TokenToVal "false" (Bool false) res 
-        | TokensToVal ["=="; "="] (Infix (ObjToObjToBool objectsEqual)) res 
-        | TokensToVal ["<>"; "!="] (Infix (ObjToObjToBool objectsNotEqual)) res
-        | TokenToVal ">=" (Infix (ObjToObjToBool (compareObjects (>=)))) res
-        | TokenToVal "<=" (Infix (ObjToObjToBool (compareObjects (<=)))) res
-        | TokenToVal ">" (Infix (ObjToObjToBool (compareObjects (>)))) res
-        | TokenToVal "<" (Infix (ObjToObjToBool (compareObjects (<)))) res 
+        | TokensToVal ["=="; "="] (Infix (0, ObjToObjToBool objectsEqual)) res 
+        | TokensToVal ["<>"; "!="] (Infix (0, ObjToObjToBool objectsNotEqual)) res
+        | TokenToVal ">=" (Infix (0, ObjToObjToBool (compareObjects (>=)))) res
+        | TokenToVal "<=" (Infix (0, ObjToObjToBool (compareObjects (<=)))) res
+        | TokenToVal ">" (Infix (0, ObjToObjToBool (compareObjects (>)))) res
+        | TokenToVal "<" (Infix (0, ObjToObjToBool (compareObjects (<)))) res 
         | TokensToVal ["!"; "not"] (BoolToBool not) res
-        | TokensToVal ["&"; "&&"; "and"] (Infix (BoolToBoolToBool (&&))) res
-        | TokensToVal ["|"; "||"; "or"] (Infix (BoolToBoolToBool (||))) res 
-        | TokenToVal "+" (Infix (ObjToObjToObj (addObjects))) res 
-        | TokenToVal "-" (Infix (ObjToObjToObj (subObjects))) res
-        | TokenToVal "/" (Infix (ObjToObjToObj (divideObjects))) res
-        | TokenToVal "*" (Infix (ObjToObjToObj (multObjects))) res
+        | TokensToVal ["&"; "&&"; "and"] (Infix (0, BoolToBoolToBool (&&))) res
+        | TokensToVal ["|"; "||"; "or"] (Infix (0, BoolToBoolToBool (||))) res 
+        | TokenToVal "+" (Infix (3, ObjToObjToObj (addObjects))) res 
+        | TokenToVal "-" (Infix (3, ObjToObjToObj (subObjects))) res
+        | TokenToVal "/" (Infix (2, ObjToObjToObj (divideObjects))) res
+        | TokenToVal "*" (Infix (2, ObjToObjToObj (multObjects))) res
         | TextCapture '"' res
         | TextCapture ''' res 
         | Num res ->
