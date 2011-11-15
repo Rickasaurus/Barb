@@ -61,7 +61,7 @@ let ``predicate language should support less than or equal to`` () =
 [<Fact>] 
 let ``predicate language should support not`` () =
     let testRecord = { Name = "Dude Duderson"; Age = 20 }
-    let dudePredicate = buildExpr<DudeRecordWithInt,bool> "Name = \"Dude Duderson\" and not Age = 19"
+    let dudePredicate = buildExpr<DudeRecordWithInt,bool> "Name = \"Dude Duderson\" and not (Age = 19)"
     let result = dudePredicate testRecord
     Assert.True(result)
 
