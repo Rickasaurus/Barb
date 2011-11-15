@@ -34,17 +34,17 @@ let attemptToResolvePair =
 //        | Bool l, (Infix (_,(ObjToObjToBool r))) -> ObjToBool (r l) |> Some
 //        | Bool l, (Infix (_,(BoolToBoolToBool r))) -> Some <| BoolToBool (r l)
 //        | ObjToBool l, ResolvedTuple r -> Some <| Bool (l (tupleToSequence r))
-    | Prefix l, ResolvedTuple r -> Some <| Obj (l (tupleToSequence r))
+//    | Prefix l, ResolvedTuple r -> Some <| Obj (l (tupleToSequence r))
 //        | ObjToBool l, Obj r -> Some <| Bool (l r)
 //        | ObjToBool l, Bool r -> Some <| Bool (l r)
 //        | BoolToBool l, Bool r -> Some <| Bool (l r)
     | Method l, Unit -> executeUnitMethod l
-    | Method l, Obj r -> executeOneParamMethod l r
-    | Method l, ResolvedTuple r -> executeParameterizedMethod l r 
+    | Method l, Obj r -> executeParameterizedMethod l r 
+//    | Method l, Obj r -> executeOneParamMethod l r
     | Invoke, Unknown r -> Some <| AppliedInvoke r
     | Invoke, ResolvedIndexArgs r -> Some <| ResolvedIndexArgs r //Here for F#-like indexing (if you want it)
     | Obj l, AppliedInvoke r -> resolveInvoke l r
-    | IndexedProperty l, ResolvedIndexArgs (Obj r) -> executeOneParamMethod l r
+    | IndexedProperty l, ResolvedIndexArgs (Obj r) -> executeIndexer l r
     | Obj l, ResolvedIndexArgs (Obj r) -> callIndexedProperty l r
     | LambdaPartial l, Obj r -> Some <| (l (Obj r))
     | _ -> None
@@ -65,8 +65,8 @@ let resolveExpression exprs (finalReduction: bool) =
         function 
         | Returned o -> Some <| resolveResultType o
         | Tuple tc -> 
-            let resolvedTp = tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> ResolvedTuple
-            Some resolvedTp
+            let resolvedTp = tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> tupleToSequence
+            Some (Obj resolvedTp)
         | Unknown unk -> bindings |> Map.tryFind unk       
         | _ -> None
     

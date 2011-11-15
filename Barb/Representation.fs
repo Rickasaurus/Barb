@@ -27,7 +27,7 @@ type ExprTypes =
     | Unit
     | SubExpression of ExprTypes list
     | Tuple of ExprTypes list
-    | ResolvedTuple of ExprTypes list
+//    | ResolvedTuple of ExprTypes list
     | IndexArgs of ExprTypes
     | ResolvedIndexArgs of ExprTypes
     | Invoke

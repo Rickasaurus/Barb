@@ -150,7 +150,7 @@ let executeUnitMethod (sigs: MethodSig) =
     |> Option.bind (fun (exec, paramTypes) -> Some <| exec Array.empty)
     |> Option.map Returned
 
-let executeOneParamMethod (sigs: MethodSig) (param: obj) =
+let executeIndexer (sigs: MethodSig) (param: obj) =
     sigs
     |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = 1)
     |> Option.bind (fun (exec, paramTypes) -> 
@@ -159,17 +159,21 @@ let executeOneParamMethod (sigs: MethodSig) (param: obj) =
     |> Option.map (fun (exec, converted) -> exec [| converted |])
     |> Option.map Returned
 
-let executeParameterizedMethod (sigs: MethodSig) (prms: ExprTypes list) =
-    let arrayPrms = 
-        prms 
-        |> List.map (function | Obj o -> o | ohno -> failwith (sprintf "Unexpected parameter type: %A" ohno))
-        |> List.toArray
+let executeParameterizedMethod (sigs: MethodSig) (args: obj) =
+    let arrayArgs =
+        match args with
+        | :? (obj seq) as tuple -> tuple |> Seq.toArray 
+        | _ as o -> [| o |]
+//    let arrayPrms = 
+//        prms 
+//        |> List.map (function | Obj o -> o | ohno -> failwith (sprintf "Unexpected parameter type: %A" ohno))
+//        |> List.toArray
     sigs
-    |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = arrayPrms.Length)
+    |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = arrayArgs.Length)
     |> Option.map (fun (exec, paramTypes) -> 
-        Array.zip paramTypes arrayPrms
+        Array.zip paramTypes arrayArgs
         |> Array.map (fun (tType, param) -> convertToTargetType tType param)
-        |> Array.map (function | Some rParam -> rParam | None -> failwith (sprintf "Unable to resolve method parameters: %A -> %A" arrayPrms paramTypes))
+        |> Array.map (function | Some rParam -> rParam | None -> failwith (sprintf "Unable to resolve method parameters: %A -> %A" arrayArgs paramTypes))
         |> fun rParams -> exec rParams)
     |> Option.map Returned
 
