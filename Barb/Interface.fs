@@ -37,21 +37,27 @@ module Compiler =
         let parsedTokens = parseProgram getMember predicate
 
     #if DEBUG
+        printfn ""
         printfn "PT: %A" parsedTokens
+        printfn ""
     #endif
 
         let reducedExpression = 
             resolveExpression parsedTokens false |> List.rev
 
     #if DEBUG
+        printfn ""
         printfn "RE: %A" reducedExpression
+        printfn ""
     #endif
 
         let calculateResult input = 
 
             let appliedParsedTokens = applyInstanceState input reducedExpression
-    #if DEBUG        
+    #if DEBUG
+            printfn ""        
             printfn "APT: %A" appliedParsedTokens
+            printfn ""
     #endif
             match resolveExpression appliedParsedTokens true with
             | Obj (res) :: [] -> res

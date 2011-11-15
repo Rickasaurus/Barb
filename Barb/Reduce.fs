@@ -49,7 +49,7 @@ let attemptToResolvePair =
     | LambdaPartial l, Obj r -> Some <| (l (Obj r))
     | _ -> None
     
-let resolveExpression exprs (failOnUnresolved: bool) = 
+let resolveExpression exprs (finalReduction: bool) = 
     let rec buildLambdaFunction (arguments: ExprTypes list) (body: ExprTypes list) =
         let args = arguments |> List.map (function | Unknown str -> str | other -> failwith (sprintf "Unexpected lambda argument type: %A" other))
         let inputs = ref []
@@ -73,18 +73,20 @@ let resolveExpression exprs (failOnUnresolved: bool) =
     and (|ResolveTriple|_|) =
         function
         // Obj InfixOp Obj InfixOp
-        | (Infix (lp, lfun)) :: Obj l :: lt, Obj r :: (Infix (rp, rfrun)) :: rt ->
+        | (Infix (lp, lfun)) :: Obj l :: lt, Obj r :: (Infix (rp, rfrun)) :: rt when finalReduction ->
             if lp <= rp then 
                 Some (Obj (lfun l r), lt, (Infix (rp, rfrun)) :: rt)
             else None
         // Obj InfixOp Obj END
-        | (Infix (lp, lfun)) :: Obj l :: lt, Obj r :: [] ->
+        | (Infix (lp, lfun)) :: Obj l :: lt, Obj r :: [] when finalReduction ->
             Some (Obj (lfun l r), lt, [])
         | _ -> None
 
     // Always looks on the left and moves to the right first, then tries to merge left and right
     and reduceExpressions lleft lright bindings =
+        #if DEBUG
         printfn "L: %A R: %A" lleft lright
+        #endif
         match lleft, lright with
         | (LambdaDef (names, expr) :: lt), right -> let lambdaExpr = reduceExpressions [] [expr] bindings
                                                     let lambdaResult = buildLambdaFunction names lambdaExpr
@@ -107,7 +109,7 @@ let resolveExpression exprs (failOnUnresolved: bool) =
             match attemptToResolvePair (l, r) with
             | Some (rToken) -> reduceExpressions lt (rToken :: rt) bindings
             | None -> reduceExpressions (r :: l :: lt) rt bindings
-        | catchall when failOnUnresolved -> failwith (sprintf "Unexpected case: %A" catchall)
+        | catchall when finalReduction -> failwith (sprintf "Unexpected case: %A" catchall)
         | left, [] -> left
 
     reduceExpressions [] exprs Map.empty

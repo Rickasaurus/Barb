@@ -49,18 +49,18 @@ type NumRec =
     
 [<Fact>]
 let ``predicate language should use correct order of operations with getters 1`` () = 
-    let dudePredicate = buildExpr<NumRec,bool> "Num + 2 / 4 = 1"
+    let dudePredicate = buildExpr<NumRec,bool> "Num + 4 / 4 = 3"
     let result = dudePredicate { Num = 2 }
     Assert.True(result)    
 
 [<Fact>]
 let ``predicate language should use correct order of operations with getters 2`` () = 
-    let dudePredicate = buildExpr<NumRec,bool> "2 + Num / 4 = 1"
-    let result = dudePredicate { Num = 2 }
+    let dudePredicate = buildExpr<NumRec,bool> "2 + Num / 4 = 3"
+    let result = dudePredicate { Num = 4 }
     Assert.True(result)
 
 [<Fact>]
 let ``predicate language should use correct order of operations with getters 3`` () = 
-    let dudePredicate = buildExpr<NumRec,bool> "2 + 2 / Num = 1"
-    let result = dudePredicate { Num = 4 }
+    let dudePredicate = buildExpr<NumRec,bool> "2 + 2 / Num = 3"
+    let result = dudePredicate { Num = 2 }
     Assert.True(result)
