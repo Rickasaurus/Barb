@@ -52,17 +52,14 @@ module Compiler =
     #endif
 
         let calculateResult input = 
-
             let appliedParsedTokens = applyInstanceState input reducedExpression
     #if DEBUG
             printfn ""        
             printfn "APT: %A" appliedParsedTokens
             printfn ""
     #endif
-            match resolveExpression appliedParsedTokens true with
-            | Obj (res) :: [] -> res
-//            | Bool (res) :: [] -> box res
-            | otherToken -> failwith (sprintf "Unexpected result: %A" otherToken)
+            resolveExpression appliedParsedTokens true
+            |>  resolveExpressionResult
 
         calculateResult
 

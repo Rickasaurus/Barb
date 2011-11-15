@@ -164,10 +164,6 @@ let executeParameterizedMethod (sigs: MethodSig) (args: obj) =
         match args with
         | :? (obj seq) as tuple -> tuple |> Seq.toArray 
         | _ as o -> [| o |]
-//    let arrayPrms = 
-//        prms 
-//        |> List.map (function | Obj o -> o | ohno -> failwith (sprintf "Unexpected parameter type: %A" ohno))
-//        |> List.toArray
     sigs
     |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = arrayArgs.Length)
     |> Option.map (fun (exec, paramTypes) -> 

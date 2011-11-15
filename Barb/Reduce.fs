@@ -7,6 +7,11 @@ open System.Collections.Concurrent
 open Barb.Interop
 open Barb.Representation
 
+let resolveExpressionResult (input: ExprTypes list) =
+    match input with
+    | Obj (res) :: [] -> res
+    | otherTokens -> failwith (sprintf "Unexpected result: %A" otherTokens)
+
 let tupleToSequence (tuple: ExprTypes list) = 
     seq {
         for t in tuple do
@@ -29,18 +34,8 @@ let rec applyInstanceState (input: obj) exprs =
 let attemptToResolvePair =        
     function
     | Prefix l, Obj r -> Obj (l r) |> Some
-//        | Obj l, (Infix (_,(ObjToObjToObj r))) -> Some <| ObjToObj (r l)
-//        | Obj l, (Infix (_,(ObjToObjToBool r))) -> ObjToBool (r l) |> Some
-//        | Bool l, (Infix (_,(ObjToObjToBool r))) -> ObjToBool (r l) |> Some
-//        | Bool l, (Infix (_,(BoolToBoolToBool r))) -> Some <| BoolToBool (r l)
-//        | ObjToBool l, ResolvedTuple r -> Some <| Bool (l (tupleToSequence r))
-//    | Prefix l, ResolvedTuple r -> Some <| Obj (l (tupleToSequence r))
-//        | ObjToBool l, Obj r -> Some <| Bool (l r)
-//        | ObjToBool l, Bool r -> Some <| Bool (l r)
-//        | BoolToBool l, Bool r -> Some <| Bool (l r)
     | Method l, Unit -> executeUnitMethod l
     | Method l, Obj r -> executeParameterizedMethod l r 
-//    | Method l, Obj r -> executeOneParamMethod l r
     | Invoke, Unknown r -> Some <| AppliedInvoke r
     | Invoke, ResolvedIndexArgs r -> Some <| ResolvedIndexArgs r //Here for F#-like indexing (if you want it)
     | Obj l, AppliedInvoke r -> resolveInvoke l r

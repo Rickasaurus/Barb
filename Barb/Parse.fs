@@ -28,6 +28,10 @@ let (|TokensToVal|_|) (mStrs: string list) (result: ExprTypes) (text: string) =
     | Some (matched) -> Some (Some(result), text.Substring(matched.Length))
     | None -> None
 
+type DelimType =
+    | Single of string
+    | Repeating of string
+
 type CaptureParams = 
     {
         Begin: string
