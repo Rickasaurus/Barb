@@ -36,7 +36,9 @@ module Compiler =
     #endif
 
         let calculateResult input = 
-            let inputBindings = memberMap |> Map.map (fun k prop -> prop input |> resolveResultType)
+            let inputBindings = 
+                memberMap
+                |> Map.map (fun k prop -> lazy (prop input |> resolveResultType ))
     
     #if DEBUG
             printfn ""

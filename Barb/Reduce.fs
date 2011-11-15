@@ -39,7 +39,7 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         let args = arguments |> List.map (function | Unknown str -> str | other -> failwith (sprintf "Unexpected lambda argument type: %A" other))
         let inputs = ref []
         let rec consumeArg arg = 
-            inputs := (arg :: !inputs)
+            inputs := (lazy(arg) :: !inputs)
             if List.length !inputs = List.length arguments then
                 let bindings = List.zip args (List.rev !inputs) |> Map.ofList
                 SubExpression (reduceExpressions [] body bindings)
@@ -64,7 +64,7 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         | Tuple tc -> 
             let resolvedTp = tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> tupleToSequence
             Some (Obj resolvedTp)
-        | Unknown unk -> bindings |> Map.tryFind unk
+        | Unknown unk -> bindings |> Map.tryFind unk |> Option.bind (fun res -> Some <| res.Force())
         | ResolveIfThenElse bindings result -> Some result
         | _ -> None
     
@@ -81,7 +81,7 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         | _ -> None
 
     // Always looks on the left and moves to the right first, then tries to merge left and right
-    and reduceExpressions lleft lright bindings =
+    and reduceExpressions lleft lright (bindings: (string, ExprTypes Lazy) Map) =
         #if DEBUG
         printfn "L: %A R: %A" lleft lright
         #endif
@@ -89,7 +89,7 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         | (LambdaDef (names, expr) :: lt), right -> let lambdaExpr = reduceExpressions [] [expr] bindings
                                                     let lambdaResult = buildLambdaFunction names lambdaExpr
                                                     reduceExpressions lt (lambdaResult :: right) bindings 
-        | (Binding (name, expr) :: lt), right -> let newbindings = bindings |> Map.add name expr in reduceExpressions lt right newbindings
+        | (Binding (name, expr) :: lt), right -> let newbindings = bindings |> Map.add name (lazy (expr)) in reduceExpressions lt right newbindings
         | (ResolveSingle bindings resolved :: lt), right -> reduceExpressions lt (resolved :: right) bindings
         | left, (SubExpression exp :: rt) ->
             match reduceExpressions [] exp bindings |> List.rev with

@@ -202,8 +202,8 @@ let ``predicate language should support decimal subtraction`` () =
     Assert.True(result)
     
 [<Fact>]
-let ``predicate language should support decimal division`` () = 
-    let dudePredicate = buildExpr<unit,bool> "4.0 / 2.0 = 2.0"
+let ``predicate language should support decimal div.0ision`` () = 
+    let dudePredicate = buildExpr<unit,bool> "4 / 2.0 = 2.0"
     let result = dudePredicate ()
     Assert.True(result) 
 
@@ -211,5 +211,13 @@ let ``predicate language should support decimal division`` () =
 let ``predicate language should support decimal multiplication`` () = 
     let dudePredicate = buildExpr<unit,bool> "2.0 * 2.0 = 4.0"
     let result = dudePredicate ()
+    Assert.True(result)  
+
+
+[<Fact>]
+let ``predicate language should support if-then-else`` () = 
+    let testRec = { Score = 101.0 } 
+    let dudePredicate = buildExpr<TestFloatRec,bool> "(if Score >= 100 then 5 else 10) = 5"
+    let result = dudePredicate testRec
     Assert.True(result)  
 
