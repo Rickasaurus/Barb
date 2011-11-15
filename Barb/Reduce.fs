@@ -44,7 +44,7 @@ let attemptToResolvePair =
     | LambdaPartial l, Obj r -> Some <| (l (Obj r))
     | _ -> None
     
-let resolveExpression exprs (finalReduction: bool) = 
+let resolveExpression exprs initialBindings (finalReduction: bool) = 
     let rec buildLambdaFunction (arguments: ExprTypes list) (body: ExprTypes list) =
         let args = arguments |> List.map (function | Unknown str -> str | other -> failwith (sprintf "Unexpected lambda argument type: %A" other))
         let inputs = ref []
@@ -55,6 +55,18 @@ let resolveExpression exprs (finalReduction: bool) =
                 SubExpression (reduceExpressions [] body bindings)
             else LambdaPartial consumeArg
         LambdaPartial consumeArg
+
+    and (|ResolveIfThenElse|_|) bindings =
+        function
+        | IfThenElse (ifexpr, thenexpr, elseexpr) ->
+            match reduceExpressions [] ifexpr bindings with
+            | Obj (:? bool as res) :: [] when finalReduction -> 
+                if res then reduceExpressions [] thenexpr bindings
+                else reduceExpressions [] elseexpr bindings
+                |> (fun resExpr -> Some (SubExpression(resExpr)))
+            | invalid when finalReduction -> failwith (sprintf "If predicate returned an invalid result: %A" invalid)
+            | _ -> None
+        | _ -> None
             
     and (|ResolveSingle|_|) bindings =
         function 
@@ -62,7 +74,8 @@ let resolveExpression exprs (finalReduction: bool) =
         | Tuple tc -> 
             let resolvedTp = tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> tupleToSequence
             Some (Obj resolvedTp)
-        | Unknown unk -> bindings |> Map.tryFind unk       
+        | Unknown unk -> bindings |> Map.tryFind unk
+        | ResolveIfThenElse bindings result -> Some result
         | _ -> None
     
     and (|ResolveTriple|_|) =
@@ -107,7 +120,7 @@ let resolveExpression exprs (finalReduction: bool) =
         | catchall when finalReduction -> failwith (sprintf "Unexpected case: %A" catchall)
         | left, [] -> left
 
-    reduceExpressions [] exprs Map.empty
+    reduceExpressions [] exprs initialBindings
 
 
 

@@ -15,15 +15,13 @@ module Compiler =
     let buildExpression (localType: Type) (predicate: string) : (obj -> obj) =
 
         let memberMap =
-            let keyValues = 
-                resolveAllProperties localType "" id
-                |> Seq.map (fun (k,v) -> new KeyValuePair<_,_>(k,v))
-            new ConcurrentDictionary<_, _>(keyValues)
+            resolveAllProperties localType "" id
+            |> Map.ofSeq
 
-        let getMember memberName =
-            match memberMap.TryGetValue memberName with
-            | true, foundMember -> Some foundMember
-            | false, _ -> None
+//        let getMember memberName =
+//            match memberMap.TryGetValue memberName with
+//            | true, foundMember -> Some foundMember
+//            | false, _ -> None
 
 //        let tokens = tokenizeString predicate
 //
@@ -34,7 +32,7 @@ module Compiler =
 //        let parsedTokens = 
 //            parseTokens getMember tokens
 //            |> (fun (res, remainder, expType) -> res)
-        let parsedTokens = parseProgram getMember predicate
+        let parsedTokens = parseProgram predicate
 
     #if DEBUG
         printfn ""
@@ -43,7 +41,7 @@ module Compiler =
     #endif
 
         let reducedExpression = 
-            resolveExpression parsedTokens false |> List.rev
+            resolveExpression parsedTokens memberMap false |> List.rev
 
     #if DEBUG
         printfn ""
@@ -58,8 +56,8 @@ module Compiler =
             printfn "APT: %A" appliedParsedTokens
             printfn ""
     #endif
-            resolveExpression appliedParsedTokens true
-            |>  resolveExpressionResult
+            resolveExpression appliedParsedTokens memberMap true
+            |> resolveExpressionResult
 
         calculateResult
 

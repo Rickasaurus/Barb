@@ -99,20 +99,26 @@ let generateLambda =
     | h :: SubExpression(names) :: [] -> LambdaDef (names, h) 
     | list -> failwith (sprintf "Incorrect lambda binding syntax: %A" list)
 
+let generateIfThenElse =
+    function
+    | SubExpression(elseexpr) :: SubExpression(thenexpr) :: SubExpression(ifexpr) :: [] -> IfThenElse (ifexpr, thenexpr, elseexpr)
+    | list -> failwith (sprintf "Incorrect if-then-else syntax: %A" list)
+
 let captureTypes = 
     [
-        { Begin = "(";    Delims = [];                  End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
-        { Begin = "(";    Delims = [Repeating ","];     End = ")";  Func = (fun exprs -> Tuple exprs) }
-        { Begin = "[";    Delims = [];                  End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
-        { Begin = "let";  Delims = [Single "="];        End = "in"; Func = bindFunction }
-        { Begin = "var";  Delims = [Single "="];        End = "in"; Func = bindFunction }
-        { Begin = "(fun"; Delims = [Single "->"];       End = ")";  Func = generateLambda }
+        { Begin = "(";    Delims = [];                             End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
+        { Begin = "(";    Delims = [Repeating ","];                End = ")";  Func = (fun exprs -> Tuple exprs) }
+        { Begin = "[";    Delims = [];                             End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
+        { Begin = "let";  Delims = [Single "="];                   End = "in"; Func = bindFunction }
+        { Begin = "var";  Delims = [Single "="];                   End = "in"; Func = bindFunction }
+        { Begin = "(fun"; Delims = [Single "->"];                  End = ")";  Func = generateLambda }
+        { Begin = "(if";  Delims = [Single "then"; Single "else"]; End = ")";  Func = generateIfThenElse }
     ]
 
 let (|CaptureDelim|_|) currentCaptures (text: string) =
     let matches, delimLen = 
         [ 
-            for cc in currentCaptures do //if List.isEmpty cc.Delims && text.StartsWith cc.Delim.Value then yield cc 
+            for cc in currentCaptures do
                 match cc.Delims with
                 | (Single delim) :: dt when text.StartsWith delim -> yield { cc with Delims = dt }, delim
                 | (Repeating delim) :: dt when text.StartsWith delim -> yield cc, delim
@@ -141,7 +147,7 @@ let (|CaptureBegin|_|) (text: string) =
     | onecap :: [] -> Some ([onecap], text.Substring(onecap.Begin.Length))
     | caps -> Some (caps, text.Substring(str))
 
-let parseProgram (getMember: string -> ExprTypes option) (startText: string) = 
+let parseProgram (startText: string) = 
     let rec parseProgramInner (str: string) (result: ExprTypes list) (currentCaptures: CaptureParams list) =
         match str with
         | "" -> result, "", currentCaptures
@@ -188,10 +194,6 @@ let parseProgram (getMember: string -> ExprTypes option) (startText: string) =
             | Some value -> parseProgramInner rem (value :: result) currentCaptures
             | None -> parseProgramInner rem result currentCaptures
         | FreeToken ["."; " "; "("; ")"; ","; "."; "]"; "["] (token, rem) ->
-            let memberToken = 
-                match getMember token with
-                | Some (expr) -> expr
-                | None -> Unknown token
-            parseProgramInner rem (memberToken :: result) currentCaptures
+            parseProgramInner rem ((Unknown token) :: result) currentCaptures
         | str -> parseProgramInner (str.Substring(1)) result currentCaptures
     let res, _, _ = parseProgramInner startText [] [] in res |> List.rev

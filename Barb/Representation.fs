@@ -29,4 +29,5 @@ type ExprTypes =
     | Binding of string * ExprTypes
     | LambdaDef of ExprTypes list * ExprTypes
     | LambdaPartial of (ExprTypes -> ExprTypes)
+    | IfThenElse of ExprTypes list * ExprTypes list * ExprTypes list
 
