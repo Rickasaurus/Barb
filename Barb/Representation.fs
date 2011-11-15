@@ -10,7 +10,6 @@ type MemberTypes =
     | MethodCall of (obj -> ((obj array -> obj) * Type array) list)
 
 type ExprTypes = 
-//    | ParentProperty of (obj -> ExprTypes)
     | Method of MethodSig
     | IndexedProperty of MethodSig
     | Obj of obj

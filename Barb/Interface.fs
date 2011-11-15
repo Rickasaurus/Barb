@@ -18,20 +18,6 @@ module Compiler =
             resolveAllProperties localType "" id
             |> Map.ofSeq
 
-//        let getMember memberName =
-//            match memberMap.TryGetValue memberName with
-//            | true, foundMember -> Some foundMember
-//            | false, _ -> None
-
-//        let tokens = tokenizeString predicate
-//
-//    #if DEBUG
-//        printfn "T: %A" tokens
-//    #endif
-//
-//        let parsedTokens = 
-//            parseTokens getMember tokens
-//            |> (fun (res, remainder, expType) -> res)
         let parsedTokens = parseProgram predicate
 
     #if DEBUG
@@ -58,12 +44,6 @@ module Compiler =
             printfn ""
     #endif
 
-//            let appliedParsedTokens = applyInstanceState input reducedExpression
-//    #if DEBUG
-//            printfn ""        
-//            printfn "APT: %A" appliedParsedTokens
-//            printfn ""
-//    #endif
             resolveExpression reducedExpression inputBindings true
             |> resolveExpressionResult
 
