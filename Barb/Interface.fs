@@ -55,7 +55,7 @@ module Compiler =
     #endif
             match resolveExpression appliedParsedTokens true with
             | Obj (res) :: [] -> res
-            | Bool (res) :: [] -> box res
+//            | Bool (res) :: [] -> box res
             | otherToken -> failwith (sprintf "Unexpected result: %A" otherToken)
 
         calculateResult

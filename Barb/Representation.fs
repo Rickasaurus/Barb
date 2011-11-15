@@ -13,17 +13,17 @@ type ExprTypes =
     | ParentProperty of (obj -> obj)
     | Method of MethodSig
     | IndexedProperty of MethodSig
-    | BoolToBoolToBool of (bool -> bool -> bool)
-    | BoolToBool of (bool -> bool)
-    | Bool of bool
-    | ObjToObjToBool of (obj -> obj -> bool)
-    | ObjToBool of (obj -> bool)
-    | ObjToObjToObj of (obj -> obj -> obj) 
-    | ObjToObj of (obj -> obj)    
+//    | BoolToBoolToBool of (bool -> bool -> bool)
+//    | BoolToBool of (bool -> bool)
+//    | Bool of bool
+//    | ObjToObjToBool of (obj -> obj -> bool)
+//    | ObjToBool of (obj -> bool)
     | Obj of obj
     | Returned of obj
-    | Infix of int * ExprTypes
+//    | Infix of int * ExprTypes
+    | Prefix of (obj -> obj)    
     | Postfix of (obj -> obj)
+    | Infix of int * (obj -> obj -> obj) 
     | Unit
     | SubExpression of ExprTypes list
     | Tuple of ExprTypes list

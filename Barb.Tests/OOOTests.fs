@@ -9,6 +9,13 @@ type DudeRecord = { Name: string; Sex: char }
 type BoolRec = { HasHat: bool; Name: string }
 
 [<Fact>]
+let ``predicate language should preserve left-to-right order of operations with parens`` () = 
+    let testRecord = { HasHat = true; Name = "Howard" }
+    let dudePredicate = buildExpr<BoolRec,bool> "HasHat and (Name = \"Howard\")"
+    let result = dudePredicate testRecord
+    Assert.True(result)    
+
+[<Fact>]
 let ``predicate language should preserve left-to-right order of operations with record bool`` () = 
     let testRecord = { HasHat = true; Name = "Howard" }
     let dudePredicate = buildExpr<BoolRec,bool> "HasHat and Name = \"Howard\""

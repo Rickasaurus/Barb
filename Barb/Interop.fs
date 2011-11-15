@@ -126,7 +126,7 @@ let (|SupportedNumberType|_|) (input: obj) =
 let rec resolveResultType (output: obj) = 
     match output with
     | null -> Obj null
-    | :? bool as boolinstance -> Bool boolinstance
+//    | :? bool as boolinstance -> Bool boolinstance
     | DecomposeOption contents -> resolveResultType contents
     | SupportedNumberType contents -> Obj contents
     | other -> Obj other
@@ -205,15 +205,18 @@ let compareAsSameType obj1 obj2 func =
     let cobj1, cobj2 = convertToSameType obj1 obj2     
     func cobj1 cobj2
      
-let objectsEqual (obj1: obj) (obj2: obj) = 
+let objectsEqualInner (obj1: obj) (obj2: obj) = 
     if obj1 = null && obj2 = null then true
     elif obj1 = null || obj2 = null then false
     else compareAsSameType obj1 obj2 (fun o1 o2 -> o1.Equals(o2))
 
-let objectsNotEqual = 
-    (fun o1 o2 -> not (objectsEqual o1 o2))
+let objectsEqual (obj1: obj) (obj2: obj) = 
+    box <| objectsEqualInner obj1 obj2
 
-let compareObjects op =
+let objectsNotEqual (obj1: obj) (obj2: obj) =  
+    box <| (not (objectsEqualInner obj1 obj2))
+
+let compareObjectsInner op =
     fun (obj1: obj) (obj2: obj) ->
         match obj1, obj2 with
         | null, null -> false
@@ -221,6 +224,24 @@ let compareObjects op =
         | (:? IComparable as comp1), (:? IComparable as comp2) when obj1.GetType() = obj2.GetType() -> op comp1 comp2
         | (:? IComparable as comp1), obj2 -> compareAsSameType comp1 obj2 (fun o1 o2 -> op (o1 :?> IComparable) (o2 :?> IComparable))
         | _ -> failwith (sprintf "Unable to compare %A and %A" obj1 obj2)
+
+let compareObjects op (obj1: obj) (obj2: obj) =
+    compareObjectsInner op obj1 obj2 |> (fun res -> box res)
+
+let notOp (obj1: obj) =
+    match obj1 with
+    | (:? bool as b) -> box (not b)
+    | w1 -> failwith (sprintf "Unexcepted argument for 'not' operation: %A" w1) 
+
+let andOp (obj1: obj) (obj2: obj) =
+    match obj1, obj2 with 
+    | (:? bool as b1), (:? bool as b2) -> box (b1 && b2)
+    | w1, w2 -> failwith (sprintf "Unexcepted arguments for 'and' operation: %A and %A" w1 w2)  
+
+let orOp (obj1: obj) (obj2: obj) =
+    match obj1, obj2 with 
+    | (:? bool as b1), (:? bool as b2) -> box (b1 || b2)
+    | w1, w2 -> failwith (sprintf "Unexcepted arguments for 'or' operation: %A or %A" w1 w2)  
 
 open System.Numerics
 

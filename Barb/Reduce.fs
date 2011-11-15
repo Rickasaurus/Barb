@@ -25,6 +25,29 @@ let rec applyInstanceState (input: obj) exprs =
             | IndexArgs (argEx) -> IndexArgs (resolveInstanceType argEx)
             | other -> other
     exprs |> List.map (fun expr -> resolveInstanceType expr)
+
+let attemptToResolvePair =        
+    function
+    | Prefix l, Obj r -> Obj (l r) |> Some
+//        | Obj l, (Infix (_,(ObjToObjToObj r))) -> Some <| ObjToObj (r l)
+//        | Obj l, (Infix (_,(ObjToObjToBool r))) -> ObjToBool (r l) |> Some
+//        | Bool l, (Infix (_,(ObjToObjToBool r))) -> ObjToBool (r l) |> Some
+//        | Bool l, (Infix (_,(BoolToBoolToBool r))) -> Some <| BoolToBool (r l)
+//        | ObjToBool l, ResolvedTuple r -> Some <| Bool (l (tupleToSequence r))
+    | Prefix l, ResolvedTuple r -> Some <| Obj (l (tupleToSequence r))
+//        | ObjToBool l, Obj r -> Some <| Bool (l r)
+//        | ObjToBool l, Bool r -> Some <| Bool (l r)
+//        | BoolToBool l, Bool r -> Some <| Bool (l r)
+    | Method l, Unit -> executeUnitMethod l
+    | Method l, Obj r -> executeOneParamMethod l r
+    | Method l, ResolvedTuple r -> executeParameterizedMethod l r 
+    | Invoke, Unknown r -> Some <| AppliedInvoke r
+    | Invoke, ResolvedIndexArgs r -> Some <| ResolvedIndexArgs r //Here for F#-like indexing (if you want it)
+    | Obj l, AppliedInvoke r -> resolveInvoke l r
+    | IndexedProperty l, ResolvedIndexArgs (Obj r) -> executeOneParamMethod l r
+    | Obj l, ResolvedIndexArgs (Obj r) -> callIndexedProperty l r
+    | LambdaPartial l, Obj r -> Some <| (l (Obj r))
+    | _ -> None
     
 let resolveExpression exprs (failOnUnresolved: bool) = 
     let rec buildLambdaFunction (arguments: ExprTypes list) (body: ExprTypes list) =
@@ -47,36 +70,21 @@ let resolveExpression exprs (failOnUnresolved: bool) =
         | Unknown unk -> bindings |> Map.tryFind unk       
         | _ -> None
     
-//    and attemptToResolveTriple bindings =
-//        function
-//        | (Infix (lp, (ObjToObjToObj lf))), Obj r, (Infix (rp, (ObjToObjToObj rf))) ->
-//            if lp > rp then lf
-//        | _ -> None
-
-    and attemptToResolvePair =        
+    and (|ResolveTriple|_|) =
         function
-        | ObjToObj l, Obj r -> Obj (l r) |> Some
-        | Obj l, (Infix (_,(ObjToObjToObj r))) -> Some <| ObjToObj (r l)
-        | Obj l, (Infix (_,(ObjToObjToBool r))) -> ObjToBool (r l) |> Some
-        | Bool l, (Infix (_,(ObjToObjToBool r))) -> ObjToBool (r l) |> Some
-        | Bool l, (Infix (_,(BoolToBoolToBool r))) -> Some <| BoolToBool (r l)
-        | ObjToBool l, ResolvedTuple r -> Some <| Bool (l (tupleToSequence r))
-        | ObjToBool l, Obj r -> Some <| Bool (l r)
-        | ObjToBool l, Bool r -> Some <| Bool (l r)
-        | BoolToBool l, Bool r -> Some <| Bool (l r)
-        | Method l, Unit -> executeUnitMethod l
-        | Method l, Obj r -> executeOneParamMethod l r
-        | Method l, ResolvedTuple r -> executeParameterizedMethod l r 
-        | Invoke, Unknown r -> Some <| AppliedInvoke r
-        | Invoke, ResolvedIndexArgs r -> Some <| ResolvedIndexArgs r //Here for F#-like indexing (if you want it)
-        | Obj l, AppliedInvoke r -> resolveInvoke l r
-        | IndexedProperty l, ResolvedIndexArgs (Obj r) -> executeOneParamMethod l r
-        | Obj l, ResolvedIndexArgs (Obj r) -> callIndexedProperty l r
-        | LambdaPartial l, Obj r -> Some <| (l (Obj r))
+        // Obj InfixOp Obj InfixOp
+        | (Infix (lp, lfun)) :: Obj l :: lt, Obj r :: (Infix (rp, rfrun)) :: rt ->
+            if lp <= rp then 
+                Some (Obj (lfun l r), lt, (Infix (rp, rfrun)) :: rt)
+            else None
+        // Obj InfixOp Obj END
+        | (Infix (lp, lfun)) :: Obj l :: lt, Obj r :: [] ->
+            Some (Obj (lfun l r), lt, [])
         | _ -> None
 
     // Always looks on the left and moves to the right first, then tries to merge left and right
     and reduceExpressions lleft lright bindings =
+        printfn "L: %A R: %A" lleft lright
         match lleft, lright with
         | (LambdaDef (names, expr) :: lt), right -> let lambdaExpr = reduceExpressions [] [expr] bindings
                                                     let lambdaResult = buildLambdaFunction names lambdaExpr
@@ -94,6 +102,7 @@ let resolveExpression exprs (failOnUnresolved: bool) =
             | other -> failwith (sprintf "Multi-indexing not currently supported")
         | [], r :: rt -> reduceExpressions [r] rt bindings
         | l :: [], [] -> [l]
+        | ResolveTriple (res, lt, rt) -> reduceExpressions lt (res :: rt) bindings
         | l :: lt, r :: rt ->        
             match attemptToResolvePair (l, r) with
             | Some (rToken) -> reduceExpressions lt (rToken :: rt) bindings
