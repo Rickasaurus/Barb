@@ -41,7 +41,7 @@ module Compiler =
     #endif
 
         let reducedExpression = 
-            resolveExpression parsedTokens memberMap false |> List.rev
+            resolveExpression parsedTokens Map.empty false |> List.rev
 
     #if DEBUG
         printfn ""
@@ -50,13 +50,21 @@ module Compiler =
     #endif
 
         let calculateResult input = 
-            let appliedParsedTokens = applyInstanceState input reducedExpression
+            let inputBindings = memberMap |> Map.map (fun k prop -> prop input |> resolveResultType)
+    
     #if DEBUG
-            printfn ""        
-            printfn "APT: %A" appliedParsedTokens
+            printfn ""
+            printfn "IB: %A" inputBindings
             printfn ""
     #endif
-            resolveExpression appliedParsedTokens memberMap true
+
+//            let appliedParsedTokens = applyInstanceState input reducedExpression
+//    #if DEBUG
+//            printfn ""        
+//            printfn "APT: %A" appliedParsedTokens
+//            printfn ""
+//    #endif
+            resolveExpression reducedExpression inputBindings true
             |> resolveExpressionResult
 
         calculateResult

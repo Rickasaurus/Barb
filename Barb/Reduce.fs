@@ -21,15 +21,15 @@ let tupleToSequence (tuple: ExprTypes list) =
             | what -> failwith (sprintf "Cannot resolve the given tuple-internal expression to a object type: %A" what)
     }
 
-let rec applyInstanceState (input: obj) exprs =
-    let rec resolveInstanceType expr =
-            match expr with 
-            | ParentProperty (call) -> Returned (call input)
-            | SubExpression (subEx) -> SubExpression (applyInstanceState input subEx)
-            | Tuple (tuple) -> Tuple (applyInstanceState input tuple) 
-            | IndexArgs (argEx) -> IndexArgs (resolveInstanceType argEx)
-            | other -> other
-    exprs |> List.map (fun expr -> resolveInstanceType expr)
+//let rec applyInstanceState (input: obj) exprs =
+//    let rec resolveInstanceType expr =
+//            match expr with 
+////            | ParentProperty (call) -> Returned (call input)
+//            | SubExpression (subEx) -> SubExpression (applyInstanceState input subEx)
+//            | Tuple (tuple) -> Tuple (applyInstanceState input tuple) 
+//            | IndexArgs (argEx) -> IndexArgs (resolveInstanceType argEx)
+//            | other -> other
+//    exprs |> List.map (fun expr -> resolveInstanceType expr)
 
 let attemptToResolvePair =        
     function

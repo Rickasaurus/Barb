@@ -64,7 +64,7 @@ let rec resolveAllProperties (rtype: System.Type) (parentName: string) (getter: 
                 fun (instance:obj) -> 
                     let parentResult = getter instance
                     prop.GetValue(parentResult, null)
-            yield fullName, ParentProperty getPropFunc
+            yield fullName, getPropFunc
     }     
 
 let rec inline convertSequence seq1 seq2 = 
@@ -126,7 +126,6 @@ let (|SupportedNumberType|_|) (input: obj) =
 let rec resolveResultType (output: obj) = 
     match output with
     | null -> Obj null
-//    | :? bool as boolinstance -> Bool boolinstance
     | DecomposeOption contents -> resolveResultType contents
     | SupportedNumberType contents -> Obj contents
     | other -> Obj other
