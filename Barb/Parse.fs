@@ -35,7 +35,7 @@ type DelimType =
 type CaptureParams = 
     {
         Begin: string
-        Delim: string option
+        Delims: DelimType list
         End: string
         Func: ExprTypes list -> ExprTypes
     }
@@ -101,20 +101,31 @@ let generateLambda =
 
 let captureTypes = 
     [
-        { Begin = "(";    Delim = None;       End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
-        { Begin = "(";    Delim = Some ",";   End = ")";  Func = (fun exprs -> Tuple exprs) }
-        { Begin = "[";    Delim = None;       End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
-        { Begin = "let";  Delim = Some "=";   End = "in"; Func = bindFunction }
-        { Begin = "var";  Delim = Some "=";   End = "in"; Func = bindFunction }
-        { Begin = "(fun"; Delim = Some "->";  End = ")";  Func = generateLambda }
+        { Begin = "(";    Delims = [];                  End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
+        { Begin = "(";    Delims = [Repeating ","];     End = ")";  Func = (fun exprs -> Tuple exprs) }
+        { Begin = "[";    Delims = [];                  End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
+        { Begin = "let";  Delims = [Single "="];        End = "in"; Func = bindFunction }
+        { Begin = "var";  Delims = [Single "="];        End = "in"; Func = bindFunction }
+        { Begin = "(fun"; Delims = [Single "->"];       End = ")";  Func = generateLambda }
     ]
 
 let (|CaptureDelim|_|) currentCaptures (text: string) =
-    let matches, str = [ for cc in currentCaptures do if cc.Delim.IsSome && text.StartsWith cc.Delim.Value then yield cc ] |> List.allMaxBy (fun ct -> ct.Delim.Value.Length)
+    let matches, delimLen = 
+        [ 
+            for cc in currentCaptures do //if List.isEmpty cc.Delims && text.StartsWith cc.Delim.Value then yield cc 
+                match cc.Delims with
+                | (Single delim) :: dt when text.StartsWith delim -> yield { cc with Delims = dt }, delim
+                | (Repeating delim) :: dt when text.StartsWith delim -> yield cc, delim
+                | (Repeating _) :: Repeating delim :: dt when text.StartsWith delim -> yield { cc with Delims = Repeating delim :: dt }, delim
+                | (Repeating _) :: Single delim :: dt when text.StartsWith delim -> yield { cc with Delims = dt }, delim  
+                | _ -> ()          
+        ] 
+        |> List.allMaxBy (fun (cc, matchedDelim) -> matchedDelim.Length)
+        |> (fun (matches, delimlen) -> matches |> List.map (fun (cc, txt) -> cc), delimlen) 
     match matches with
     | [] -> None
-    | onecap :: [] -> Some ([onecap], text.Substring(onecap.Delim.Value.Length))
-    | caps -> Some (caps, text.Substring(str))
+    | onecap :: [] -> Some ([onecap], text.Substring(delimLen))
+    | caps -> Some (caps, text.Substring(delimLen))
 
 let (|CaptureEnd|_|) currentCaptures (text: string) =
     let matches, str = [ for cc in currentCaptures do if text.StartsWith cc.End then yield cc ] |> List.allMaxBy (fun ct -> ct.End.Length) 
@@ -140,7 +151,7 @@ let parseProgram (getMember: string -> ExprTypes option) (startText: string) =
                 match captures with
                 | [] -> failwith "Unexpected end of subexpression"
                 | h :: [] -> h
-                | list -> list |> List.filter (fun cap -> cap.Delim.IsNone) |> (function | h :: [] -> h | _ -> failwith "Ambiguous end of subexpression")
+                | list -> list |> List.filter (fun cap -> List.isEmpty cap.Delims) |> (function | h :: [] -> h | _ -> failwith "Ambiguous end of subexpression")
             let value = subExprs |> List.rev |> exprConstraint.Func 
             parseProgramInner rem (value :: result) currentCaptures
         | CaptureDelim currentCaptures (cParams, crem) -> 
