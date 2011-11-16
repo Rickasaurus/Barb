@@ -23,6 +23,7 @@ let tupleToSequence (tuple: ExprTypes list) =
 
 let attemptToResolvePair =        
     function
+    | Obj l, Postfix r -> Obj (r l) |> Some
     | Prefix l, Obj r -> Obj (l r) |> Some
     | Method l, Unit -> executeUnitMethod l
     | Method l, Obj r -> executeParameterizedMethod l r 
@@ -50,17 +51,21 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         function
         | IfThenElse (ifexpr, thenexpr, elseexpr) ->
             match reduceExpressions [] ifexpr bindings with
-            | Obj (:? bool as res) :: [] when finalReduction -> 
+            | Obj (:? bool as res) :: [] -> 
                 if res then reduceExpressions [] thenexpr bindings
                 else reduceExpressions [] elseexpr bindings
                 |> (fun resExpr -> Some (SubExpression(resExpr)))
             | invalid when finalReduction -> failwith (sprintf "If predicate returned an invalid result: %A" invalid)
-            | _ -> None
+            | rif ->
+                let rthen = reduceExpressions [] thenexpr bindings
+                let relse = reduceExpressions [] elseexpr bindings
+                if rif <> ifexpr && rthen <> thenexpr && relse <> elseexpr then IfThenElse (rif, rthen, relse) |> Some
+                else None
         | _ -> None
             
     and (|ResolveSingle|_|) bindings =
         function 
-        | Returned o -> Some <| resolveResultType o
+        | Returned o -> resolveResultType o |> Some
         | Tuple tc -> 
             let resolvedTp = tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> tupleToSequence
             Some (Obj resolvedTp)
