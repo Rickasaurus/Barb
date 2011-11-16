@@ -21,33 +21,22 @@ let tupleToSequence (tuple: ExprTypes list) =
             | what -> failwith (sprintf "Cannot resolve the given tuple-internal expression to a object type: %A" what)
     }
 
-let attemptToResolvePair =        
-    function
-    | Obj l, Postfix r -> Obj (r l) |> Some
-    | Prefix l, Obj r -> Obj (l r) |> Some
-    | Method l, Unit -> executeUnitMethod l
-    | Method l, Obj r -> executeParameterizedMethod l r 
-    | Invoke, Unknown r -> Some <| AppliedInvoke r
-    | Invoke, ResolvedIndexArgs r -> Some <| ResolvedIndexArgs r //Here for F#-like indexing (if you want it)
-    | Obj l, AppliedInvoke r -> resolveInvoke l r
-    | IndexedProperty l, ResolvedIndexArgs (Obj r) -> executeIndexer l r
-    | Obj l, ResolvedIndexArgs (Obj r) -> callIndexedProperty l r
-    | LambdaPartial l, Obj r -> Some <| (l (Obj r))
-    | _ -> None
-    
-let resolveExpression exprs initialBindings (finalReduction: bool) = 
-    let rec buildLambdaFunction (arguments: ExprTypes list) (body: ExprTypes list) =
-        let args = arguments |> List.map (function | Unknown str -> str | other -> failwith (sprintf "Unexpected lambda argument type: %A" other))
-        let inputs = ref []
-        let rec consumeArg arg = 
-            inputs := (lazy(arg) :: !inputs)
-            if List.length !inputs = List.length arguments then
-                let bindings = List.zip args (List.rev !inputs) |> Map.ofList
-                SubExpression (reduceExpressions [] body bindings)
-            else LambdaPartial consumeArg
-        LambdaPartial consumeArg
 
-    and (|ResolveIfThenElse|_|) bindings =
+
+
+let resolveExpression exprs initialBindings (finalReduction: bool) = 
+//    let rec buildLambdaFunction (arguments: ExprTypes list) (body: ExprTypes list) =
+//        let args = arguments |> List.map (function | Unknown str -> str | other -> failwith (sprintf "Unexpected lambda argument type: %A" other))
+//        let inputs = ref []
+//        let rec consumeArg arg = 
+//            inputs := (lazy(arg) :: !inputs)
+//            if List.length !inputs = List.length arguments then
+//                let bindings = List.zip args (List.rev !inputs) |> Map.ofList
+//                SubExpression (reduceExpressions [] body bindings)
+//            else LambdaPartial consumeArg
+//        LambdaPartial consumeArg
+
+    let rec (|ResolveIfThenElse|_|) bindings =
         function
         | IfThenElse (ifexpr, thenexpr, elseexpr) ->
             match reduceExpressions [] ifexpr bindings with
@@ -62,7 +51,22 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
                 if rif <> ifexpr && rthen <> thenexpr && relse <> elseexpr then IfThenElse (rif, rthen, relse) |> Some
                 else None
         | _ -> None
-            
+
+    and applyArgToLambda bindings lambda (arg: obj) =
+        let prms, eargs, expr = lambda
+        let args = Obj arg :: eargs
+        if List.length prms = List.length args then
+            let newbindings = 
+                args 
+                |> List.map Lazy.CreateFromValue 
+                |> List.rev
+                |> List.zip prms 
+                |> Seq.append (Map.toSeq bindings) 
+                |> Map.ofSeq 
+            SubExpression (reduceExpressions [] [expr] newbindings)
+        else
+            Lambda(prms, args, expr)
+
     and (|ResolveSingle|_|) bindings =
         function 
         | Returned o -> resolveResultType o |> Some
@@ -72,6 +76,20 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         | Unknown unk -> bindings |> Map.tryFind unk |> Option.bind (fun res -> Some <| res.Force())
         | ResolveIfThenElse bindings result -> Some result
         | _ -> None
+
+    and attemptToResolvePair bindings =        
+        function
+        | Obj l, Postfix r -> Obj (r l) |> Some
+        | Prefix l, Obj r -> Obj (l r) |> Some
+        | Method l, Unit -> executeUnitMethod l
+        | Method l, Obj r -> executeParameterizedMethod l r 
+        | Invoke, Unknown r -> Some <| AppliedInvoke r
+        | Invoke, ResolvedIndexArgs r -> Some <| ResolvedIndexArgs r //Here for F#-like indexing (if you want it)
+        | Obj l, AppliedInvoke r -> resolveInvoke l r
+        | IndexedProperty l, ResolvedIndexArgs (Obj r) -> executeIndexer l r
+        | Obj l, ResolvedIndexArgs (Obj r) -> callIndexedProperty l r
+        | Lambda (p,a,e), Obj r -> applyArgToLambda bindings (p,a,e) r |> Some
+        | _ -> None    
     
     and (|ResolveTriple|_|) =
         function
@@ -91,9 +109,9 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         printfn "L: %A R: %A" lleft lright
         #endif
         match lleft, lright with
-        | (LambdaDef (names, expr) :: lt), right -> let lambdaExpr = reduceExpressions [] [expr] bindings
-                                                    let lambdaResult = buildLambdaFunction names lambdaExpr
-                                                    reduceExpressions lt (lambdaResult :: right) bindings 
+//        | (LambdaDef (names, expr) :: lt), right -> let lambdaExpr = reduceExpressions [] [expr] bindings
+//                                                    let lambdaResult = buildLambdaFunction names lambdaExpr
+//                                                    reduceExpressions lt (lambdaResult :: right) bindings 
         | (Binding (name, expr) :: lt), right -> let newbindings = bindings |> Map.add name (lazy (expr)) in reduceExpressions lt right newbindings
         | (ResolveSingle bindings resolved :: lt), right -> reduceExpressions lt (resolved :: right) bindings
         | left, (SubExpression exp :: rt) ->
@@ -109,7 +127,7 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         | l :: [], [] -> [l]
         | ResolveTriple (res, lt, rt) -> reduceExpressions lt (res :: rt) bindings
         | l :: lt, r :: rt ->        
-            match attemptToResolvePair (l, r) with
+            match attemptToResolvePair bindings (l, r) with
             | Some (rToken) -> reduceExpressions lt (rToken :: rt) bindings
             | None -> reduceExpressions (r :: l :: lt) rt bindings
         | catchall when finalReduction -> failwith (sprintf "Unexpected case: %A" catchall)

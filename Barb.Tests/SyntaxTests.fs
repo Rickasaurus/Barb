@@ -165,6 +165,21 @@ let ``predicate language should support internal use of lambdas`` () =
     Assert.True(result) 
 
 [<Fact>]
+let ``predicate language should support internal use of lambdas with more than one parameter`` () = 
+    let testRecord = { HasHat = false; Name = "Don" }
+    let dudePredicate = buildExpr<BoolRec,bool> "let fx = (fun x y -> x = \"Don\" and not y) in fx Name HasHat"
+    let result = dudePredicate testRecord
+    Assert.True(result) 
+
+[<Fact>]
+let ``predicate language lambda parameters should scope external bindings`` () = 
+    let testRecord = { HasHat = false; Name = "Don" }
+    let dudePredicate = buildExpr<BoolRec,bool> "let x = 1 in let fx = (fun x -> x = \"Don\") in fx Name"
+    let result = dudePredicate testRecord
+    Assert.True(result) 
+
+
+[<Fact>]
 let ``predicate language should support int addition`` () = 
     let dudePredicate = buildExpr<unit,bool> "1 + 2 = 3"
     let result = dudePredicate ()

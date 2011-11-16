@@ -1,5 +1,9 @@
 ﻿namespace Barb
 
+// TODO:
+// Add option to disable optimization (for mutable interactions)
+// Add "global world" bindings which can be optimzied 
+
 open System
 open System.Collections
 open System.Collections.Generic

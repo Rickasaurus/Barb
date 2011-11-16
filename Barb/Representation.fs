@@ -28,8 +28,9 @@ type ExprTypes =
     | AppliedInvoke of string
     | Unknown of string
     | Binding of string * ExprTypes
-    | LambdaDef of ExprTypes list * ExprTypes
-    | LambdaPartial of (ExprTypes -> ExprTypes)
+//    | LambdaDef of ExprTypes list * ExprTypes
+//    | LambdaPartial of (ExprTypes -> ExprTypes)
+    | Lambda of string list * ExprTypes list * ExprTypes
     | IfThenElse of ExprTypes list * ExprTypes list * ExprTypes list
     with
         override t.Equals(yobj) =
@@ -52,8 +53,9 @@ type ExprTypes =
                 | AppliedInvoke l, AppliedInvoke r 
                 | Unknown l, Unknown r -> l = r
                 | Binding (ls, le), Binding (rs, re) -> ls = rs && le.Equals(re)
-                | LambdaDef (lp, le), LambdaDef (rp, re) -> List.forall2 (fun l r -> l.Equals r) lp rp && le.Equals(re)                     
-                | LambdaPartial l, LambdaPartial r -> Object.Equals(l, r)
+//                | LambdaDef (lp, le), LambdaDef (rp, re) -> List.forall2 (fun l r -> l.Equals r) lp rp && le.Equals(re)                     
+//                | LambdaPartial l, LambdaPartial r -> Object.Equals(l, r)
+                | Lambda (ln, lv, le), Lambda (rn, rv, re) -> ln = rn && List.forall2 (fun l r -> l.Equals r) lv rv && le.Equals(re)
                 | IfThenElse (li, lt, le), IfThenElse (ri, rt, re) -> List.forall2 (fun l r -> l.Equals r) li ri && List.forall2 (fun l r -> l.Equals r) lt rt && List.forall2 (fun l r -> l.Equals r) le re
                 | _ -> false
             | _ -> false

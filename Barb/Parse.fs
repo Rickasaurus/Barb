@@ -1,5 +1,10 @@
 ﻿module Barb.Parse
 
+// TODO: 
+// Change all this string manipulation to indexed lookups
+// Do ascii lookup for Num, instead of a dumb list
+// Add a way for captureTypes to know if a Repeat node has been already seen
+ 
 open System
 open System.Text
 open System.Text.RegularExpressions
@@ -96,7 +101,9 @@ let bindFunction =
 
 let generateLambda = 
     function 
-    | h :: SubExpression(names) :: [] -> LambdaDef (names, h) 
+    | h :: SubExpression(names) :: [] ->
+        let prms = names |> List.map (function | Unknown n -> n | other -> failwith (sprintf "Unexpected construct in lambda argument list: %A" other))
+        Lambda (prms, List.empty, h) 
     | list -> failwith (sprintf "Incorrect lambda binding syntax: %A" list)
 
 let generateIfThenElse =
