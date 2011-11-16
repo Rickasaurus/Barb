@@ -42,7 +42,7 @@ module Compiler =
         let calculateResult input = 
             let inputBindings = 
                 memberMap
-                |> Map.map (fun k prop -> lazy (prop input |> resolveResultType ))
+                |> Map.map (fun k prop -> lazy (prop input))
     
     #if DEBUG
             printfn ""

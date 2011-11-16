@@ -25,16 +25,6 @@ let tupleToSequence (tuple: ExprTypes list) =
 
 
 let resolveExpression exprs initialBindings (finalReduction: bool) = 
-//    let rec buildLambdaFunction (arguments: ExprTypes list) (body: ExprTypes list) =
-//        let args = arguments |> List.map (function | Unknown str -> str | other -> failwith (sprintf "Unexpected lambda argument type: %A" other))
-//        let inputs = ref []
-//        let rec consumeArg arg = 
-//            inputs := (lazy(arg) :: !inputs)
-//            if List.length !inputs = List.length arguments then
-//                let bindings = List.zip args (List.rev !inputs) |> Map.ofList
-//                SubExpression (reduceExpressions [] body bindings)
-//            else LambdaPartial consumeArg
-//        LambdaPartial consumeArg
 
     let rec (|ResolveIfThenElse|_|) bindings =
         function

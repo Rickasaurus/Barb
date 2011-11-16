@@ -17,6 +17,42 @@ let nullableToOption res =
     | null -> None
     | item -> Some item
 
+let (|DecomposeOption|_|) (o: obj) = 
+    if o = null then Some null
+    else
+        let genericOptionType = typedefof<_ option>
+        let bindingFlags = BindingFlags.GetProperty ||| BindingFlags.Instance ||| BindingFlags.Public      
+        match o.GetType() with
+        | t when t.IsGenericType -> 
+            let gt = t.GetGenericTypeDefinition()
+            if gt = genericOptionType then
+                Some <| t.InvokeMember("Value", bindingFlags, null, o, Array.empty)
+            else None
+        | _ -> None  
+       
+let (|SupportedNumberType|_|) (input: obj) =
+    match input with
+    | (:? byte as num) -> Some (int64 (int num) :> obj)
+    | (:? sbyte as num) -> Some (int64 (int num) :> obj)
+    | (:? int16 as num) -> Some (int64 (int32 num) :> obj)
+    | (:? uint16 as num) -> Some (int64 (uint32 num) :> obj)
+    | (:? int32 as num) -> Some (int64 num :> obj)
+    | (:? uint32 as num) -> Some (int64 num :> obj)
+//    | (:? int64 as num) -> Some (int64 num :> obj)
+    | (:? uint64 as num) -> Some (int64 num :> obj)
+    | (:? nativeint as num) -> Some (int64 (int64 num) :> obj)
+    | (:? unativeint as num) -> Some (int64 (uint64 num) :> obj)
+    | (:? float as num) -> Some (decimal num :> obj)
+    | (:? single as num) -> Some (decimal num :> obj)
+    | value -> None
+
+let rec resolveResultType (output: obj) = 
+    match output with
+    | null -> Obj null
+    | DecomposeOption contents -> resolveResultType contents
+    | SupportedNumberType contents -> Obj contents
+    | other -> Obj other
+
 let resolveMember (rtype: System.Type) (memberName: string) =
     let resolveProp () = 
         rtype.GetProperty(memberName) |> nullableToOption
@@ -54,7 +90,7 @@ let resolveMember (rtype: System.Type) (memberName: string) =
 let rec resolveAllProperties (rtype: System.Type) (parentName: string) (getter: obj -> obj) =
     let properties = rtype.GetProperties()
     let methodCollections = rtype.GetMethods()
-                            |> Seq.groupBy (fun mi -> mi.Name)                                        
+                            |> Seq.groupBy (fun mi -> mi.Name)                                   
     seq {
         for prop in properties do
             let fullName =
@@ -63,8 +99,23 @@ let rec resolveAllProperties (rtype: System.Type) (parentName: string) (getter: 
             let getPropFunc = 
                 fun (instance:obj) -> 
                     let parentResult = getter instance
-                    prop.GetValue(parentResult, null)
+                    prop.GetValue(parentResult, null) |> Returned
             yield fullName, getPropFunc
+        for (name, methods) in methodCollections do
+            let resolvedMethods = methods |> Seq.toList |> List.map (fun mi -> mi, mi.GetParameters() |> Array.map (fun pi -> pi.ParameterType))
+            let func = 
+                fun (instance:obj) -> 
+                    let methodOverloads =
+                        [
+                            for mi, prms in resolvedMethods do
+                                let resolver = 
+                                    fun (args) -> 
+                                        let parentResult = getter instance
+                                        mi.Invoke(parentResult, args)
+                                yield resolver, prms
+                        ]
+                    Method methodOverloads
+            yield name, func
     }     
 
 let rec inline convertSequence seq1 seq2 = 
@@ -94,41 +145,9 @@ let convertToTargetType (ttype: Type) (param: obj) =
         | true -> Some <| des.ConvertFrom(param)
         | false -> try Some <| System.Convert.ChangeType(param, ttype) with _ -> None
 
-let (|DecomposeOption|_|) (o: obj) = 
-    if o = null then Some null
-    else
-        let genericOptionType = typedefof<_ option>
-        let bindingFlags = BindingFlags.GetProperty ||| BindingFlags.Instance ||| BindingFlags.Public      
-        match o.GetType() with
-        | t when t.IsGenericType -> 
-            let gt = t.GetGenericTypeDefinition()
-            if gt = genericOptionType then
-                Some <| t.InvokeMember("Value", bindingFlags, null, o, Array.empty)
-            else None
-        | _ -> None  
-       
-let (|SupportedNumberType|_|) (input: obj) =
-    match input with
-    | (:? byte as num) -> Some (int64 (int num) :> obj)
-    | (:? sbyte as num) -> Some (int64 (int num) :> obj)
-    | (:? int16 as num) -> Some (int64 (int32 num) :> obj)
-    | (:? uint16 as num) -> Some (int64 (uint32 num) :> obj)
-    | (:? int32 as num) -> Some (int64 num :> obj)
-    | (:? uint32 as num) -> Some (int64 num :> obj)
-//    | (:? int64 as num) -> Some (int64 num :> obj)
-    | (:? uint64 as num) -> Some (int64 num :> obj)
-    | (:? nativeint as num) -> Some (int64 (int64 num) :> obj)
-    | (:? unativeint as num) -> Some (int64 (uint64 num) :> obj)
-    | (:? float as num) -> Some (decimal num :> obj)
-    | (:? single as num) -> Some (decimal num :> obj)
-    | value -> None
 
-let rec resolveResultType (output: obj) = 
-    match output with
-    | null -> Obj null
-    | DecomposeOption contents -> resolveResultType contents
-    | SupportedNumberType contents -> Obj contents
-    | other -> Obj other
+
+
 
 let cachedResolveMember = 
     let inputToKey (rtype: System.Type, caseName) = rtype.FullName + "~" + caseName
