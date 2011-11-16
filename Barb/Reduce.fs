@@ -28,18 +28,23 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
 
     let rec (|ResolveIfThenElse|_|) bindings =
         function
+        | Resolved (IfThenElse (ifexpr, thenexpr, elseexpr)) when finalReduction ->
+            match reduceExpressions [] ifexpr bindings with
+            | Obj (:? bool as res) :: [] -> 
+                if res then reduceExpressions [] thenexpr bindings
+                else reduceExpressions [] elseexpr bindings
+                |> (fun resExpr -> Some (SubExpression(resExpr)))
+            | invalid -> failwith (sprintf "If predicate returned an invalid result: %A" invalid)
         | IfThenElse (ifexpr, thenexpr, elseexpr) ->
             match reduceExpressions [] ifexpr bindings with
             | Obj (:? bool as res) :: [] -> 
                 if res then reduceExpressions [] thenexpr bindings
                 else reduceExpressions [] elseexpr bindings
                 |> (fun resExpr -> Some (SubExpression(resExpr)))
-            | invalid when finalReduction -> failwith (sprintf "If predicate returned an invalid result: %A" invalid)
-            | rif ->
-                let rthen = reduceExpressions [] thenexpr bindings
-                let relse = reduceExpressions [] elseexpr bindings
-                if rif <> ifexpr && rthen <> thenexpr && relse <> elseexpr then IfThenElse (rif, rthen, relse) |> Some
-                else None
+            | rif -> 
+                let rthen = reduceExpressions [] thenexpr bindings |> List.rev
+                let relse = reduceExpressions [] elseexpr bindings |> List.rev
+                IfThenElse (rif |> List.rev, rthen, relse) |> Resolved |> Some
         | _ -> None
 
     and applyArgToLambda bindings lambda (arg: obj) =
@@ -60,24 +65,25 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
     and (|ResolveSingle|_|) bindings =
         function 
         | Returned o -> resolveResultType o |> Some
+        | Resolved (Tuple tc) when finalReduction ->
+            tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> tupleToSequence |> box |> Obj |> Some
         | Tuple tc -> 
-            let resolvedTp = tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> tupleToSequence
-            Some (Obj resolvedTp)
+            tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> Tuple |> Resolved |> Some
         | Unknown unk -> bindings |> Map.tryFind unk |> Option.bind (fun res -> Some <| res.Force())
         | ResolveIfThenElse bindings result -> Some result
         | _ -> None
 
-    and attemptToResolvePair bindings =        
+    and attemptToResolvePair bindings =
         function
         | Obj l, Postfix r -> Obj (r l) |> Some
         | Prefix l, Obj r -> Obj (l r) |> Some
         | Method l, Unit -> executeUnitMethod l
         | Method l, Obj r -> executeParameterizedMethod l r 
-        | Invoke, Unknown r -> Some <| AppliedInvoke r
-        | Invoke, ResolvedIndexArgs r -> Some <| ResolvedIndexArgs r //Here for F#-like indexing (if you want it)
+        | Invoke, Unknown r -> AppliedInvoke r |> Some
+        | Invoke, Resolved (IndexArgs r) -> IndexArgs r |> Resolved |> Some //Here for F#-like indexing (if you want it)
         | Obj l, AppliedInvoke r -> resolveInvoke l r
-        | IndexedProperty l, ResolvedIndexArgs (Obj r) -> executeIndexer l r
-        | Obj l, ResolvedIndexArgs (Obj r) -> callIndexedProperty l r
+        | IndexedProperty l, Resolved (IndexArgs (Obj r)) -> executeIndexer l r
+        | Obj l, Resolved (IndexArgs (Obj r)) -> callIndexedProperty l r
         | Lambda (p,a,e), Obj r -> applyArgToLambda bindings (p,a,e) r |> Some
         | _ -> None    
     
@@ -99,9 +105,6 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         printfn "L: %A R: %A" lleft lright
         #endif
         match lleft, lright with
-//        | (LambdaDef (names, expr) :: lt), right -> let lambdaExpr = reduceExpressions [] [expr] bindings
-//                                                    let lambdaResult = buildLambdaFunction names lambdaExpr
-//                                                    reduceExpressions lt (lambdaResult :: right) bindings 
         | (Binding (name, expr) :: lt), right -> let newbindings = bindings |> Map.add name (lazy (expr)) in reduceExpressions lt right newbindings
         | (ResolveSingle bindings resolved :: lt), right -> reduceExpressions lt (resolved :: right) bindings
         | left, (SubExpression exp :: rt) ->
@@ -111,7 +114,7 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         | left, (IndexArgs exp :: rt) ->
             match reduceExpressions [] [exp] bindings with
             | [] -> failwith (sprintf "No indexer found in [ ]")
-            | single :: [] -> reduceExpressions left (ResolvedIndexArgs single :: rt) bindings
+            | single :: [] -> reduceExpressions left (Resolved (IndexArgs single) :: rt) bindings
             | other -> failwith (sprintf "Multi-indexing not currently supported")
         | [], r :: rt -> reduceExpressions [r] rt bindings
         | l :: [], [] -> [l]
