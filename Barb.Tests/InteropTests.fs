@@ -92,14 +92,3 @@ let ``predicate language should support property indexers with strings`` () =
     let dudePredicate = buildExpr<IndexerRecord<string,string>,bool> "Table.Item[\"two\"] = \"two\""
     let result = dudePredicate testRecord
     Assert.True(result)    
-
-type MethodsType<'a> (value: 'a) =
-//    member t.NoParams() = value
-//    member t.OneParam one = [one; value]
-//    member t.TwoParams one two = [one; two; value]
-    member t.HigherOrderOne (func: 'a -> 'a) = func value
-//    member t.HigherOrderNone (func: 'a -> 'a) = func value
-
-//[<Fact>]
-//let ``predicate language should support higher order interop`` () =
-//     
