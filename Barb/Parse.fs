@@ -119,6 +119,7 @@ let captureTypes =
         { Begin = "let";  Delims = [Single "="];                   End = "in"; Func = bindFunction }
         { Begin = "var";  Delims = [Single "="];                   End = "in"; Func = bindFunction }
         { Begin = "(fun"; Delims = [Single "->"];                  End = ")";  Func = generateLambda }
+        { Begin = "(";    Delims = [Single "=>"];                  End = ")";  Func = generateLambda }
         { Begin = "(if";  Delims = [Single "then"; Single "else"]; End = ")";  Func = generateIfThenElse }
     ]
 

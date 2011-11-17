@@ -1,5 +1,7 @@
 ﻿module PredicateLanguageInteropTests
 
+open System
+
 open Barb.Compiler
 
 open Xunit
@@ -91,4 +93,10 @@ let ``predicate language should support property indexers with strings`` () =
     let testRecord = { Name = "Dude Duderson"; Table = new PropIndexerTester<string,string>(["one"; "two"; "three"] |> List.map (fun i -> i, i) |> Map.ofList) }
     let dudePredicate = buildExpr<IndexerRecord<string,string>,bool> "Table.Item[\"two\"] = \"two\""
     let result = dudePredicate testRecord
+    Assert.True(result)    
+
+[<Fact>]
+let ``predicate language should support static methods`` () = 
+    let dudePredicate = buildExpr<unit,bool> "String.IsNullOrEmpty(null)"
+    let result = dudePredicate ()    
     Assert.True(result)    

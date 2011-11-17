@@ -8,6 +8,7 @@ open System.ComponentModel
 open System.Linq
 open System.Collections.Concurrent
 open System.Collections.Generic
+open System.Runtime.CompilerServices
 
 open Barb.Helpers
 open Barb.Representation
@@ -52,6 +53,14 @@ let rec resolveResultType (output: obj) =
     | DecomposeOption contents -> resolveResultType contents
     | SupportedNumberType contents -> Obj contents
     | other -> Obj other
+
+//let findAllExtensionMethods () = 
+//    AppDomain.CurrentDomain.GetAssemblies()   
+//    |> Seq.filter (fun a -> a.IsDefined(typeof<ExtensionAttribute>,false))
+//    |> Seq.collect (fun a -> a.GetTypes())
+//    |> Seq.filter (fun typ -> typ.IsSealed && not typ.IsNested)
+//    |> Seq.filter (fun typ -> typ.IsDefined(typeof<ExtensionAttribute>,false))
+//    |> Seq.collect (fun typ -> typ.GetMethods(BindingFlags.Static ||| BindingFlags.Public))
 
 let resolveMember (rtype: System.Type) (memberName: string) =
     let resolveProp () = 
@@ -144,10 +153,6 @@ let convertToTargetType (ttype: Type) (param: obj) =
         match des.CanConvertFrom(param.GetType()) with
         | true -> Some <| des.ConvertFrom(param)
         | false -> try Some <| System.Convert.ChangeType(param, ttype) with _ -> None
-
-
-
-
 
 let cachedResolveMember = 
     let inputToKey (rtype: System.Type, caseName) = rtype.FullName + "~" + caseName

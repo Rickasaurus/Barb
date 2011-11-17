@@ -64,28 +64,36 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
 
     and (|ResolveSingle|_|) bindings =
         function 
-        | Returned o -> resolveResultType o |> Some
-        | Resolved (Tuple tc) when finalReduction ->
-            tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> tupleToSequence |> box |> Obj |> Some
-        | Tuple tc -> 
-            tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> Tuple |> Resolved |> Some
-        | Unknown unk -> bindings |> Map.tryFind unk |> Option.bind (fun res -> Some <| res.Force())
-        | ResolveIfThenElse bindings result -> Some result
+        | left, r :: rt ->
+            match r with
+            | Returned o -> resolveResultType o |> Some
+            | Resolved (Tuple tc) when finalReduction ->
+                tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> tupleToSequence |> box |> Obj |> Some
+            | Tuple tc -> 
+                tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> Tuple |> Resolved |> Some
+            | Unknown unk -> bindings |> Map.tryFind unk |> Option.bind (fun res -> Some <| res.Force())
+            | ResolveIfThenElse bindings result -> Some result
+            | _ -> None
+            |> Option.map (fun res -> res, left, rt)
         | _ -> None
 
-    and attemptToResolvePair bindings =
-        function
-        | Obj l, Postfix r -> Obj (r l) |> Some
-        | Prefix l, Obj r -> Obj (l r) |> Some
-        | Method l, Unit -> executeUnitMethod l
-        | Method l, Obj r -> executeParameterizedMethod l r 
-        | Invoke, Unknown r -> AppliedInvoke r |> Some
-        | Invoke, Resolved (IndexArgs r) -> IndexArgs r |> Resolved |> Some //Here for F#-like indexing (if you want it)
-        | Obj l, AppliedInvoke r -> resolveInvoke l r
-        | IndexedProperty l, Resolved (IndexArgs (Obj r)) -> executeIndexer l r
-        | Obj l, Resolved (IndexArgs (Obj r)) -> callIndexedProperty l r
-        | Lambda (p,a,e), Obj r -> applyArgToLambda bindings (p,a,e) r |> Some
-        | _ -> None    
+    and (|ResolveTuple|_|) bindings =
+        function 
+        | l :: lt, r :: rt ->
+            match l, r with
+            | Obj l, Postfix r -> Obj (r l) |> Some
+            | Prefix l, Obj r -> Obj (l r) |> Some
+            | Method l, Unit -> executeUnitMethod l
+            | Method l, Obj r -> executeParameterizedMethod l r 
+            | Invoke, Unknown r -> AppliedInvoke r |> Some
+            | Invoke, Resolved (IndexArgs r) -> IndexArgs r |> Resolved |> Some //Here for F#-like indexing (if you want it)
+            | Obj l, AppliedInvoke r -> resolveInvoke l r
+            | IndexedProperty l, Resolved (IndexArgs (Obj r)) -> executeIndexer l r
+            | Obj l, Resolved (IndexArgs (Obj r)) -> callIndexedProperty l r
+            | Lambda (p,a,e), Obj r -> applyArgToLambda bindings (p,a,e) r |> Some
+            | _ -> None
+            |> Option.map (fun res -> res, lt, rt)
+        | _ -> None
     
     and (|ResolveTriple|_|) =
         function
@@ -106,7 +114,6 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         #endif
         match lleft, lright with
         | (Binding (name, expr) :: lt), right -> let newbindings = bindings |> Map.add name (lazy (expr)) in reduceExpressions lt right newbindings
-        | (ResolveSingle bindings resolved :: lt), right -> reduceExpressions lt (resolved :: right) bindings
         | left, (SubExpression exp :: rt) ->
             match reduceExpressions [] exp bindings |> List.rev with
             | single :: [] -> reduceExpressions left (single :: rt) bindings
@@ -116,13 +123,11 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
             | [] -> failwith (sprintf "No indexer found in [ ]")
             | single :: [] -> reduceExpressions left (Resolved (IndexArgs single) :: rt) bindings
             | other -> failwith (sprintf "Multi-indexing not currently supported")
-        | [], r :: rt -> reduceExpressions [r] rt bindings
-        | l :: [], [] -> [l]
         | ResolveTriple (res, lt, rt) -> reduceExpressions lt (res :: rt) bindings
-        | l :: lt, r :: rt ->        
-            match attemptToResolvePair bindings (l, r) with
-            | Some (rToken) -> reduceExpressions lt (rToken :: rt) bindings
-            | None -> reduceExpressions (r :: l :: lt) rt bindings
+        | ResolveTuple bindings (res, lt, rt) -> reduceExpressions lt (res :: rt) bindings   
+        | ResolveSingle bindings (res, lt, rt) -> reduceExpressions lt (res :: rt) bindings
+        | l,  r :: rt -> reduceExpressions (r :: l) rt bindings
+        | l :: [], [] -> [l]
         | catchall when finalReduction -> failwith (sprintf "Unexpected case: %A" catchall)
         | left, [] -> left
 
