@@ -61,7 +61,7 @@ let (|Num|_|) (text: string) =
         let resi, dot = inner (0, false)
         let tokenStr = 
             let resultStr = sb.ToString()
-            if dot then match Decimal.TryParse(resultStr) with | true, num -> Obj num | _ -> Obj resultStr
+            if dot then match Double.TryParse(resultStr) with | true, num -> Obj num | _ -> Obj resultStr
             else match Int64.TryParse(resultStr) with | true, num -> Obj num | _ -> Obj resultStr
         let rest = text.Substring(resi)
         Some (Some (tokenStr), rest)

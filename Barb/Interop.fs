@@ -43,8 +43,8 @@ let (|SupportedNumberType|_|) (input: obj) =
     | (:? uint64 as num) -> Some (int64 num :> obj)
     | (:? nativeint as num) -> Some (int64 (int64 num) :> obj)
     | (:? unativeint as num) -> Some (int64 (uint64 num) :> obj)
-    | (:? float as num) -> Some (decimal num :> obj)
-    | (:? single as num) -> Some (decimal num :> obj)
+    | (:? decimal as num) -> Some (float num :> obj)
+    | (:? single as num) -> Some (float num :> obj)
     | value -> None
 
 let rec resolveResultType (output: obj) = 
@@ -271,37 +271,37 @@ open System.Numerics
 let addObjects (obj1: obj) (obj2: obj) =
     if obj1 = null || obj2 = null then failwith "Unexpected null in addition"
     match obj1, obj2 with
-    | (:? decimal as d1), (:? decimal as d2) -> (d1 + d2) :> obj
+    | (:? float as d1), (:? float as d2) -> (d1 + d2) :> obj
     | (:? int64 as b1), (:? int64 as b2) -> (b1 + b2) :> obj
-    | (:? decimal as d1), (:? int64 as b2) -> (d1 + decimal b2) :> obj
-    | (:? int64 as b1), (:? decimal as d2) -> (decimal b1 + d2) :> obj
+    | (:? float as d1), (:? int64 as b2) -> (d1 + float b2) :> obj
+    | (:? int64 as b1), (:? float as d2) -> (float b1 + d2) :> obj
     | _ -> failwith (sprintf "Cannot add %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))
 
 let subObjects (obj1: obj) (obj2: obj) =
     if obj1 = null || obj2 = null then failwith "Unexpected null in subtraction"
     match obj1, obj2 with
-    | (:? decimal as d1), (:? decimal as d2) -> (d1 - d2) :> obj
+    | (:? float as d1), (:? float as d2) -> (d1 - d2) :> obj
     | (:? int64 as b1), (:? int64 as b2) -> (b1 - b2) :> obj
-    | (:? decimal as d1), (:? int64 as b2) -> (d1 - decimal b2) :> obj
-    | (:? int64 as b1), (:? decimal as d2) -> (decimal b1 - d2) :> obj
+    | (:? float as d1), (:? int64 as b2) -> (d1 - float b2) :> obj
+    | (:? int64 as b1), (:? float as d2) -> (float b1 - d2) :> obj
     | _ -> failwith (sprintf "Cannot subtract %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))
 
 let divideObjects (obj1: obj) (obj2: obj) =
     if obj1 = null || obj2 = null then failwith "Unexpected null in division"
     match obj1, obj2 with
-    | (:? decimal as d1), (:? decimal as d2) -> (d1 / d2) :> obj
+    | (:? float as d1), (:? float as d2) -> (d1 / d2) :> obj
     | (:? int64 as b1), (:? int64 as b2) -> (b1 / b2) :> obj
-    | (:? decimal as d1), (:? int64 as b2) -> (d1 / decimal b2) :> obj
-    | (:? int64 as b1), (:? decimal as d2) -> (decimal b1 / d2) :> obj
+    | (:? float as d1), (:? int64 as b2) -> (d1 / float b2) :> obj
+    | (:? int64 as b1), (:? float as d2) -> (float b1 / d2) :> obj
     | _ -> failwith (sprintf "Cannot divide %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))
 
 let multObjects (obj1: obj) (obj2: obj) =
     if obj1 = null || obj2 = null then failwith "Unexpected null in multiplication"
     match obj1, obj2 with
-    | (:? decimal as d1), (:? decimal as d2) -> (d1 * d2) :> obj
+    | (:? float as d1), (:? float as d2) -> (d1 * d2) :> obj
     | (:? int64 as b1), (:? int64 as b2) -> (b1 * b2) :> obj
-    | (:? decimal as d1), (:? int64 as b2) -> (d1 * decimal b2) :> obj
-    | (:? int64 as b1), (:? decimal as d2) -> (decimal b1 * d2) :> obj
+    | (:? float as d1), (:? int64 as b2) -> (d1 * float b2) :> obj
+    | (:? int64 as b1), (:? float as d2) -> (float b1 * d2) :> obj
     | _ -> failwith (sprintf "Cannot multiply %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))
 
         

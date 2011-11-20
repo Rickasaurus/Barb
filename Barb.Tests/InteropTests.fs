@@ -95,8 +95,8 @@ let ``predicate language should support property indexers with strings`` () =
     let result = dudePredicate testRecord
     Assert.True(result)    
 
-[<Fact>]
-let ``predicate language should support static methods`` () = 
-    let dudePredicate = buildExpr<unit,bool> "String.IsNullOrEmpty(null)"
-    let result = dudePredicate ()    
-    Assert.True(result)    
+//[<Fact>]
+//let ``predicate language should support static methods`` () = 
+//    let dudePredicate = buildExpr<unit,bool> "String.IsNullOrEmpty(null)"
+//    let result = dudePredicate ()    
+//    Assert.True(result)    
