@@ -117,9 +117,9 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         | left, (SubExpression exp :: rt) ->
             match reduceExpressions [] exp bindings |> List.rev with
             | single :: [] -> reduceExpressions left (single :: rt) bindings
-            | many -> reduceExpressions (SubExpression many :: left) rt bindings
-        | left, (IndexArgs exp :: rt) ->
-            match reduceExpressions [] [exp] bindings with
+            | many -> reduceExpressions (SubExpression many :: left) rt bindings         
+        | left, (IndexArgs exp :: rt) when finalReduction ->
+            match reduceExpressions [] [exp] bindings |> List.rev with
             | [] -> failwith (sprintf "No indexer found in [ ]")
             | single :: [] -> reduceExpressions left (Resolved (IndexArgs single) :: rt) bindings
             | other -> failwith (sprintf "Multi-indexing not currently supported")

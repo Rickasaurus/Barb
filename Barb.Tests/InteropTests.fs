@@ -95,6 +95,20 @@ let ``predicate language should support property indexers with strings`` () =
     let result = dudePredicate testRecord
     Assert.True(result)    
 
+type IndexedName = 
+    {
+        Name: string
+        Index: int
+    }   
+
+[<Fact>]
+let ``predicate language should correctly reduce the contents of indexers before applying`` () = 
+    let testRecord = { Name = "Dude Duderson"; Index = 1 }
+    let dudePredicate = buildExpr<IndexedName,bool> "Name[Index] = \"u\""
+    let result = dudePredicate testRecord
+    Assert.True(result)    
+
+
 //[<Fact>]
 //let ``predicate language should support static methods`` () = 
 //    let dudePredicate = buildExpr<unit,bool> "String.IsNullOrEmpty(null)"
