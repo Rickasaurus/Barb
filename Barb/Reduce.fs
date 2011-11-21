@@ -17,18 +17,14 @@ let tupleToSequence (tuple: ExprTypes list) =
         for t in tuple do
             match t with
             | Obj v -> yield box v
-            | Unknown v -> yield v :> obj
             | what -> failwith (sprintf "Cannot resolve the given tuple-internal expression to a object type: %A" what)
     }
-
-
-
 
 let resolveExpression exprs initialBindings (finalReduction: bool) = 
 
     let rec (|ResolveIfThenElse|_|) bindings =
-        function
-        | Resolved (IfThenElse (ifexpr, thenexpr, elseexpr)) when finalReduction ->
+        function        
+        | Resolved (IfThenElse (ifexpr, thenexpr, elseexpr)) when finalReduction ->            
             match reduceExpressions [] ifexpr bindings with
             | Obj (:? bool as res) :: [] -> 
                 if res then reduceExpressions [] thenexpr bindings
@@ -37,10 +33,13 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
             | invalid -> failwith (sprintf "If predicate returned an invalid result: %A" invalid)
         | IfThenElse (ifexpr, thenexpr, elseexpr) ->
             match reduceExpressions [] ifexpr bindings with
+            // If fully resolved in initial reduction, resolve and return the result clause
             | Obj (:? bool as res) :: [] -> 
                 if res then reduceExpressions [] thenexpr bindings
                 else reduceExpressions [] elseexpr bindings
                 |> (fun resExpr -> Some (SubExpression(resExpr)))
+            // If not fully resolved in initial reduction, reduce both clauses and return the result
+            // Note: If in the future globally scoped Variables are added, resolving them here will cause problems with inner non-pure calls
             | rif -> 
                 let rthen = reduceExpressions [] thenexpr bindings |> List.rev
                 let relse = reduceExpressions [] elseexpr bindings |> List.rev
@@ -86,7 +85,7 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
             | Method l, Unit -> executeUnitMethod l
             | Method l, Obj r -> executeParameterizedMethod l r 
             | Invoke, Unknown r -> AppliedInvoke r |> Some
-            | Invoke, Resolved (IndexArgs r) -> IndexArgs r |> Resolved |> Some //Here for F#-like indexing (if you want it)
+            | Invoke, Resolved (IndexArgs r) -> IndexArgs r |> Resolved |> Some // Here for F#-like indexing (if you want it)
             | Obj l, AppliedInvoke r -> resolveInvoke l r
             | IndexedProperty l, Resolved (IndexArgs (Obj r)) -> executeIndexer l r
             | Obj l, Resolved (IndexArgs (Obj r)) -> callIndexedProperty l r
@@ -97,17 +96,19 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
     
     and (|ResolveTriple|_|) =
         function
-        // Obj InfixOp Obj InfixOp
+        // Order of Operations case 1: Obj_L InfixOp_R1 Obj_R InfixOp_R2
+        // If InfixOp_R1 <= InfixOp_R2 then we can safely apply InfixOp_R1
         | (Infix (lp, lfun)) :: Obj l :: lt, Obj r :: (Infix (rp, rfrun)) :: rt when finalReduction ->
             if lp <= rp then 
                 Some (Obj (lfun l r), lt, (Infix (rp, rfrun)) :: rt)
             else None
-        // Obj InfixOp Obj END
+        // Order of Operations case 2: Obj InfixOp Obj END 
+        // We've reached the end of our list, it's safe to use InfixOp
         | (Infix (lp, lfun)) :: Obj l :: lt, Obj r :: [] when finalReduction ->
             Some (Obj (lfun l r), lt, [])
         | _ -> None
 
-    // Always looks on the left and moves to the right first, then tries to merge left and right
+    // Tries to merge/convert local tokens, if it can't it moves to the right
     and reduceExpressions lleft lright (bindings: (string, ExprTypes Lazy) Map) =
         #if DEBUG
         printfn "L: %A R: %A" lleft lright
