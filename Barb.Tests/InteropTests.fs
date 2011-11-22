@@ -108,6 +108,12 @@ let ``predicate language should correctly reduce the contents of indexers before
     let result = dudePredicate testRecord
     Assert.True(result)    
 
+[<Fact>]
+let ``predicate language should support using the results of calls to build incremental tuples`` () = 
+    let testRecord = { Name = "Dude Duderson"; Index = 1 }
+    let dudePredicate = buildExpr<IndexedName,bool> "(Index .. 3) = (1, 2, 3)"
+    let result = dudePredicate testRecord
+    Assert.True(result)  
 
 //[<Fact>]
 //let ``predicate language should support static methods`` () = 

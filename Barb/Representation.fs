@@ -27,4 +27,6 @@ type ExprTypes =
     | Binding of string * ExprTypes
     | Lambda of string list * ExprTypes list * ExprTypes
     | IfThenElse of ExprTypes list * ExprTypes list * ExprTypes list
+    | Generator of ExprTypes * ExprTypes * ExprTypes
+    | Fold of ExprTypes * ExprTypes
     | Resolved of ExprTypes

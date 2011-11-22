@@ -12,6 +12,7 @@ let resolveExpressionResult (input: ExprTypes list) =
     | Obj (res) :: [] -> res
     | otherTokens -> failwith (sprintf "Unexpected result: %A" otherTokens)
 
+
 let tupleToSequence (tuple: ExprTypes list) = 
     seq {
         for t in tuple do
@@ -72,6 +73,19 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
                 tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> Tuple |> Resolved |> Some
             | Unknown unk -> bindings |> Map.tryFind unk |> Option.bind (fun res -> Some <| res.Force())
             | ResolveIfThenElse bindings result -> Some result
+            | Resolved (Generator (Obj(s), Obj(i), Obj(e))) when finalReduction ->
+                match s, i, e with
+                | (:? int64 as s), (:? int64 as i), (:? int64 as e) -> Obj (seq {s .. i .. e }) |> Some
+                | (:? float as s), (:? float as i), (:? float as e) -> Obj (seq {s .. i .. e }) |> Some
+                | _ -> failwith (sprintf "Unexpected Generator Parameters: %A, %A, %A" s i e)
+            | Generator (sexpr, iexpr, eexpr) when finalReduction ->
+                let rs = reduceExpressions [] [sexpr] bindings
+                let ri = reduceExpressions [] [iexpr] bindings
+                let re = reduceExpressions [] [eexpr] bindings
+                match rs, ri, re with
+                | (s :: []), (i :: []), (e :: []) -> Generator (s, i, e) |> Resolved |> Some
+                | _ -> failwith (sprintf "One or more generator expressions are unresolved: %A, %A, %A" rs ri re)
+                //| s, i, e -> Generator (SubExpression s, SubExpression i, SubExpression e) |> Resolved |> Some
             | _ -> None
             |> Option.map (fun res -> res, left, rt)
         | _ -> None
@@ -99,8 +113,7 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         // Order of Operations case 1: Obj_L InfixOp_R1 Obj_R InfixOp_R2
         // If InfixOp_R1 <= InfixOp_R2 then we can safely apply InfixOp_R1
         | (Infix (lp, lfun)) :: Obj l :: lt, Obj r :: (Infix (rp, rfrun)) :: rt when finalReduction ->
-            if lp <= rp then 
-                Some (Obj (lfun l r), lt, (Infix (rp, rfrun)) :: rt)
+            if lp <= rp then Some (Obj (lfun l r), lt, (Infix (rp, rfrun)) :: rt)
             else None
         // Order of Operations case 2: Obj InfixOp Obj END 
         // We've reached the end of our list, it's safe to use InfixOp
