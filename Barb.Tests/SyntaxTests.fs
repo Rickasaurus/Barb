@@ -249,6 +249,18 @@ let ``predicate language should support iterative incremental tuple building wit
     Assert.True(result)  
 
 [<Fact>]
+let ``predicate language should treat tuples properly even when in a left subexpression`` () = 
+    let dudePredicate = buildExpr<unit,bool> "((1,2,3)) = (1,2,3)"
+    let result = dudePredicate ()
+    Assert.True(result)  
+
+[<Fact>]
+let ``predicate language should treat tuples properly even when in a right subexpression`` () = 
+    let dudePredicate = buildExpr<unit,bool> "(1,2,3) = ((1,2,3))"
+    let result = dudePredicate ()
+    Assert.True(result)  
+
+[<Fact>]
 let ``predicate language should support a simple fold`` () = 
     let dudePredicate = buildExpr<unit,bool> "(fold (1, 2, 3) with true in (fun e s -> s and e < 5))"
     let result = dudePredicate ()

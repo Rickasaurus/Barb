@@ -228,10 +228,15 @@ let compareAsSameType obj1 obj2 func =
     let cobj1, cobj2 = convertToSameType obj1 obj2     
     func cobj1 cobj2
      
-let objectsEqualInner (obj1: obj) (obj2: obj) = 
-    if obj1 = null && obj2 = null then true
-    elif obj1 = null || obj2 = null then false
-    else compareAsSameType obj1 obj2 (fun o1 o2 -> o1.Equals(o2))
+let rec objectsEqualInner (obj1: obj) (obj2: obj) =
+    match obj1, obj2 with
+    | null, null -> true 
+    | (:? seq<obj> as seq1), (:? seq<obj> as seq2) -> 
+        if Seq.length seq1 <> Seq.length seq2 then false
+        else Seq.zip seq1 seq2 |> Seq.forall (fun (o1, o2) -> objectsEqualInner o1 o2)
+    | null, _ -> false
+    | _, null -> false
+    | obj1, obj2 -> compareAsSameType obj1 obj2 (fun o1 o2 -> o1.Equals(o2))
 
 let objectsEqual (obj1: obj) (obj2: obj) = 
     box <| objectsEqualInner obj1 obj2
