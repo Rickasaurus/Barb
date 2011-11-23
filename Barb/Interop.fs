@@ -6,6 +6,7 @@ open System.Text.RegularExpressions
 open System.Reflection
 open System.ComponentModel
 open System.Linq
+open System.Collections
 open System.Collections.Concurrent
 open System.Collections.Generic
 open System.Runtime.CompilerServices
@@ -197,7 +198,8 @@ let executeParameterizedMethod (sigs: MethodSig) (args: obj) =
     |> Option.map Returned
 
 let resolveObjectIndexer (rtype: System.Type) =
-    let indexers = rtype.GetCustomAttributes(typeof<DefaultMemberAttribute>, true) |> Array.map (fun t -> t :?> DefaultMemberAttribute)
+    let indexers = rtype.GetCustomAttributes(typeof<DefaultMemberAttribute>, true) 
+                   |> Array.map (fun t -> t :?> DefaultMemberAttribute)
     match indexers with
     | [| |] -> None 
     | attrs -> let memberName = attrs.[0].MemberName    
@@ -208,8 +210,14 @@ let cachedResolveObjectIndexer =
     let resolveValue rtype = resolveObjectIndexer rtype
     memoizeBy inputToKey resolveValue
 
-let callIndexedProperty (target: obj) (indexVal: obj) =
+let callIndexedProperty (target: obj) (indexVal: obj) =    
     if target = null then Some <| Obj null
+    elif target.GetType().IsArray then
+        match indexVal with
+        | (:? int64 as num) -> 
+            let arr = target :?> Array
+            arr.GetValue(num) |> Returned |> Some
+        | _ -> None
     else
         let ttype = target.GetType()
         match cachedResolveObjectIndexer ttype with

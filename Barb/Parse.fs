@@ -47,6 +47,8 @@ type CaptureParams =
 
 open System.Numerics
 
+let whitespace = [| " "; "\r"; "\n"; "\t"; |]
+
 let (|Num|_|) (text: string) =
     let numChars = [| '0'; '1'; '2'; '3'; '4'; '5'; '6'; '7'; '8'; '9' |]
     let sb = new StringBuilder()
@@ -92,12 +94,13 @@ let (|FreeToken|_|) (endTokens: string list) (text: string) =
         let index = list |> List.min 
         let tokenText = text.Substring(0, index)
         let remainder = text.Substring(index)
-        Some (tokenText, remainder) 
+        if index > 0 then Some (tokenText, remainder) 
+        else None
 
 let generateBind = 
     function 
     | h :: SubExpression([Unknown(name)]) :: [] -> Binding (name, h) 
-    | list -> failwith (sprintf "Incorrect let binding syntax: %A" list)
+    | list -> failwith (sprintf "Incorrect binding syntax: %A" list)
 
 let generateLambda = 
     function 
@@ -119,11 +122,6 @@ let generateIterator =
         Generator (SubExpression(starte), SubExpression(inc), SubExpression(ende))        
     | list -> failwith (sprintf "Incorrect generator syntax: %A" list)
 
-//let generateFold = 
-//    function
-//    | SubExpression(funexpr) :: SubExpression(starte) :: SubExpression(starte) :: [] -> 
-//    | list -> failwith (sprintf "Incorrect fold syntax: %A" list)
-
 let captureTypes = 
     [
         { Begin = "(";     Delims = [];                             End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
@@ -135,7 +133,6 @@ let captureTypes =
         { Begin = "(";     Delims = [Single "=>"];                  End = ")";  Func = generateLambda }
         { Begin = "(if";   Delims = [Single "then"; Single "else"]; End = ")";  Func = generateIfThenElse }
         { Begin = "(";     Delims = [Repeating ".."];               End = ")";  Func = generateIterator }
-//        { Begin = "(fold"; Delims = [Single "with"; Single "in"];   End = ")";  Func = generateFold }
     ]
 
 let (|CaptureDelim|_|) currentCaptures (text: string) =
@@ -191,6 +188,9 @@ let parseProgram (startText: string) =
             | [] -> result, crem, cParams
             | results -> [SubExpression (results |> List.rev)], crem, cParams 
         | SkipToken " " res
+        | SkipToken "\t" res
+        | SkipToken "\r" res
+        | SkipToken "\n" res
         | TokenToVal "." Invoke res
         | TokenToVal "()" Unit res
         | TokenToVal "null" (Obj null) res
@@ -216,7 +216,7 @@ let parseProgram (startText: string) =
             match v with
             | Some value -> parseProgramInner rem (value :: result) currentCaptures
             | None -> parseProgramInner rem result currentCaptures
-        | FreeToken ["."; " "; "("; ")"; ","; "."; "]"; "["] (token, rem) ->
+        | FreeToken ["."; " "; "("; ")"; ","; "."; "]"; "["; "\r"; "\n"; "\t"] (token, rem) ->
             parseProgramInner rem ((Unknown token) :: result) currentCaptures
         | str -> parseProgramInner (str.Substring(1)) result currentCaptures
     let res, _, _ = parseProgramInner startText [] [] in res |> List.rev

@@ -125,10 +125,6 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         #endif
         match lleft, lright with
         | left, Resolved(expr) :: rt -> reduceExpressions (expr :: left) rt bindings
-//        | (Binding (name, bexpr) :: lt), (Lambda (p, a, lexpr) :: rt) ->
-//            let rexpr = reduceExpressions [] [expr] bindings |> SubExpression
-//            let recBound = SubExpression [Binding(name, rexpr); rexpr] |> Resolved
-//            reduceExpressions lt (Binding(name, recBound) :: recBound :: right) bindings
         | left, (Binding (name, expr) :: rt) ->
             match reduceExpressions [] [expr] bindings with
             | Lambda(p,a,lexpr) :: [] when not finalReduction -> 
