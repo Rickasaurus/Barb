@@ -25,13 +25,6 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
 
     let rec (|ResolveIfThenElse|_|) bindings =
         function        
-//        | Resolved (IfThenElse (ifexpr, thenexpr, elseexpr)) when finalReduction ->            
-//            match reduceExpressions [] ifexpr bindings with
-//            | Obj (:? bool as res) :: [] -> 
-//                if res then reduceExpressions [] thenexpr bindings
-//                else reduceExpressions [] elseexpr bindings
-//                |> (fun resExpr -> Some (SubExpression(resExpr)))
-//            | invalid -> failwith (sprintf "If predicate returned an invalid result: %A" invalid)
         | IfThenElse (ifexpr, thenexpr, elseexpr) ->
             match reduceExpressions [] ifexpr bindings with
             // If fully resolved in initial reduction, resolve and return the result clause
@@ -125,11 +118,23 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
     // Tries to merge/convert local tokens, if it can't it moves to the right
     and reduceExpressions lleft lright (bindings: (string, ExprTypes Lazy) Map) =
         #if DEBUG
-        printfn "L: %A R: %A" lleft lright
+        printfn "L: %A" lleft 
+        printfn "R: %A" lright
+        printfn "B: %A" bindings
+        printfn ""
         #endif
         match lleft, lright with
         | left, Resolved(expr) :: rt -> reduceExpressions (expr :: left) rt bindings
-        | (Binding (name, expr) :: lt), right -> let newbindings = bindings |> Map.add name (lazy (expr)) in reduceExpressions lt right newbindings
+//        | (Binding (name, bexpr) :: lt), (Lambda (p, a, lexpr) :: rt) ->
+//            let rexpr = reduceExpressions [] [expr] bindings |> SubExpression
+//            let recBound = SubExpression [Binding(name, rexpr); rexpr] |> Resolved
+//            reduceExpressions lt (Binding(name, recBound) :: recBound :: right) bindings
+        | left, (Binding (name, expr) :: rt) ->
+            match reduceExpressions [] [expr] bindings with
+            | Lambda(p,a,lexpr) :: [] when not finalReduction -> 
+                let recLambda = Binding(name, Lambda(p,a,SubExpression [Binding(name, Lambda(p,a,lexpr)); lexpr])) |> Resolved
+                reduceExpressions left (recLambda :: rt) bindings
+            | rexpr -> let newbindings = bindings |> Map.add name (lazy SubExpression rexpr) in  reduceExpressions left rt newbindings
         | left, (SubExpression exp :: rt) ->
             match reduceExpressions [] exp bindings |> List.rev with
             | single :: [] -> reduceExpressions left (single :: rt) bindings

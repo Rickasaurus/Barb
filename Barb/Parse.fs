@@ -94,7 +94,7 @@ let (|FreeToken|_|) (endTokens: string list) (text: string) =
         let remainder = text.Substring(index)
         Some (tokenText, remainder) 
 
-let bindFunction = 
+let generateBind = 
     function 
     | h :: SubExpression([Unknown(name)]) :: [] -> Binding (name, h) 
     | list -> failwith (sprintf "Incorrect let binding syntax: %A" list)
@@ -119,17 +119,23 @@ let generateIterator =
         Generator (SubExpression(starte), SubExpression(inc), SubExpression(ende))        
     | list -> failwith (sprintf "Incorrect generator syntax: %A" list)
 
+//let generateFold = 
+//    function
+//    | SubExpression(funexpr) :: SubExpression(starte) :: SubExpression(starte) :: [] -> 
+//    | list -> failwith (sprintf "Incorrect fold syntax: %A" list)
+
 let captureTypes = 
     [
-        { Begin = "(";    Delims = [];                             End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
-        { Begin = "(";    Delims = [Repeating ","];                End = ")";  Func = (fun exprs -> Tuple exprs) }
-        { Begin = "[";    Delims = [];                             End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
-        { Begin = "let";  Delims = [Single "="];                   End = "in"; Func = bindFunction }
-        { Begin = "var";  Delims = [Single "="];                   End = "in"; Func = bindFunction }
-        { Begin = "(fun"; Delims = [Single "->"];                  End = ")";  Func = generateLambda }
-        { Begin = "(";    Delims = [Single "=>"];                  End = ")";  Func = generateLambda }
-        { Begin = "(if";  Delims = [Single "then"; Single "else"]; End = ")";  Func = generateIfThenElse }
-        { Begin = "(";    Delims = [Repeating ".."];               End = ")";  Func = generateIterator }
+        { Begin = "(";     Delims = [];                             End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
+        { Begin = "(";     Delims = [Repeating ","];                End = ")";  Func = (fun exprs -> Tuple exprs) }
+        { Begin = "[";     Delims = [];                             End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
+        { Begin = "let";   Delims = [Single "="];                   End = "in"; Func = generateBind }
+        { Begin = "var";   Delims = [Single "="];                   End = "in"; Func = generateBind }
+        { Begin = "(fun";  Delims = [Single "->"];                  End = ")";  Func = generateLambda }
+        { Begin = "(";     Delims = [Single "=>"];                  End = ")";  Func = generateLambda }
+        { Begin = "(if";   Delims = [Single "then"; Single "else"]; End = ")";  Func = generateIfThenElse }
+        { Begin = "(";     Delims = [Repeating ".."];               End = ")";  Func = generateIterator }
+//        { Begin = "(fold"; Delims = [Single "with"; Single "in"];   End = ")";  Func = generateFold }
     ]
 
 let (|CaptureDelim|_|) currentCaptures (text: string) =
