@@ -131,8 +131,19 @@ let ``predicate language should be able to index into a given array`` () =
     Assert.True(result)
 
 [<Fact>]
-let ``predicate language should support comparing arrays`` () =  
-    let record = { Names1 = [|"John"; "Frank"|]; Names2 = [|""; "Franklin"|]; Scores = [|0.0; 0.8|] }   
+let ``predicate language should support recursive array iteration`` () =  
+    let record = { Names1 = [||]; Names2 = [||]; Scores = [|0.0; 0.8; 0.5; 0.6|] }   
+    let predText = 
+        "let maxVal = (fun i best -> let nextbest = (if best > Scores[i] then best else Scores[i]) in
+                                       (if i = 0 then nextbest else maxVal (i - 1) nextbest))
+                      in maxVal (Scores.Length - 1) 0 = 0.8"
+    let pred = buildExpr<NameScores,bool> predText
+    let result = pred record
+    Assert.True(result)
+
+[<Fact>]
+let ``predicate language should support a fold implementation`` () =  
+    let record = { Names1 = [||]; Names2 = [||]; Scores = [|0.0; 0.8; 0.5; 0.6|] }   
     let predText = 
         "let maxVal = (fun i best -> let nextbest = (if best > Scores[i] then best else Scores[i]) in
                                        (if i = 0 then nextbest else maxVal (i - 1) nextbest))

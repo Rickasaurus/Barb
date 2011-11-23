@@ -60,8 +60,8 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         | left, r :: rt ->
             match r with
             | Returned o -> resolveResultType o |> Some
-            | Tuple tc when finalReduction ->
-                tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> tupleToSequence |> box |> Obj |> Some
+//            | Tuple tc when finalReduction ->
+//                tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> tupleToSequence |> box |> Obj |> Some
             | Tuple tc -> 
                 tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> Tuple |> Resolved |> Some
             | Unknown unk -> bindings |> Map.tryFind unk |> Option.bind (fun res -> Some <| res.Force())
@@ -96,6 +96,10 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
             | Invoke, IndexArgs r -> IndexArgs r |> Some // Here for F#-like indexing (if you want it)
             | Obj l, AppliedInvoke r -> resolveInvoke l r
             | IndexedProperty l, IndexArgs (Obj r) -> executeIndexer l r
+            | Tuple (elements), IndexArgs (Obj r) -> match r with 
+                                                     | :? int64 as idx -> List.nth elements (int idx) 
+                                                     | _ -> failwith (sprintf "Bad type for tuple index: %A" r)
+                                                     |> Some
             | Obj l, IndexArgs (Obj r) -> callIndexedProperty l r
             | Lambda (p,a,e), Obj r -> applyArgToLambda bindings (p,a,e) r |> Some
             | _ -> None

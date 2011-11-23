@@ -268,6 +268,13 @@ let ``predicate language should support recursion`` () =
     let result = dudePredicate ()
     Assert.True(result)  
 
+[<Fact>]
+let ``predicate language tuples should be indexable`` () = 
+    let dudePredicate = buildExpr<unit,bool> "(1,2,3)[1] = 2"
+    let result = dudePredicate ()
+    Assert.True(result)  
+
+
 //[<Fact>]
 //let ``predicate language should support a simple fold`` () = 
 //    let dudePredicate = buildExpr<unit,bool> "(fold (1, 2, 3) with true in (fun e s -> s and e < 5))"
