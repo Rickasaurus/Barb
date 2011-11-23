@@ -143,14 +143,14 @@ let ``predicate language should support recursive array iteration`` () =
 
 [<Fact>]
 let ``predicate language should support a fold implementation`` () =  
-    let record = { Names1 = [||]; Names2 = [||]; Scores = [|0.0; 0.8; 0.5; 0.6|] }   
-    let predText = 
-        "let maxVal = (fun i best -> let nextbest = (if best > Scores[i] then best else Scores[i]) in
-                                       (if i = 0 then nextbest else maxVal (i - 1) nextbest))
-                      in maxVal (Scores.Length - 1) 0 = 0.8"
+    let record = { Names1 = [|""; "BLAH"; "BLAHZENHEIMER"|]; Names2 = [|"DUDE"; "BLEG"; "BLAHZENHEIMER"|]; Scores = [|0.0; 0.8; 1.0;|] }   
+    let predText =
+        "let isFullMatch = (fun i ismatch -> let st = ismatch and Scores[i] < 0.4 in
+                                               (if i = 0 then st else isFullMatch (i - 1) st))
+         in isFullMatch (Scores.Length - 1) true"
     let pred = buildExpr<NameScores,bool> predText
     let result = pred record
-    Assert.True(result)
+    Assert.False(result)
 
 
 

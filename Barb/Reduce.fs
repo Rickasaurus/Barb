@@ -7,11 +7,15 @@ open System.Collections.Concurrent
 open Barb.Interop
 open Barb.Representation
 
+let indexIntoTuple elements (index: obj) = 
+    match index with 
+    | :? int64 as idx -> List.nth elements (int idx) 
+    | _ -> failwith (sprintf "Bad type for tuple index: %A" index)
+
 let resolveExpressionResult (input: ExprTypes list) =
     match input with
     | Obj (res) :: [] -> res
     | otherTokens -> failwith (sprintf "Unexpected result: %A" otherTokens)
-
 
 let tupleToSequence (tuple: ExprTypes list) = 
     seq {
@@ -60,8 +64,8 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
         | left, r :: rt ->
             match r with
             | Returned o -> resolveResultType o |> Some
-//            | Tuple tc when finalReduction ->
-//                tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> tupleToSequence |> box |> Obj |> Some
+            | Tuple tc when finalReduction ->
+                tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> List.rev |> tupleToSequence |> box |> Obj |> Some
             | Tuple tc -> 
                 tc |> List.collect (fun t -> reduceExpressions [] [t] bindings) |> Tuple |> Resolved |> Some
             | Unknown unk -> bindings |> Map.tryFind unk |> Option.bind (fun res -> Some <| res.Force())
@@ -78,8 +82,7 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
                 match rs, ri, re with
                 | (Obj(s) :: []), (Obj(i) :: []), (Obj(e) :: []) -> Generator (Obj s, Obj i, Obj e) |> Some
                 | s, i, e when not finalReduction -> Generator (SubExpression s, SubExpression i, SubExpression e) |> Resolved |> Some
-                | _ -> failwith (sprintf "One or more generator expressions are unresolved: %A, %A, %A" rs ri re)
-                //
+                | _ -> failwith (sprintf "One or more generator expressions could not be resolved: %A, %A, %A" rs ri re)
             | _ -> None
             |> Option.map (fun res -> res, left, rt)
         | _ -> None
@@ -96,10 +99,7 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
             | Invoke, IndexArgs r -> IndexArgs r |> Some // Here for F#-like indexing (if you want it)
             | Obj l, AppliedInvoke r -> resolveInvoke l r
             | IndexedProperty l, IndexArgs (Obj r) -> executeIndexer l r
-            | Tuple (elements), IndexArgs (Obj r) -> match r with 
-                                                     | :? int64 as idx -> List.nth elements (int idx) 
-                                                     | _ -> failwith (sprintf "Bad type for tuple index: %A" r)
-                                                     |> Some
+            | Tuple (elements), IndexArgs (Obj r) -> indexIntoTuple elements r |> Some
             | Obj l, IndexArgs (Obj r) -> callIndexedProperty l r
             | Lambda (p,a,e), Obj r -> applyArgToLambda bindings (p,a,e) r |> Some
             | _ -> None
