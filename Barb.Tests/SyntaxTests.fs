@@ -260,8 +260,17 @@ let ``predicate language should treat tuples properly even when in a right subex
     let result = dudePredicate ()
     Assert.True(result)  
 
+//let fx = (fun x -> x = \"Don\") in fx Name"
+
 [<Fact>]
-let ``predicate language should support a simple fold`` () = 
-    let dudePredicate = buildExpr<unit,bool> "(fold (1, 2, 3) with true in (fun e s -> s and e < 5))"
+let ``predicate language should support recursion`` () = 
+    let dudePredicate = buildExpr<unit,bool> "let fx = (fun x -> (if x = 0 then true else fx (x - 1))) in fx 5"
     let result = dudePredicate ()
     Assert.True(result)  
+
+//[<Fact>]
+//let ``predicate language should support a simple fold`` () = 
+//    let dudePredicate = buildExpr<unit,bool> "(fold (1, 2, 3) with true in (fun e s -> s and e < 5))"
+//    let result = dudePredicate ()
+//    Assert.True(result)  
+
