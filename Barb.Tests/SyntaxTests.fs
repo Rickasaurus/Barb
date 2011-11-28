@@ -237,6 +237,13 @@ let ``predicate language should support if-then-else`` () =
     Assert.True(result)  
 
 [<Fact>]
+let ``predicate language should support if-then-else with initial/final spacing`` () = 
+    let testRec = { Score = 101.0 } 
+    let dudePredicate = buildExpr<TestFloatRec,bool> "( if Score >= 100 then 5 else 10 ) = 5"
+    let result = dudePredicate testRec
+    Assert.True(result)  
+
+[<Fact>]
 let ``predicate language should support iterative incremental tuple building`` () = 
     let dudePredicate = buildExpr<unit,bool> "(1 .. 5) = (1, 2, 3, 4, 5)"
     let result = dudePredicate ()

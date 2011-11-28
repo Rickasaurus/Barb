@@ -34,8 +34,8 @@ let (|TokensToVal|_|) (mStrs: string list) (result: ExprTypes) (text: string) =
     | None -> None
 
 type DelimType =
-    | Single of string
-    | Repeating of string
+    | SCapture of string
+    | RCapture of string
 
 type CaptureParams = 
     {
@@ -104,14 +104,14 @@ let generateBind =
 
 let generateLambda = 
     function 
-    | h :: SubExpression(names) :: [] ->
+    | h :: SubExpression(names) :: SubExpression([]) :: [] ->
         let prms = names |> List.map (function | Unknown n -> n | other -> failwith (sprintf "Unexpected construct in lambda argument list: %A" other))
         Lambda (prms, List.empty, h) 
     | list -> failwith (sprintf "Incorrect lambda binding syntax: %A" list)
 
 let generateIfThenElse =
     function
-    | SubExpression(elseexpr) :: SubExpression(thenexpr) :: SubExpression(ifexpr) :: [] -> IfThenElse (ifexpr, thenexpr, elseexpr)
+    | SubExpression(elseexpr) :: SubExpression(thenexpr) :: SubExpression(ifexpr) :: SubExpression([]) :: [] -> IfThenElse (ifexpr, thenexpr, elseexpr)
     | list -> failwith (sprintf "Incorrect if-then-else syntax: %A" list)
 
 let generateIterator = 
@@ -124,15 +124,15 @@ let generateIterator =
 
 let captureTypes = 
     [
-        { Begin = "(";     Delims = [];                             End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
-        { Begin = "(";     Delims = [Repeating ","];                End = ")";  Func = (fun exprs -> Tuple exprs) }
-        { Begin = "[";     Delims = [];                             End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
-        { Begin = "let";   Delims = [Single "="];                   End = "in"; Func = generateBind }
-        { Begin = "var";   Delims = [Single "="];                   End = "in"; Func = generateBind }
-        { Begin = "(fun";  Delims = [Single "->"];                  End = ")";  Func = generateLambda }
-        { Begin = "(";     Delims = [Single "=>"];                  End = ")";  Func = generateLambda }
-        { Begin = "(if";   Delims = [Single "then"; Single "else"]; End = ")";  Func = generateIfThenElse }
-        { Begin = "(";     Delims = [Repeating ".."];               End = ")";  Func = generateIterator }
+        { Begin = "(";   Delims = [];                                                 End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
+        { Begin = "(";   Delims = [RCapture ","];                                     End = ")";  Func = (fun exprs -> Tuple exprs) }
+        { Begin = "[";   Delims = [];                                                 End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
+        { Begin = "let"; Delims = [SCapture "="];                                     End = "in"; Func = generateBind }
+        { Begin = "var"; Delims = [SCapture "="];                                     End = "in"; Func = generateBind }
+        { Begin = "(";   Delims = [SCapture "fun"; SCapture "->"];                    End = ")";  Func = generateLambda }
+        { Begin = "(";   Delims = [SCapture "=>"];                                    End = ")";  Func = generateLambda }
+        { Begin = "(";   Delims = [SCapture "if"; SCapture "then"; SCapture "else"];  End = ")";  Func = generateIfThenElse }
+        { Begin = "(";   Delims = [RCapture ".."];                                    End = ")";  Func = generateIterator }
     ]
 
 let (|CaptureDelim|_|) currentCaptures (text: string) =
@@ -140,10 +140,11 @@ let (|CaptureDelim|_|) currentCaptures (text: string) =
         [ 
             for cc in currentCaptures do
                 match cc.Delims with
-                | (Single delim) :: dt when text.StartsWith delim -> yield { cc with Delims = dt }, delim
-                | (Repeating delim) :: dt when text.StartsWith delim -> yield cc, delim
-                | (Repeating _) :: Repeating delim :: dt when text.StartsWith delim -> yield { cc with Delims = Repeating delim :: dt }, delim
-                | (Repeating _) :: Single delim :: dt when text.StartsWith delim -> yield { cc with Delims = dt }, delim  
+                //TODO: make it so intermediate tokens are not ignored
+                | (SCapture delim) :: dt when text.StartsWith delim -> yield { cc with Delims = dt }, delim
+                | (RCapture delim) :: dt when text.StartsWith delim -> yield cc, delim
+                | (RCapture _) :: RCapture delim :: dt when text.StartsWith delim -> yield { cc with Delims = RCapture delim :: dt }, delim
+                | (RCapture _) :: SCapture delim :: dt when text.StartsWith delim -> yield { cc with Delims = dt }, delim  
                 | _ -> ()          
         ] 
         |> List.allMaxBy (fun (cc, matchedDelim) -> matchedDelim.Length)

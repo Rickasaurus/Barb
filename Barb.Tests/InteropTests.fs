@@ -141,7 +141,7 @@ let ``predicate language should support recursive array iteration`` () =
     let result = pred record
     Assert.True(result)
 
-[<Fact>]
+//[<Fact>]
 let ``predicate language should support a fold implementation`` () =  
     let record = { Names1 = [|""; "BLAH"; "BLAHZENHEIMER"|]; Names2 = [|"DUDE"; "BLEG"; "BLAHZENHEIMER"|]; Scores = [|0.0; 0.8; 1.0;|] }   
     let predText =
