@@ -1,39 +1,70 @@
 Barb is a small dynamic scripting language for .NET with the following properties:
 
+- Syntax that makes both F# and C# devs feel at home
 - Fully expression oriented (Whitespace is completely ignored)
 - Paren based scoping rules (Lisp-like)
-- Syntax that makes both F# and C# devs feel at home
+- Pure functional (No mutation allowed)
 
---
+This makes Barb an easy to learn language which you can give to your users for safely scripting over data in your application.
 
-I created Barb because I needed a user language for my applications but yet no existing .NET language hosted nicely inside of my application.  This was my criteria:
+
+------------------------------------
+---     	  Why Barb?          ---
+------------------------------------
+
+
+I created Barb because I needed a user language for my applications but yet no existing .NET language hosted nicely inside of my application and met my criteria:
 
 - Simple/Terse Syntax
-- Expression Oriented
+- Expression Oriented (Any program should be able to be represented in a single line of code)
 - No casting necessary and transparent type conversions
-- Native .NET type system
+- Native .NET type system (No painful conversions!)
 - Tries really hard to do what a non-technical user would expect
 - Easy to maintain
 - Fast Execution (I use it to script over sets of records in the millions range)
+- Safe from accidental data corruption by non-technical users
 
 Dynamic Linq, IronPython and IronRuby all failed for one of these reasons or another.
 
-The current implementation is still young and a bit rough around the edges. I needed to get something out fast for my product in about three days time.  After that period it was useful only for writing one-line expressions along these lines:
+The current implementation is still young and a bit rough around the edges. It's ideally useful only for writing one-line expressions along these lines:
 
 "(Name.Contains "John" or Name.Contains "Mary") and (Age > 20 or Weight > 200)"
 
-It's seen some work since then but I'm not quite ready to put it out there.  In particular, it needs better error messages and some extra work into making a friendly API for hosting.
+It can do much more, but still needs works to be friendly enoungh for a real release. In particular, it needs better error messages and some extra work into making a friendly API for hosting.
 
 However, I thought it might be useful to others in its current form.  If you do play with it I hope you'll let me know what you think.
 
+
 ------------------------------------
----         Things To do         ---
+---       Current Features       ---
+------------------------------------
+
+- Recursive lambda bindings with F# or C# syntax
+- Value name binding with F# or C# syntax
+- Order of operations 
+- Static or instance calls and indexers via cached reflection
+- Numerical sequence expressions (Identical to F#'s)
+- Tuples (any IEnumerable is treated as a tuple internally)
+
+ 
+------------------------------------
+---        Things To do          ---
 ------------------------------------
 
 - Lambda interop with .NET
 - Extension method resolution
-- Recursive bindings
 - A resonable API with configuration options
+- Allow if/fun without parens in cases where it's already in a subexpression
+- Generalized Sequence Expressions
+
+
+------------------------------------
+---     Planned Limitations      ---
+------------------------------------
+
+- All numbers are converted interally to Int64 or Double.  This will change but was necessary for now to keep things simple.
+- Barb may cause unexpected behavior when making calls that mutate things.  I do plan on adding an API option to fix this, but it will tone down optimization significantly.
+
 
 ------------------------------------
 --- Extra Nerdy Stuff Under Here ---
