@@ -71,6 +71,6 @@ However, I thought it might be useful to others in its current form.  If you do 
 --- Extra Nerdy Stuff Under Here ---
 ------------------------------------
 
-Compilation is done by n-tuple expression merging.  This is done initially to pre-compute as much as possible and the optimized result is then reduced again with the information given by the passed in data object.  Decisions can be made at runtime based on the contents of these tuples and their neighbors.  This allows for a huge amount of flexibility in deciding what to do.  Function/Value composition also allows for fast code to be built out of existing .NET constructs and eliminates the complexity of a intermediate representation.
+Compilation is done by n-tuple merging of expression nodes.  This is done initially to pre-compute as much as possible and the optimized result is then reduced again with the information given by the passed in data object.  Decisions can be made at runtime based on the contents of these tuples and their neighbors.  This allows for a huge amount of flexibility in deciding what to do.  Function/Value composition also allows for fast code to be built out of existing .NET constructs and eliminates the complexity of a intermediate representation.
 
 It's kind of Scheme-like under the hood, but I've worked hard to make it very C#/F#ish on the surface.
