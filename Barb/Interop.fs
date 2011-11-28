@@ -212,24 +212,22 @@ let cachedResolveObjectIndexer =
 
 let callIndexedProperty (target: obj) (indexVal: obj) =    
     if target = null then Some <| Obj null
-    elif target.GetType().IsArray then
-        match indexVal with
-        | (:? int64 as num) -> 
-            let arr = target :?> Array
-            arr.GetValue(num) |> Returned |> Some
-        | _ -> None
     else
         let ttype = target.GetType()
-        match cachedResolveObjectIndexer ttype with
-        | None -> None
-        | Some (propInfo, paramInfos) -> 
-            match paramInfos with
-            | [| |] -> failwith (sprintf "Expected an indexed object, but got non-indexed: %s" ttype.FullName)
-            | [| arg |] -> 
-                match convertToTargetType (arg.ParameterType) indexVal with
-                | Some (converted) -> Some <| (Returned (propInfo.GetValue(target, [| converted |])))
-                | None -> failwith (sprintf "No conversion found from %s of %s to %s" (string indexVal) (indexVal.GetType().ToString()) (arg.ParameterType.ToString()))                
-            | other -> failwith (sprintf "MultiIndexed objects are not currently supported: %s" ttype.FullName)
+        match target, indexVal with
+        | (:? Array as arr),          (:? int64 as idx) -> arr.GetValue(idx) |> Returned |> Some
+        | (:? IEnumerable as enumer), (:? int64 as idx64) -> let idx = int idx64 in enumer |> Seq.cast<obj> |> Seq.nth idx |> Returned |> Some  
+        | _ ->
+            match cachedResolveObjectIndexer ttype with
+            | None -> None
+            | Some (propInfo, paramInfos) -> 
+                match paramInfos with
+                | [| |] -> failwith (sprintf "Expected an indexed object, but got non-indexed: %s" ttype.FullName)
+                | [| arg |] -> 
+                    match convertToTargetType (arg.ParameterType) indexVal with
+                    | Some (converted) -> Some <| (Returned (propInfo.GetValue(target, [| converted |])))
+                    | None -> failwith (sprintf "No conversion found from %s of %s to %s" (string indexVal) (indexVal.GetType().ToString()) (arg.ParameterType.ToString()))                
+                | other -> failwith (sprintf "MultiIndexed objects are not currently supported: %s" ttype.FullName)
 
 
 let compareAsSameType obj1 obj2 func =

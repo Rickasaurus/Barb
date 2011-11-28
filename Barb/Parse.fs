@@ -114,7 +114,7 @@ let generateIfThenElse =
     | SubExpression(elseexpr) :: SubExpression(thenexpr) :: SubExpression(ifexpr) :: SubExpression([]) :: [] -> IfThenElse (ifexpr, thenexpr, elseexpr)
     | list -> failwith (sprintf "Incorrect if-then-else syntax: %A" list)
 
-let generateIterator = 
+let generateNumIterator = 
     function
     | SubExpression(ende) :: SubExpression(starte) :: [] -> 
         Generator (SubExpression(starte), Obj(box 1L), SubExpression(ende))
@@ -132,7 +132,7 @@ let captureTypes =
         { Begin = "(";   Delims = [SCapture "fun"; SCapture "->"];                    End = ")";  Func = generateLambda }
         { Begin = "(";   Delims = [SCapture "=>"];                                    End = ")";  Func = generateLambda }
         { Begin = "(";   Delims = [SCapture "if"; SCapture "then"; SCapture "else"];  End = ")";  Func = generateIfThenElse }
-        { Begin = "(";   Delims = [RCapture ".."];                                    End = ")";  Func = generateIterator }
+        { Begin = "(";   Delims = [RCapture ".."];                                    End = ")";  Func = generateNumIterator }
     ]
 
 let (|CaptureDelim|_|) currentCaptures (text: string) =
