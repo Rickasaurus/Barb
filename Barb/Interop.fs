@@ -68,6 +68,9 @@ let rec resolveResultType (output: obj) =
     | SupportedNumberType contents -> Obj contents
     | other -> Obj other
 
+let fieldToExpr (fld: FieldInfo) =
+    fun (obj: obj) -> fld.GetValue(obj, null) |> Returned
+
 let propertyToExpr (prop: PropertyInfo) =
     match prop.GetIndexParameters() with
     | [||] -> (fun obj -> prop.GetValue(obj, null) |> Returned)
@@ -75,53 +78,23 @@ let propertyToExpr (prop: PropertyInfo) =
         let typeArgs = prms |> Array.map (fun pi -> pi.ParameterType)
         (fun (obj: obj) -> [(fun args -> prop.GetValue(obj, args)), typeArgs] |> IndexedProperty)
 
-let overloadedMethodToExpr (methods: MethodInfo seq) (getter: obj -> obj) =
+let overloadedMethodToExpr (methods: MethodInfo seq) =
     let methodsWithPrms = methods |> Seq.map (fun mi -> mi, mi.GetParameters() |> Array.map (fun pi -> pi.ParameterType)) |> Seq.toList
-    fun (instance:obj) -> 
+    fun (instance: obj) -> 
         let methodOverloads =
             [
                 for mi, prms in methodsWithPrms do
                     let resolver = 
                         fun (args) -> 
-                            let parentResult = getter instance
-                            mi.Invoke(parentResult, args)
+                            mi.Invoke(instance, args)
                     yield resolver, prms
             ]
         Method methodOverloads
 
-let resolveMember (rtype: System.Type) (memberName: string) =
-    let resolveProp () = 
-        rtype.GetProperty(memberName) |> nullableToOption
-        |> function
-           | None -> None
-           | Some prop -> match prop.GetIndexParameters() with
-                          | [||] -> Some <| PropertyCall (fun obj -> prop.GetValue(obj, null))
-                          | prms ->
-                                let typeArgs = prms |> Array.map (fun pi -> pi.ParameterType)
-                                Some <| IndexedPropertyCall (fun obj -> [(fun args -> prop.GetValue(obj, args)), typeArgs])
-    let resolveMethod () = 
-       rtype.GetMethods()
-       |> Array.filter (fun mi -> mi.Name = memberName) |> Array.toList
-       |> function
-          | [] -> None
-          | list -> 
-            let methodsWithParams = 
-                list |> List.map (fun mi -> mi, mi.GetParameters() |> Array.map (fun pi -> pi.ParameterType))
-            let globallyResolvedMethods instance =
-                methodsWithParams
-                |> List.map (fun (mi, mp) ->
-                                let callMethod = 
-                                    fun args ->
-                                        if instance <> null then mi.Invoke(instance, args)
-                                        else null
-                                callMethod, mp)
-            Some <| MethodCall (globallyResolvedMethods)
-    let resolveField () = 
-        rtype.GetField(memberName) |> nullableToOption
-        |> function
-            | Some fld -> Some <| PropertyCall (fun obj -> fld.GetValue(obj, null))
-            | None -> None  
-    resolveProp () |> Option.tryResolve resolveMethod |> Option.tryResolve resolveField
+let resolveMember (rtype: System.Type) (memberName: string) : (obj -> ExprTypes) option =
+    rtype.GetProperty(memberName) |> nullableToOption |> Option.map propertyToExpr
+    |> Option.tryResolve (fun () -> match rtype.GetMethods() |> Array.filter (fun mi -> mi.Name = memberName) with | [||] -> None | methods -> methods |> overloadedMethodToExpr |> Some)
+    |> Option.tryResolve (fun () -> rtype.GetField(memberName) |> nullableToOption |> Option.map fieldToExpr)
 
 let cachedResolveMember = 
     let inputToKey (rtype: System.Type, caseName) = rtype.FullName + "~" + caseName
@@ -130,11 +103,9 @@ let cachedResolveMember =
 
 let resolveInvoke (o: obj) (memberName: string) =
     if o = null then None
-    else cachedResolveMember (o.GetType(), memberName)
-         |> Option.map (function
-                        | PropertyCall pc -> Returned (pc o)
-                        | MethodCall mc -> Method (mc o)
-                        | IndexedPropertyCall ipc -> IndexedProperty (ipc o))
+    else match cachedResolveMember (o.GetType(), memberName) with
+         | Some (resolvedMember) -> resolvedMember o |> Some
+         | None -> failwith (sprintf "Unable to lookup specified member %s in object %s" memberName (o.GetType().Name))
 
 let rec resolveMembers (rtype: System.Type) (parentName: string) (getter: obj -> obj) =
     let properties = rtype.GetProperties()
@@ -147,7 +118,7 @@ let rec resolveMembers (rtype: System.Type) (parentName: string) (getter: obj ->
                 else String.Format("{0}.{1}", parentName, prop.Name)
             yield fullName, propertyToExpr prop
         for (name, methods) in methodCollections do           
-            yield name, overloadedMethodToExpr methods id
+            yield name, overloadedMethodToExpr methods
     }     
 
 let rec inline convertSequence seq1 seq2 = 
