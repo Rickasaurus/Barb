@@ -42,17 +42,17 @@ type StringWindow =
         member t.Item with get(x) = t.Text.[x + t.Offset]
         override t.ToString () = t.Text.Substring(t.Offset) 
 
-let (|SkipToken|_|) (mStr: string) (text: StringWindow) =
+let (|Skip|_|) (mStr: string) (text: StringWindow) =
     if text.StartsWith(mStr) then 
         Some (None, text.Subwindow(mStr.Length))
     else None
 
-let (|TokenToVal|_|) (mStr: string) (result: ExprTypes) (text: StringWindow) =
+let (|StrToVal|_|) (mStr: string) (result: ExprTypes) (text: StringWindow) =
     if text.StartsWith(mStr) then 
         Some (Some(result), text.Subwindow(mStr.Length))
     else None
 
-let (|TokensToVal|_|) (mStrs: string list) (result: ExprTypes) (text: StringWindow) =
+let (|StrsToVal|_|) (mStrs: string list) (result: ExprTypes) (text: StringWindow) =
     match mStrs |> List.tryFind (fun mStr -> text.StartsWith(mStr)) with
     | Some (matched) -> Some (Some(result), text.Subwindow(matched.Length))
     | None -> None
@@ -211,28 +211,28 @@ let parseProgram (startText: string) =
             match result with
             | [] -> result, crem, cParams
             | results -> [SubExpression (results |> List.rev)], crem, cParams 
-        | SkipToken " " res
-        | SkipToken "\t" res
-        | SkipToken "\r" res
-        | SkipToken "\n" res
-        | TokenToVal "." Invoke res
-        | TokenToVal "()" Unit res
-        | TokenToVal "null" (Obj null) res
-        | TokenToVal "true" (Obj true) res 
-        | TokenToVal "false" (Obj false) res 
-        | TokensToVal ["=="; "="] (Infix (3, objectsEqual)) res 
-        | TokensToVal ["<>"; "!="] (Infix (3, objectsNotEqual)) res
-        | TokenToVal ">=" (Infix (3, compareObjects (>=))) res
-        | TokenToVal "<=" (Infix (3, compareObjects (<=))) res
-        | TokenToVal ">" (Infix (3, compareObjects (>))) res
-        | TokenToVal "<" (Infix (3, compareObjects (<))) res 
-        | TokensToVal ["!"; "not"] (Prefix notOp) res
-        | TokensToVal ["&"; "&&"; "and"] (Infix (4, andOp)) res
-        | TokensToVal ["|"; "||"; "or"] (Infix (4, orOp)) res 
-        | TokenToVal "/" (Infix (1, divideObjects)) res
-        | TokenToVal "*" (Infix (1, multObjects)) res
-        | TokenToVal "+" (Infix (2, addObjects)) res 
-        | TokenToVal "-" (Infix (2, subObjects)) res
+        | Skip " " res
+        | Skip "\t" res
+        | Skip "\r" res
+        | Skip "\n" res
+        | StrToVal "." Invoke res
+        | StrToVal "()" Unit res
+        | StrToVal "null" (Obj null) res
+        | StrToVal "true" (Obj true) res 
+        | StrToVal "false" (Obj false) res 
+        | StrsToVal ["=="; "="] (Infix (3, objectsEqual)) res 
+        | StrsToVal ["<>"; "!="] (Infix (3, objectsNotEqual)) res
+        | StrToVal ">=" (Infix (3, compareObjects (>=))) res
+        | StrToVal "<=" (Infix (3, compareObjects (<=))) res
+        | StrToVal ">" (Infix (3, compareObjects (>))) res
+        | StrToVal "<" (Infix (3, compareObjects (<))) res 
+        | StrsToVal ["!"; "not"] (Prefix notOp) res
+        | StrsToVal ["&"; "&&"; "and"] (Infix (4, andOp)) res
+        | StrsToVal ["|"; "||"; "or"] (Infix (4, orOp)) res 
+        | StrToVal "/" (Infix (1, divideObjects)) res
+        | StrToVal "*" (Infix (1, multObjects)) res
+        | StrToVal "+" (Infix (2, addObjects)) res 
+        | StrToVal "-" (Infix (2, subObjects)) res
         | TextCapture '"' res
         | TextCapture ''' res 
         | Num res ->
