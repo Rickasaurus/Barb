@@ -110,7 +110,8 @@ let resolveInvoke (o: obj) (memberName: string) =
 let rec resolveMembers (rtype: System.Type) (parentName: string) (getter: obj -> obj) =
     let properties = rtype.GetProperties()
     let methodCollections = rtype.GetMethods()
-                            |> Seq.groupBy (fun mi -> mi.Name)                                   
+                            |> Seq.groupBy (fun mi -> mi.Name)
+    let fields = rtype.GetFields()               
     seq {
         for prop in properties do
             let fullName =
@@ -119,6 +120,11 @@ let rec resolveMembers (rtype: System.Type) (parentName: string) (getter: obj ->
             yield fullName, propertyToExpr prop
         for (name, methods) in methodCollections do           
             yield name, overloadedMethodToExpr methods
+        for field in fields do
+            let fullName =
+                if String.IsNullOrEmpty parentName then field.Name 
+                else String.Format("{0}.{1}", parentName, field.Name)
+            yield fullName, fieldToExpr field
     }     
 
 let rec inline convertSequence seq1 seq2 = 
