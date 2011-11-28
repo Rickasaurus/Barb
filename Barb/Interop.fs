@@ -107,24 +107,14 @@ let resolveInvoke (o: obj) (memberName: string) =
          | Some (resolvedMember) -> resolvedMember o |> Some
          | None -> failwith (sprintf "Unable to lookup specified member %s in object %s" memberName (o.GetType().Name))
 
-let rec resolveMembers (rtype: System.Type) (parentName: string) (getter: obj -> obj) =
-    let properties = rtype.GetProperties()
-    let methodCollections = rtype.GetMethods()
-                            |> Seq.groupBy (fun mi -> mi.Name)
-    let fields = rtype.GetFields()               
+let rec resolveMembers (rtype: System.Type) (bindingflags: BindingFlags) =
+    let properties = rtype.GetProperties(bindingflags)
+    let methodCollections = rtype.GetMethods(bindingflags) |> Seq.groupBy (fun mi -> mi.Name)
+    let fields = rtype.GetFields(bindingflags)               
     seq {
-        for prop in properties do
-            let fullName =
-                if String.IsNullOrEmpty parentName then prop.Name 
-                else String.Format("{0}.{1}", parentName, prop.Name)
-            yield fullName, propertyToExpr prop
-        for (name, methods) in methodCollections do           
-            yield name, overloadedMethodToExpr methods
-        for field in fields do
-            let fullName =
-                if String.IsNullOrEmpty parentName then field.Name 
-                else String.Format("{0}.{1}", parentName, field.Name)
-            yield fullName, fieldToExpr field
+        for prop in properties do yield prop.Name, propertyToExpr prop
+        for (name, methods) in methodCollections do yield name, overloadedMethodToExpr methods
+        for field in fields do yield field.Name, fieldToExpr field
     }     
 
 let rec inline convertSequence seq1 seq2 = 

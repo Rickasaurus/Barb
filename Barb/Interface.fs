@@ -8,6 +8,7 @@ open System
 open System.Collections
 open System.Collections.Generic
 open System.Collections.Concurrent
+open System.Reflection
 
 open Barb.Interop
 open Barb.Representation
@@ -19,7 +20,7 @@ module Compiler =
     let buildExpression (localType: Type) (predicate: string) : (obj -> obj) =
 
         let memberMap =
-            resolveMembers localType "" id
+            resolveMembers localType (BindingFlags.Instance ||| BindingFlags.Static ||| BindingFlags.NonPublic ||| BindingFlags.Public)
             |> Map.ofSeq
 
         let parsedTokens = parseProgram predicate
