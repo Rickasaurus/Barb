@@ -95,6 +95,7 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
             | Prefix l, Obj r -> Obj (l r) |> Some
             | Method l, Unit -> executeUnitMethod l
             | Method l, Obj r -> executeParameterizedMethod l r 
+            | Unknown l, AppliedInvoke r -> cachedResolveStatic (l, r)
             | Invoke, Unknown r -> AppliedInvoke r |> Some
             | Invoke, IndexArgs r -> IndexArgs r |> Some // Here for F#-like indexing (if you want it)
             | Obj l, AppliedInvoke r -> resolveInvoke l r

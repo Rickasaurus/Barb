@@ -14,7 +14,6 @@ type ExprTypes =
     | Invoke
     | Method of MethodSig
     | IndexedProperty of MethodSig
-    | StaticObj of Type
     | Obj of obj
     | Returned of obj
     | Prefix of (obj -> obj)    

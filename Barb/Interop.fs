@@ -23,11 +23,6 @@ open Barb.Representation
 //    |> Seq.filter (fun typ -> typ.IsDefined(typeof<ExtensionAttribute>,false))
 //    |> Seq.collect (fun typ -> typ.GetMethods(BindingFlags.Static ||| BindingFlags.Public))
 
-let findAllPublicStaticTypes () =
-    AppDomain.CurrentDomain.GetAssemblies()
-    |> Seq.collect (fun a -> a.GetTypes())
-    |> Seq.filter (fun typ -> typ.IsPublic && typ.IsClass && typ.IsSealed && typ.IsAbstract)
-
 let nullableToOption res =
     match res with
     | null -> None
@@ -99,6 +94,28 @@ let resolveMember (rtype: System.Type) (memberName: string) : (obj -> ExprTypes)
 let cachedResolveMember = 
     let inputToKey (rtype: System.Type, caseName) = rtype.FullName + "~" + caseName
     let resolveMember (rtype, caseName) = resolveMember rtype caseName
+    memoizeBy inputToKey resolveMember
+
+let getTypeByName (typename: string) = 
+    AppDomain.CurrentDomain.GetAssemblies() 
+    |> Seq.collect (fun a -> a.GetTypes())
+    |> Seq.filter (fun typ -> typ.Name = typename)
+    |> Seq.toList
+
+let resolveStatic (rtypename: string) (memberName: string) : ExprTypes option =
+    match getTypeByName rtypename with
+    | [] -> None
+    | rtype :: [] ->        
+        rtype.GetProperty(memberName) |> nullableToOption |> Option.map propertyToExpr
+        |> Option.tryResolve (fun () -> match rtype.GetMethods() |> Array.filter (fun mi -> mi.Name = memberName) with | [||] -> None | methods -> methods |> overloadedMethodToExpr |> Some)
+        |> Option.tryResolve (fun () -> rtype.GetField(memberName) |> nullableToOption |> Option.map fieldToExpr)
+        |> function | Some (objToExpr) -> Some (objToExpr null) | None -> failwith (sprintf "Member name of %s was ambiguous: %s" rtypename memberName)            
+    | manytype -> failwith (sprintf "Type name was ambiguous: %s" rtypename) 
+
+// Note: may not properly fail if types are loaded later, but I'm willing to sacrifice this for now in the name of complexity reduction
+let cachedResolveStatic =
+    let inputToKey (typename, membername) = typename + "~" + membername
+    let resolveMember (typename, membername) = resolveStatic typename membername
     memoizeBy inputToKey resolveMember
 
 let resolveInvoke (o: obj) (memberName: string) =
