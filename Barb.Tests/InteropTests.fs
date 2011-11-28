@@ -141,22 +141,18 @@ let ``predicate language should support recursive array iteration`` () =
     let result = pred record
     Assert.True(result)
 
-//[<Fact>]
-let ``predicate language should support a fold implementation`` () =  
-    let record = { Names1 = [|""; "BLAH"; "BLAHZENHEIMER"|]; Names2 = [|"DUDE"; "BLEG"; "BLAHZENHEIMER"|]; Scores = [|0.0; 0.8; 1.0;|] }   
-    let predText =
-        "let isFullMatch = (fun i ismatch -> let st = ismatch and Scores[i] < 0.4 in
-                                               (if i = 0 then st else isFullMatch (i - 1) st))
-         in isFullMatch (Scores.Length - 1) true"
-    let pred = buildExpr<NameScores,bool> predText
-    let result = pred record
-    Assert.False(result)
+type TypeWithStaticMethod =
+    { Meaningless: string }
+    with static member IsTrue () = true
 
+[<Fact>]
+let ``predicate language should support invoking static methods`` () =
+    let dudePredicate = buildExpr<TypeWithStaticMethod,bool> "IsTrue()"
+    let result = dudePredicate { Meaningless = "yep" }
+    Assert.True(result)         
 
-
-
-//[<Fact>]
-//let ``predicate language should support static methods`` () = 
-//    let dudePredicate = buildExpr<unit,bool> "String.IsNullOrEmpty(null)"
-//    let result = dudePredicate ()    
-//    Assert.True(result)    
+[<Fact>]
+let ``predicate language should support static methods on type names`` () = 
+    let dudePredicate = buildExpr<unit,bool> "String.IsNullOrEmpty(null)"
+    let result = dudePredicate ()    
+    Assert.True(result)    

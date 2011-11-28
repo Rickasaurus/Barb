@@ -19,7 +19,7 @@ module Compiler =
     let buildExpression (localType: Type) (predicate: string) : (obj -> obj) =
 
         let memberMap =
-            resolveAllProperties localType "" id
+            resolveMembers localType "" id
             |> Map.ofSeq
 
         let parsedTokens = parseProgram predicate

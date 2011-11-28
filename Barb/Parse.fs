@@ -140,7 +140,6 @@ let (|CaptureDelim|_|) currentCaptures (text: string) =
         [ 
             for cc in currentCaptures do
                 match cc.Delims with
-                //TODO: make it so intermediate tokens are not ignored
                 | (SCapture delim) :: dt when text.StartsWith delim -> yield { cc with Delims = dt }, delim
                 | (RCapture delim) :: dt when text.StartsWith delim -> yield cc, delim
                 | (RCapture _) :: RCapture delim :: dt when text.StartsWith delim -> yield { cc with Delims = RCapture delim :: dt }, delim
