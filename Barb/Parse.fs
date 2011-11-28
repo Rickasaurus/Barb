@@ -18,19 +18,43 @@ open Barb.Helpers
 open Barb.Interop
 open Barb.Representation
 
-let (|SkipToken|_|) (mStr: string) (text: string) =
+type StringWindow =
+    struct
+        val Text: string 
+        val Offset: int
+        new(text: string, offset: int) = { Text = text; Offset = offset }
+    end
+    with 
+        member t.StartsWith (str: string) =            
+            let text = t.Text
+            let offset = t.Offset
+            let textLen = t.Length
+            let rec matches i res =
+                if i > textLen - 1 then false
+                else
+                    let newres = res && (text.[offset + i] = str.[i])
+                    match i, newres with | 0, _ -> newres | _, false -> newres | _ -> matches (i - 1) newres
+            matches (str.Length - 1) true
+        member t.Length = t.Text.Length - t.Offset
+        member t.Subwindow start = StringWindow (t.Text, t.Offset + start)
+        member t.Substring (index, len) = t.Text.Substring(t.Offset + index, len)
+        member t.IndexOf (pattern: string) = max (t.Text.IndexOf(pattern, t.Offset) - t.Offset) -1
+        member t.Item with get(x) = t.Text.[x + t.Offset]
+        override t.ToString () = t.Text.Substring(t.Offset) 
+
+let (|SkipToken|_|) (mStr: string) (text: StringWindow) =
     if text.StartsWith(mStr) then 
-        Some (None, text.Substring(mStr.Length))
+        Some (None, text.Subwindow(mStr.Length))
     else None
 
-let (|TokenToVal|_|) (mStr: string) (result: ExprTypes) (text: string) =
+let (|TokenToVal|_|) (mStr: string) (result: ExprTypes) (text: StringWindow) =
     if text.StartsWith(mStr) then 
-        Some (Some(result), text.Substring(mStr.Length))
+        Some (Some(result), text.Subwindow(mStr.Length))
     else None
 
-let (|TokensToVal|_|) (mStrs: string list) (result: ExprTypes) (text: string) =
+let (|TokensToVal|_|) (mStrs: string list) (result: ExprTypes) (text: StringWindow) =
     match mStrs |> List.tryFind (fun mStr -> text.StartsWith(mStr)) with
-    | Some (matched) -> Some (Some(result), text.Substring(matched.Length))
+    | Some (matched) -> Some (Some(result), text.Subwindow(matched.Length))
     | None -> None
 
 type DelimType =
@@ -41,7 +65,7 @@ type CaptureParams =
     {
         Begin: string
         Delims: DelimType list
-        End: string
+        End: string        
         Func: ExprTypes list -> ExprTypes
     }
 
@@ -49,7 +73,7 @@ open System.Numerics
 
 let whitespace = [| " "; "\r"; "\n"; "\t"; |]
 
-let (|Num|_|) (text: string) =
+let (|Num|_|) (text: StringWindow) =
     let numChars = [| '0'; '1'; '2'; '3'; '4'; '5'; '6'; '7'; '8'; '9' |]
     let sb = new StringBuilder()
     if numChars.Contains(text.[0]) then
@@ -65,11 +89,11 @@ let (|Num|_|) (text: string) =
             let resultStr = sb.ToString()
             if dot then match Double.TryParse(resultStr) with | true, num -> Obj num | _ -> Obj resultStr
             else match Int64.TryParse(resultStr) with | true, num -> Obj num | _ -> Obj resultStr
-        let rest = text.Substring(resi)
+        let rest = text.Subwindow(resi)
         Some (Some (tokenStr), rest)
     else None
         
-let (|TextCapture|_|) (b: char) (text: string) = 
+let (|TextCapture|_|) (b: char) (text: StringWindow) = 
     if text.[0] = b then 
         let sb = new StringBuilder()
         let rec findSafeIndex i =
@@ -77,23 +101,23 @@ let (|TextCapture|_|) (b: char) (text: string) =
             elif text.[i] = '\\' then findSafeIndex(i + 1)
             elif text.[i] = b && text.[i - 1] <> '\\' then 
                 let tokenStr = Some (Obj (sb.ToString() :> obj))
-                let rest = text.Substring(i + 1)
+                let rest = text.Subwindow(i + 1)
                 Some (tokenStr, rest)
             else sb.Append(text.[i]) |> ignore; findSafeIndex (i + 1)
         findSafeIndex 1
     else None  
 
-let (|FreeToken|_|) (endTokens: string list) (text: string) =
+let (|FreeToken|_|) (endTokens: string list) (text: StringWindow) =
     let endIndices = 
         endTokens 
         |> List.map (fun e -> text.IndexOf e)
-        |> List.filter (fun i -> i > 0)
+        |> List.filter (fun i -> i >= 0)
     match endIndices with
-    | [] -> Some (text, "")
+    | [] -> Some (text.ToString(), StringWindow("", 0))
     | list -> 
         let index = list |> List.min 
         let tokenText = text.Substring(0, index)
-        let remainder = text.Substring(index)
+        let remainder = text.Subwindow(index)
         if index > 0 then Some (tokenText, remainder) 
         else None
 
@@ -126,16 +150,16 @@ let captureTypes =
     [
         { Begin = "(";   Delims = [];                                                 End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
         { Begin = "(";   Delims = [RCapture ","];                                     End = ")";  Func = (fun exprs -> Tuple exprs) }
-        { Begin = "[";   Delims = [];                                                 End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
-        { Begin = "let"; Delims = [SCapture "="];                                     End = "in"; Func = generateBind }
-        { Begin = "var"; Delims = [SCapture "="];                                     End = "in"; Func = generateBind }
         { Begin = "(";   Delims = [SCapture "fun"; SCapture "->"];                    End = ")";  Func = generateLambda }
         { Begin = "(";   Delims = [SCapture "=>"];                                    End = ")";  Func = generateLambda }
         { Begin = "(";   Delims = [SCapture "if"; SCapture "then"; SCapture "else"];  End = ")";  Func = generateIfThenElse }
         { Begin = "(";   Delims = [RCapture ".."];                                    End = ")";  Func = generateNumIterator }
+        { Begin = "[";   Delims = [];                                                 End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
+        { Begin = "let"; Delims = [SCapture "="];                                     End = "in"; Func = generateBind }
+        { Begin = "var"; Delims = [SCapture "="];                                     End = "in"; Func = generateBind }
     ]
 
-let (|CaptureDelim|_|) currentCaptures (text: string) =
+let (|CaptureDelim|_|) currentCaptures (text: StringWindow) =
     let matches, delimLen = 
         [ 
             for cc in currentCaptures do
@@ -150,27 +174,27 @@ let (|CaptureDelim|_|) currentCaptures (text: string) =
         |> (fun (matches, delimlen) -> matches |> List.map (fun (cc, txt) -> cc), delimlen) 
     match matches with
     | [] -> None
-    | onecap :: [] -> Some ([onecap], text.Substring(delimLen))
-    | caps -> Some (caps, text.Substring(delimLen))
+    | onecap :: [] -> Some ([onecap], text.Subwindow(delimLen))
+    | caps -> Some (caps, text.Subwindow(delimLen))
 
-let (|CaptureEnd|_|) currentCaptures (text: string) =
+let (|CaptureEnd|_|) currentCaptures (text: StringWindow) =
     let matches, str = [ for cc in currentCaptures do if text.StartsWith cc.End then yield cc ] |> List.allMaxBy (fun ct -> ct.End.Length) 
     match matches with
     | [] -> None
-    | onecap :: [] -> Some ([onecap], text.Substring(onecap.End.Length))
-    | caps -> Some (caps, text.Substring(str))
+    | onecap :: [] -> Some ([onecap], text.Subwindow(onecap.End.Length))
+    | caps -> Some (caps, text.Subwindow(str))
 
-let (|CaptureBegin|_|) (text: string) =
+let (|CaptureBegin|_|) (text: StringWindow) =
     let matches, str = [ for ct in captureTypes do if text.StartsWith ct.Begin then yield ct ] |> List.allMaxBy (fun ct -> ct.Begin.Length)
     match matches with
     | [] -> None
-    | onecap :: [] -> Some ([onecap], text.Substring(onecap.Begin.Length))
-    | caps -> Some (caps, text.Substring(str))
+    | onecap :: [] -> Some ([onecap], text.Subwindow(onecap.Begin.Length))
+    | caps -> Some (caps, text.Subwindow(str))
 
 let parseProgram (startText: string) = 
-    let rec parseProgramInner (str: string) (result: ExprTypes list) (currentCaptures: CaptureParams list) =
+    let rec parseProgramInner (str: StringWindow) (result: ExprTypes list) (currentCaptures: CaptureParams list) =
         match str with
-        | "" -> result, "", currentCaptures
+        | _ when str.Length = 0 -> result, str, currentCaptures
         | CaptureBegin (cParams, crem) -> 
             let subExprs, rem, captures = parseProgramInner crem [] cParams
             let exprConstraint = 
@@ -218,5 +242,5 @@ let parseProgram (startText: string) =
             | None -> parseProgramInner rem result currentCaptures
         | FreeToken ["."; " "; "("; ")"; ","; "."; "]"; "["; "\r"; "\n"; "\t"] (token, rem) ->
             parseProgramInner rem ((Unknown token) :: result) currentCaptures
-        | str -> parseProgramInner (str.Substring(1)) result currentCaptures
-    let res, _, _ = parseProgramInner startText [] [] in res |> List.rev
+        | str -> parseProgramInner (str.Subwindow(1)) result currentCaptures
+    let res, _, _ = parseProgramInner (StringWindow(startText, 0)) [] [] in res |> List.rev

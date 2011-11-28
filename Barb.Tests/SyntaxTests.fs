@@ -14,6 +14,27 @@ let ``predicate language should work with a simple predicate`` () =
     Assert.True(result)
 
 [<Fact>] 
+let ``predicate language should work with double equals`` () =
+    let testRecord = { Name = "Dude"; Sex = 'm' }
+    let dudePredicate = buildExpr<DudeRecord,bool> "Name == \"Dude\""
+    let result = dudePredicate testRecord
+    Assert.True(result)
+
+[<Fact>] 
+let ``predicate language should ignore whitespace, even at the end of a token`` () =
+    let testRecord = { Name = "Dude"; Sex = 'f' }
+    let dudePredicate = buildExpr<DudeRecord,bool> " true "
+    let result = dudePredicate testRecord
+    Assert.True(result)
+
+[<Fact>] 
+let ``predicate language should support simple and usage`` () =
+    let testRecord = { Name = "Dude"; Sex = 'f' }
+    let dudePredicate = buildExpr<DudeRecord,bool> "true and true"
+    let result = dudePredicate testRecord
+    Assert.True(result)
+
+[<Fact>] 
 let ``predicate language should work with a compound predicate`` () =
     let testRecord = { Name = "Dude"; Sex = 'f' }
     let dudePredicate = buildExpr<DudeRecord,bool> "Name = \"Dude\" and Sex = 'f'"
