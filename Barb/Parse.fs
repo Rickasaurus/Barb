@@ -1,7 +1,6 @@
 ﻿module Barb.Parse
 
 // TODO: 
-// Change all this string manipulation to indexed lookups
 // Do ascii lookup for Num, instead of a dumb list
 // Add a way for captureTypes to know if a Repeat node has been already seen
  
@@ -20,8 +19,9 @@ open Barb.Representation
 
 type StringWindow =
     struct
-        val Text: string 
-        val Offset: int
+        // These are mutable to prevent property generation.
+        val mutable Text: string 
+        val mutable Offset: int
         new(text: string, offset: int) = { Text = text; Offset = offset }
     end
     with 
