@@ -5,13 +5,12 @@ Barb is a small dynamic scripting language for .NET with the following propertie
 - Paren based scoping rules (Lisp-like)
 - Pure functional (No mutation allowed)
 
-This makes Barb an easy to learn language which you can give to your users for safely scripting over data in your application.
+This makes Barb an easy to learn language which you can give to your users for safely scripting over data in your application.  Best of all, you'll be able to use it without learning a bunch of new syntax.
 
 
 ------------------------------------
 ---     	  Why Barb?          ---
 ------------------------------------
-
 
 I created Barb because I needed a user language for my applications but yet no existing .NET language hosted nicely inside of my application and met my criteria:
 
