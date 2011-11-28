@@ -95,6 +95,13 @@ let ``predicate language should support property indexers with strings`` () =
     let result = dudePredicate testRecord
     Assert.True(result)    
 
+[<Fact>]
+let ``predicate language should directly support property indexers with strings`` () = 
+    let testRecord = new PropIndexerTester<string,string>(["one"; "two"; "three"] |> List.map (fun i -> i, i) |> Map.ofList)
+    let dudePredicate = buildExpr<PropIndexerTester<string,string>,bool> "Item[\"two\"] = \"two\""
+    let result = dudePredicate testRecord
+    Assert.True(result)    
+
 type IndexedName = 
     {
         Name: string
