@@ -29,7 +29,7 @@ The current implementation is still young and a bit rough around the edges. It's
 
 "(Name.Contains "John" or Name.Contains "Mary") and (Age > 20 or Weight > 200)"
 
-It can do much more, but still needs works to be friendly enoungh for a real release. In particular, it needs better error messages and some extra work into making a friendly API for hosting.
+It can do much more, but still needs work to be friendly enoungh for a real release. In particular, it needs better error messages and a friendly API for hosting.
 
 However, I thought it might be useful to others in its current form.  If you do play with it I hope you'll let me know what you think.
 
@@ -61,7 +61,7 @@ However, I thought it might be useful to others in its current form.  If you do 
 ---     Planned Limitations      ---
 ------------------------------------
 
-- All numbers are converted interally to Int64 or Double.  This will change but was necessary for now to keep 
+- All numbers are converted internally to Int64 or Double.  This will change but was necessary for now to keep 
   things simple.
 - Barb may cause unexpected behavior when making calls that mutate things.  I do plan on adding an API option to 
   fix this, but it will tone down optimization significantly.
