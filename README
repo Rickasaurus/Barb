@@ -61,21 +61,16 @@ However, I thought it might be useful to others in its current form.  If you do 
 ---     Planned Limitations      ---
 ------------------------------------
 
-- All numbers are converted interally to Int64 or Double.  This will change but was necessary for now to keep things simple.
-- Barb may cause unexpected behavior when making calls that mutate things.  I do plan on adding an API option to fix this, but it will tone down optimization significantly.
+- All numbers are converted interally to Int64 or Double.  This will change but was necessary for now to keep 
+  things simple.
+- Barb may cause unexpected behavior when making calls that mutate things.  I do plan on adding an API option to 
+  fix this, but it will tone down optimization significantly.
 
 
 ------------------------------------
 --- Extra Nerdy Stuff Under Here ---
 ------------------------------------
 
-Barb aims to accomplish the above goals through two somewhat non-traditional design decisions:
-
-- Compilation by n-tuple expression merging. This is done initially to pre-compute as much as possible and second time for each final result
-- Composition is used instead of IL or code generation, mainly function composition
-
-Expression lists allow for tuple-wise reductions to a result, instead of standard code generation or expression building.  Decisions can be made at runtime based on the contents of these tuples and their neighbors. This allows for a huge amount of flexibility in deciding what to do.
-
-Function/Value composition allows for fast code to be built out of existing .NET constructs and eliminates the complexity of a intermediate representation.
+Compilation is done by n-tuple expression merging.  This is done initially to pre-compute as much as possible and the optimized result is then reduced again with the information given by the passed in data object.  Decisions can be made at runtime based on the contents of these tuples and their neighbors.  This allows for a huge amount of flexibility in deciding what to do.  Function/Value composition also allows for fast code to be built out of existing .NET constructs and eliminates the complexity of a intermediate representation.
 
 It's kind of Scheme-like under the hood, but I've worked hard to make it very C#/F#ish on the surface.
