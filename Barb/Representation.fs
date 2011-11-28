@@ -4,11 +4,6 @@ open System
 
 type MethodSig = ((obj array -> obj) * Type array) list
 
-type MemberTypes = 
-    | PropertyCall of (obj -> obj)
-    | IndexedPropertyCall of (obj -> ((obj array -> obj) * Type array) list)
-    | MethodCall of (obj -> ((obj array -> obj) * Type array) list)
-
 type ExprTypes = 
     | Unit
     | Invoke

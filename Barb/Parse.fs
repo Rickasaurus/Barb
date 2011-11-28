@@ -58,8 +58,8 @@ let (|TokensToVal|_|) (mStrs: string list) (result: ExprTypes) (text: StringWind
     | None -> None
 
 type DelimType =
-    | SCapture of string
-    | RCapture of string
+    | SCap of string
+    | RCap of string
 
 type CaptureParams = 
     {
@@ -149,14 +149,14 @@ let generateNumIterator =
 let captureTypes = 
     [
         { Begin = "(";   Delims = [];                                                 End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
-        { Begin = "(";   Delims = [RCapture ","];                                     End = ")";  Func = (fun exprs -> Tuple exprs) }
-        { Begin = "(";   Delims = [SCapture "fun"; SCapture "->"];                    End = ")";  Func = generateLambda }
-        { Begin = "(";   Delims = [SCapture "=>"];                                    End = ")";  Func = generateLambda }
-        { Begin = "(";   Delims = [SCapture "if"; SCapture "then"; SCapture "else"];  End = ")";  Func = generateIfThenElse }
-        { Begin = "(";   Delims = [RCapture ".."];                                    End = ")";  Func = generateNumIterator }
+        { Begin = "(";   Delims = [RCap ","];                                     End = ")";  Func = (fun exprs -> Tuple exprs) }
+        { Begin = "(";   Delims = [SCap "fun"; SCap "->"];                    End = ")";  Func = generateLambda }
+        { Begin = "(";   Delims = [SCap "=>"];                                    End = ")";  Func = generateLambda }
+        { Begin = "(";   Delims = [SCap "if"; SCap "then"; SCap "else"];  End = ")";  Func = generateIfThenElse }
+        { Begin = "(";   Delims = [RCap ".."];                                    End = ")";  Func = generateNumIterator }
         { Begin = "[";   Delims = [];                                                 End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
-        { Begin = "let"; Delims = [SCapture "="];                                     End = "in"; Func = generateBind }
-        { Begin = "var"; Delims = [SCapture "="];                                     End = "in"; Func = generateBind }
+        { Begin = "let"; Delims = [SCap "="];                                     End = "in"; Func = generateBind }
+        { Begin = "var"; Delims = [SCap "="];                                     End = "in"; Func = generateBind }
     ]
 
 let (|CaptureDelim|_|) currentCaptures (text: StringWindow) =
@@ -164,10 +164,10 @@ let (|CaptureDelim|_|) currentCaptures (text: StringWindow) =
         [ 
             for cc in currentCaptures do
                 match cc.Delims with
-                | (SCapture delim) :: dt when text.StartsWith delim -> yield { cc with Delims = dt }, delim
-                | (RCapture delim) :: dt when text.StartsWith delim -> yield cc, delim
-                | (RCapture _) :: RCapture delim :: dt when text.StartsWith delim -> yield { cc with Delims = RCapture delim :: dt }, delim
-                | (RCapture _) :: SCapture delim :: dt when text.StartsWith delim -> yield { cc with Delims = dt }, delim  
+                | (SCap delim) :: dt when text.StartsWith delim -> yield { cc with Delims = dt }, delim
+                | (RCap delim) :: dt when text.StartsWith delim -> yield cc, delim
+                | (RCap _) :: RCap delim :: dt when text.StartsWith delim -> yield { cc with Delims = RCap delim :: dt }, delim
+                | (RCap _) :: SCap delim :: dt when text.StartsWith delim -> yield { cc with Delims = dt }, delim  
                 | _ -> ()          
         ] 
         |> List.allMaxBy (fun (cc, matchedDelim) -> matchedDelim.Length)
