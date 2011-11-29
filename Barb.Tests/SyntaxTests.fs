@@ -266,13 +266,13 @@ let ``predicate language should support if-then-else with initial/final spacing`
 
 [<Fact>]
 let ``predicate language should support iterative incremental tuple building`` () = 
-    let dudePredicate = buildExpr<unit,bool> "(1 .. 5) = (1, 2, 3, 4, 5)"
+    let dudePredicate = buildExpr<unit,bool> "{1 .. 5} = (1, 2, 3, 4, 5)"
     let result = dudePredicate ()
     Assert.True(result)  
 
 [<Fact>]
 let ``predicate language should support iterative incremental tuple building with jumps`` () = 
-    let dudePredicate = buildExpr<unit,bool> "(0 .. 2 .. 10) = (0, 2, 4, 6, 8, 10)"
+    let dudePredicate = buildExpr<unit,bool> "{0 .. 2 .. 10} = (0, 2, 4, 6, 8, 10)"
     let result = dudePredicate ()
     Assert.True(result)  
 

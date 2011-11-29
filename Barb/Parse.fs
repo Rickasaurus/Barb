@@ -148,15 +148,15 @@ let generateNumIterator =
 
 let captureTypes = 
     [
-        { Begin = "(";   Delims = [];                                                 End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
-        { Begin = "(";   Delims = [RCap ","];                                     End = ")";  Func = (fun exprs -> Tuple exprs) }
-        { Begin = "(";   Delims = [SCap "fun"; SCap "->"];                    End = ")";  Func = generateLambda }
-        { Begin = "(";   Delims = [SCap "=>"];                                    End = ")";  Func = generateLambda }
+        { Begin = "(";   Delims = [];                                     End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
+        { Begin = "(";   Delims = [RCap ","];                             End = ")";  Func = (fun exprs -> Tuple exprs) }
+        { Begin = "(";   Delims = [SCap "fun"; SCap "->"];                End = ")";  Func = generateLambda }
+        { Begin = "(";   Delims = [SCap "=>"];                            End = ")";  Func = generateLambda }
         { Begin = "(";   Delims = [SCap "if"; SCap "then"; SCap "else"];  End = ")";  Func = generateIfThenElse }
-        { Begin = "(";   Delims = [RCap ".."];                                    End = ")";  Func = generateNumIterator }
-        { Begin = "[";   Delims = [];                                                 End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
-        { Begin = "let"; Delims = [SCap "="];                                     End = "in"; Func = generateBind }
-        { Begin = "var"; Delims = [SCap "="];                                     End = "in"; Func = generateBind }
+        { Begin = "{";   Delims = [RCap ".."];                            End = "}";  Func = generateNumIterator }
+        { Begin = "[";   Delims = [];                                     End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
+        { Begin = "let"; Delims = [SCap "="];                             End = "in"; Func = generateBind }
+        { Begin = "var"; Delims = [SCap "="];                             End = "in"; Func = generateBind }
     ]
 
 let (|CaptureDelim|_|) currentCaptures (text: StringWindow) =
