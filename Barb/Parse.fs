@@ -69,6 +69,12 @@ type CaptureParams =
         Func: ExprTypes list -> ExprTypes
     }
 
+type ExpressionParams =
+    {
+        Delims: DelimType list
+        Func: ExprTypes list -> ExprTypes
+    }
+
 open System.Numerics
 
 let whitespace = [| " "; "\r"; "\n"; "\t"; |]
@@ -146,20 +152,25 @@ let generateNumIterator =
         Generator (SubExpression(starte), SubExpression(inc), SubExpression(ende))        
     | list -> failwith (sprintf "Incorrect generator syntax: %A" list)
 
+let expressionTypes =
+    [
+        { Delims = [];                                    Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
+        { Delims = [RCap ","];                            Func = (fun exprs -> Tuple exprs) }
+        { Delims = [SCap "fun"; SCap "->"];               Func = generateLambda }
+        { Delims = [SCap "=>"];                           Func = generateLambda }
+        { Delims = [SCap "if"; SCap "then"; SCap "else"]; Func = generateIfThenElse }
+    ]
+
 let captureTypes = 
     [
-        { Begin = "(";   Delims = [];                                     End = ")";  Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
-        { Begin = "(";   Delims = [RCap ","];                             End = ")";  Func = (fun exprs -> Tuple exprs) }
-        { Begin = "(";   Delims = [SCap "fun"; SCap "->"];                End = ")";  Func = generateLambda }
-        { Begin = "(";   Delims = [SCap "=>"];                            End = ")";  Func = generateLambda }
-        { Begin = "(";   Delims = [SCap "if"; SCap "then"; SCap "else"];  End = ")";  Func = generateIfThenElse }
         { Begin = "{";   Delims = [RCap ".."];                            End = "}";  Func = generateNumIterator }
         { Begin = "[";   Delims = [];                                     End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
         { Begin = "let"; Delims = [SCap "="];                             End = "in"; Func = generateBind }
         { Begin = "var"; Delims = [SCap "="];                             End = "in"; Func = generateBind }
     ]
+    |> List.append (expressionTypes |> List.map (fun et -> { Begin = "("; Delims = et.Delims; End = ")"; Func = et.Func } ))
 
-let (|CaptureDelim|_|) currentCaptures (text: StringWindow) =
+let (|CaptureDelim|_|) (currentCaptures: CaptureParams list) (text: StringWindow) =
     let matches, delimLen = 
         [ 
             for cc in currentCaptures do
@@ -190,6 +201,7 @@ let (|CaptureBegin|_|) (text: StringWindow) =
     | [] -> None
     | onecap :: [] -> Some ([onecap], text.Subwindow(onecap.Begin.Length))
     | caps -> Some (caps, text.Subwindow(str))
+
 
 let parseProgram (startText: string) = 
     let rec parseProgramInner (str: StringWindow) (result: ExprTypes list) (currentCaptures: CaptureParams list) =
