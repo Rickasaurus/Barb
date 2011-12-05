@@ -17,12 +17,15 @@ open Barb.Reduce
 
 module Compiler =
 
-    let buildExpression (localType: Type) (predicate: string) : (obj -> obj) =
+    let buildExpression (localType: Type) (predicate: string) (settings: BarbSettings) : (obj -> obj) =
 
         let memberMap =
             resolveMembers localType (BindingFlags.Instance ||| BindingFlags.Static ||| BindingFlags.NonPublic ||| BindingFlags.Public)
             |> Map.ofSeq
-
+        
+        let additionalBindings =
+            settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, lazy (Obj kv.Value))
+              
         let parsedTokens = parseProgram predicate
 
     #if DEBUG
@@ -32,7 +35,9 @@ module Compiler =
     #endif
 
         let reducedExpression = 
-            resolveExpression parsedTokens Map.empty false |> List.rev
+            if settings.OptimizeForImmutability then
+                resolveExpression parsedTokens Map.empty false |> List.rev
+            else parsedTokens
 
     #if DEBUG
         printfn ""
@@ -41,9 +46,10 @@ module Compiler =
     #endif
 
         let calculateResult input = 
-            let inputBindings = 
-                memberMap
-                |> Map.map (fun k prop -> lazy (prop input))
+            let inputBindings =
+                additionalBindings               
+                |> Seq.fold (fun s (k,v) -> s |> Map.add k v )
+                    (memberMap |> Map.map (fun k prop -> lazy (prop input)))
     
     #if DEBUG
             printfn ""
@@ -56,8 +62,8 @@ module Compiler =
 
         calculateResult
 
-    let buildExpr<'I, 'O> predicate =
-        let expression = buildExpression typeof<'I> predicate
+    let buildExprWithSettings<'I, 'O> settings predicate =
+        let expression = buildExpression typeof<'I> predicate settings
         fun (input : 'I) -> 
             match expression input with
             | :? 'O as result -> result
@@ -66,8 +72,12 @@ module Compiler =
                                | Some (typedRes) -> typedRes :?> 'O               
                                | None -> failwith (sprintf "Unexpected output type/format: %A/%s" untypedRes (untypedRes.GetType().Name))
 
-type BarbFunc<'I,'O> (predicate) =
-    let func = Compiler.buildExpr<'I,'O> (predicate)
+    let buildExpr<'I,'O> predicate =
+        buildExprWithSettings<'I,'O> BarbSettings.Default predicate
+
+type BarbFunc<'I,'O> (predicate, ?settings) =
+    let settings = defaultArg settings BarbSettings.Default
+    let func : 'I -> 'O = Compiler.buildExprWithSettings settings (predicate)
     member t.Execute (record: 'I) =     
         func record
 

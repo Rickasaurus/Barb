@@ -1,6 +1,14 @@
 ﻿module Barb.Representation
 
 open System
+open System.Collections.Generic
+
+type BarbSettings = 
+    {
+        OptimizeForImmutability: bool
+        AdditionalBindings: IDictionary<string,obj>
+    }
+    with static member Default = { OptimizeForImmutability = true; AdditionalBindings = [] |> dict }
 
 type MethodSig = ((obj array -> obj) * Type array) list
 

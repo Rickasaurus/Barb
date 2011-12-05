@@ -163,10 +163,10 @@ let expressionTypes =
 
 let captureTypes = 
     [
-        { Begin = "{";   Delims = [RCap ".."];                            End = "}";  Func = generateNumIterator }
-        { Begin = "[";   Delims = [];                                     End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
-        { Begin = "let"; Delims = [SCap "="];                             End = "in"; Func = generateBind }
-        { Begin = "var"; Delims = [SCap "="];                             End = "in"; Func = generateBind }
+        { Begin = "{";   Delims = [RCap ".."]; End = "}";  Func = generateNumIterator }
+        { Begin = "[";   Delims = [];          End = "]";  Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
+        { Begin = "let"; Delims = [SCap "="];  End = "in"; Func = generateBind }
+        { Begin = "var"; Delims = [SCap "="];  End = "in"; Func = generateBind }
     ]
     |> List.append (expressionTypes |> List.map (fun et -> { Begin = "("; Delims = et.Delims; End = ")"; Func = et.Func } ))
 
