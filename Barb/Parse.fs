@@ -218,7 +218,7 @@ let parseProgram (startText: string) =
             parseProgramInner rem (value :: result) currentCaptures
         | CaptureDelim currentCaptures (cParams, crem) -> 
             let subExprs, rem, captures = parseProgramInner crem [] cParams
-            [SubExpression (result |> List.rev)] @ subExprs, rem, captures 
+            SubExpression (result |> List.rev) :: subExprs, rem, captures 
         | CaptureEnd currentCaptures (cParams, crem) ->  
             match result with
             | [] -> result, crem, cParams
