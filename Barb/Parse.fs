@@ -158,28 +158,6 @@ let allExpressionTypes =
         { Pattern = [SCap "var"; SCap "="; SCap "in"];              Func = generateBind }
     ]
 
-//let doubleUnboundeExpressionTypes =
-//    [
-//        { Begin = None;       Delims = [];                          End = None;         Func = (fun exprs -> SubExpression exprs) }
-//        { Begin = None;       Delims = [RCap ","];                  End = None;         Func = (fun exprs -> Tuple exprs) }
-//        { Begin = None;       Delims = [SCap "=>"];                 End = None;         Func = generateLambda }
-//    ]
-//
-//let startBoundedExpressionTypes = 
-//    [
-//        { Begin = Some "fun"; Delims = [SCap "->"];                 End = None;         Func = generateLambda }
-//        { Begin = Some "if";  Delims = [SCap "then"; SCap "else"];  End = None;         Func = generateIfThenElse }
-//    ]
-//
-//let boundedExpressionTypes = 
-//    [
-//        { Begin = Some "(";   Delims = [];                          End = Some ")";     Func = (function | [] -> Unit | exprs -> SubExpression exprs) }
-//        { Begin = Some "{";   Delims = [RCap ".."];                 End = Some "}";     Func = generateNumIterator }
-//        { Begin = Some "[";   Delims = [];                          End = Some "]";     Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
-//        { Begin = Some "let"; Delims = [SCap "="];                  End = Some "in";    Func = generateBind }
-//        { Begin = Some "var"; Delims = [SCap "="];                  End = Some "in";    Func = generateBind }
-//    ]
-
 let (|NewExpression|_|) (text: StringWindow) =
     let matches, str = 
         [ 
@@ -243,85 +221,6 @@ let (|FinishOpenExpression|_|) (typesStack: SubexpressionType list) (text: Strin
             | _ -> None
         | _ -> None
 
-//let (|MatchCurrentExpression|_|) (typesStack: SubexpressionType list) (text: StringWindow) =
-//        match typesStack with
-//        | current :: [] -> current.Pattern, []
-//        | current :: next :: rest -> current.Pattern, next.Pattern
-//        |> function
-//            | (SCap h) :: lRest, _ -> h.Length, { ct with Pattern = rest }
-//            | (RCap h) :: lRest, _ -> h.Length, ct
-//            | (Open :: (SCap h) :: lRest), _ ->
-//            | (Open :: (RCap h) :: lRest), _ ->
-//            | Open :: [], SCap :: rRest -> 
-//            | Open :: [], RCap :: rRest -> 
-//    match current.Pattern with
-//    | ((SCap h) :: cRest) :: subs ->
-//    | ((RCap h) :: cRest) :: subs ->
-//    // Open Started
-//    | (Open :: (SCap h) :: pRest) :: subs ->
-//    | (Open :: (RCap h) :: pRest) :: subs ->
-//    // Open Ended
-//    | (Open :: []) :: (pExpr) :: subs ->
-
-//    let matches, str = 
-//        [ 
-//            for ct in possible do 
-//                match ct.Pattern with
-//                | (SCap h) :: rest when text.StartsWith(h) -> yield h, { ct with Pattern = rest }
-//                | (RCap h) :: rest when text.StartsWith(h) -> yield h, ct
-//                | _ -> ()
-//                match ct.Pattern, current.Pattern with
-//                | Open :: (SCap h) :: rest, next :: crest when text.StartsWith(h) -> yield h, { ct with Pattern = rest @ [next] }
-//                | Open :: (RCap h) :: rest, next :: crest when text.StartsWith(h) -> yield h, { ct with Pattern = (RCap h) :: (rest @ next) }
-//                | _ -> ()
-//        ] |> List.allMaxBy (fun (m, rest) -> m.Length)
-//    match matches with
-//    | [] -> None
-//    | [(mtext, subexprtype)] -> Some (subexprtype, text.Subwindow(mtext.Length))
-//    | _ -> failwith (sprintf "Ambiguous expression match: %A" matches)
-
-//let (|CaptureDelim|_|) (currentCaptures: ExpressionParams list) (text: StringWindow) =
-//    let matches, delimLen = 
-//        [ 
-//            for cc in currentCaptures do
-//                match cc.Delims with
-//                | (SCap delim) :: dt when text.StartsWith delim -> yield { cc with Delims = dt }, delim
-//                | (RCap delim) :: dt when text.StartsWith delim -> yield cc, delim
-//                | (RCap _) :: RCap delim :: dt when text.StartsWith delim -> yield { cc with Delims = RCap delim :: dt }, delim
-//                | (RCap _) :: SCap delim :: dt when text.StartsWith delim -> yield { cc with Delims = dt }, delim  
-//                | _ -> ()          
-//        ] 
-//        |> List.allMaxBy (fun (cc, matchedDelim) -> matchedDelim.Length)
-//        |> (fun (matches, delimlen) -> matches |> List.map (fun (cc, txt) -> cc), delimlen) 
-//    match matches with
-//    | [] -> None
-//    | onecap :: [] -> Some ([onecap], text.Subwindow(delimLen))
-//    | caps -> Some (caps, text.Subwindow(delimLen))
-//
-//let (|CaptureEnd|_|) currentCaptures (text: StringWindow) =
-//    let matches, str = 
-//        [ 
-//            for cc in currentCaptures do 
-//                if text.StartsWith cc.End then yield cc
-//        ] |> List.allMaxBy (fun ct -> ct.End.Length) 
-//    match matches with
-//    | [] -> None
-//    | onecap :: [] -> Some ([onecap], text.Subwindow(onecap.End.Length))
-//    | caps -> Some (caps, text.Subwindow(str))
-//
-//let (|CaptureBegin|_|) (text: StringWindow) =
-//    let matches, str = 
-//        [ 
-//            for ct in expressionTypes do 
-//                match ct.Begin with
-//                | Some (b) when text.StartsWith(b) -> yield ct
-//                | _ -> ()
-//        ] |> List.allMaxBy (fun ct -> match ct.Begin with | Some(b) -> b.Length | None -> 0)
-//    match matches with
-//    | [] -> None
-//    | onecap :: [] -> Some ([onecap], text.Subwindow(match onecap.Begin with | Some(b) -> b.Length | None -> 0))
-//    | caps -> Some (caps, text.Subwindow(str))
-
 let parseProgram (startText: string) = 
     let rec parseProgramInner (str: StringWindow) (result: ExprTypes list) (currentCaptures: SubexpressionType list) =
         match str with
@@ -330,22 +229,6 @@ let parseProgram (startText: string) =
             | [] -> crem, [SubExpression result], currentCaptures
             | results -> crem, [SubExpression (results |> List.rev)], currentCaptures 
         | _ when str.Length = 0 -> str, result, currentCaptures
-//        | CaptureBegin (cParams, crem) -> 
-//            let subExprs, rem, captures = parseProgramInner crem [] cParams 
-//            let exprConstraint = 
-//                match captures with
-//                | [] -> failwith "Unexpected end of subexpression"
-//                | h :: [] -> h
-//                | list -> list |> List.filter (fun cap -> List.isEmpty cap.Delims) |> (function | h :: [] -> h | _ -> failwith "Ambiguous end of subexpression")
-//            let value = subExprs |> List.rev |> exprConstraint.Func 
-//            parseProgramInner rem (value :: result) currentCaptures
-//        | CaptureDelim currentCaptures (cParams, crem) -> 
-//            let subExprs, rem, captures = parseProgramInner crem [] cParams
-//            SubExpression (result |> List.rev) :: subExprs, rem, captures 
-//        | CaptureEnd currentCaptures (cParams, crem) ->  
-//            match result with
-//            | [] -> result, crem, cParams
-//            | results -> [SubExpression (results |> List.rev)], crem, cParams 
         | OngoingExpression currentCaptures (captures, crem) ->
             match captures with
             | { Pattern = []; Func = _ } :: parents -> crem, [SubExpression (result |> List.rev)], captures
