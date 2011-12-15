@@ -258,6 +258,14 @@ let ``predicate language should support if-then-else`` () =
     Assert.True(result)  
 
 [<Fact>]
+let ``predicate language should support if-then-else without an explicit subexpression`` () = 
+    let testRec = { Score = 101.0 } 
+    let dudePredicate = buildExpr<TestFloatRec,bool> "if Score >= 100 then true else false"
+    let result = dudePredicate testRec
+    Assert.True(result)  
+
+
+[<Fact>]
 let ``predicate language should support if-then-else with initial/final spacing`` () = 
     let testRec = { Score = 101.0 } 
     let dudePredicate = buildExpr<TestFloatRec,bool> "( if Score >= 100 then 5 else 10 ) = 5"

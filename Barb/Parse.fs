@@ -62,14 +62,6 @@ type DelimType =
     | SCap of string
     | RCap of string
 
-//type ExpressionParams =
-//    {   
-//        Begin: string option
-//        Delims: DelimType list
-//        End: string option
-//        Func: ExprTypes list -> ExprTypes
-//    }
-
 type SubexpressionType = 
     {
         Pattern: DelimType list
@@ -213,18 +205,18 @@ let (|OngoingExpression|_|) (typesStack: SubexpressionType list) (text: StringWi
             |> Option.map (fun (mtext, subexp) -> subexp, text.Subwindow(mtext.Length))
         | _ -> None
 
-let (|RefineOpenExpression|_|) (typesStack: SubexpressionType list) (text: StringWindow) =
+let (|RefineToOpenExpression|_|) (typesStack: SubexpressionType list) (text: StringWindow) =
     let matches, str = 
         [ 
             for ct in allExpressionTypes do 
                 match ct.Pattern with
-                | Open :: (SCap h) :: rest when text.StartsWith(h) -> yield h, { ct with Pattern = rest }
-                | Open :: (RCap h) :: rest when text.StartsWith(h) -> yield h, ct
+                | Open :: (SCap h) :: rest when text.StartsWith(h) -> yield h, { ct with Pattern = rest } 
+                | Open :: (RCap h) :: rest when text.StartsWith(h) -> yield h, { ct with Pattern = (RCap h) :: rest }
                 | _ -> ()    
         ] |> List.allMaxBy (fun (m, rest) -> m.Length)   
     match matches with
     | [] -> None
-    | [(mtext, subexprtype)] -> Some (subexprtype, text.Subwindow(mtext.Length))
+    | [(mtext, subexprtype)] -> Some (subexprtype :: typesStack, text.Subwindow(mtext.Length))
     | _ -> failwith (sprintf "Ambiguous open expression match: %A" matches)    
 
 let rec findClosed (typesStack: SubexpressionType list) = 
@@ -238,7 +230,8 @@ let (|FinishOpenExpression|_|) (typesStack: SubexpressionType list) (text: Strin
         match typesStack with
         | current :: rest -> 
             match current.Pattern with
-            | (Open) :: [] -> 
+            | (Open) :: [] 
+            | (RCap _) :: Open :: [] -> 
                 match findClosed rest with
                 | Some (parent) -> 
                     match parent.Pattern with
@@ -353,7 +346,6 @@ let parseProgram (startText: string) =
 //            match result with
 //            | [] -> result, crem, cParams
 //            | results -> [SubExpression (results |> List.rev)], crem, cParams 
-
         | OngoingExpression currentCaptures (captures, crem) ->
             match captures with
             | { Pattern = []; Func = _ } :: parents -> crem, [SubExpression (result |> List.rev)], captures
@@ -369,6 +361,9 @@ let parseProgram (startText: string) =
                 | _ -> failwith "Unexpected end of subexpression"
             let value = subExprs |> List.rev |> resolvedCap.Func 
             parseProgramInner rem (value :: result) currentCaptures
+        | RefineToOpenExpression currentCaptures (captures, crem) ->
+            let rrem, rSubExprs, rCaptures = parseProgramInner crem [] captures
+            rrem, SubExpression (result |> List.rev) :: rSubExprs, captures 
         | Skip " " res
         | Skip "\t" res
         | Skip "\r" res
