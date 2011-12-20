@@ -53,7 +53,6 @@ However, I thought it might be useful to others in its current form.  If you do 
 - Lambda interop with .NET
 - Extension method resolution
 - A resonable API with configuration options
-- Allow if/fun without parens in cases where it's already in a subexpression
 - Generalized Sequence Expressions
 
 
