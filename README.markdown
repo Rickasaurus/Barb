@@ -68,49 +68,53 @@ Examples of Use <a id="examples" />
 
 The best way to think about Barb is over some collection of records (data classes to you C# folks).
 
-type CustRecord =
-    {
-		Name: string
-		Age: int
-		Weight: int
-		Source: obj
-		Locations: string array
-    }
+	type CustRecord =
+		{
+			Name: string
+			Age: int
+			Weight: int
+			Source: obj
+			Locations: string array
+		}
 
 1. As mentioned above, Barb is great for writing queries.
-e.g.  let predicate = buildExpr<CustRecord,bool>("Name.Contains "John" and (Age > 20 or Weight > 200)")
+e.g. 
+	let predicate = buildExpr<CustRecord,bool>("Name.Contains "John" and (Age > 20 or Weight > 200)")
 This will will return a predicate which you can then use to filter over large numbers of records.
 
 
 2. It can also be used to for user specified reflection. One case where I use this is for writing out CSV files. 
 Given a set of record field specifying strings, you can easily build functions which will grab the specified data.  
 
-e.g. let fld1Getter = buildExpr<CustRecord,int>("Weight") 
+e.g. 
+	let fld1Getter = buildExpr<CustRecord,int>("Weight") 
 Quite simple right? Barb will also convert to the correct output type if able.
 
-e.g. let fld1Getter = buildExpr<CustRecord,string>("Weight") 
+e.g. 
+	let fld1Getter = buildExpr<CustRecord,string>("Weight") 
 Here the integer will be converted on the fly to string because it's what you statically specified.
 
-e.g. let fld1Getter = buildExpr<CustRecord,string>("Source.Url")
+e.g. 
+	let fld1Getter = buildExpr<CustRecord,string>("Source.Url")
 Barb can will also reflect into the real type of a given obj, which can be quite handy for taking the hard work out of accessing untyped data.
 
 
 3. Barb supports many of the constructs a F# user would expect
 
-e.g. buildExpr<CustRecord,string>("Locations.[0]") // The F# style '.' is optional :)
-e.g. buildExpr<CustRecord,string>("if Age > 40 then 'Old' else 'Young'")
-e.g. buildExpr<CustRecord,int>("let x = Age + 1 in x") // or..
-e.g. buildExpr<CustRecord,int>("var x = Age + 1 in x") // (although, I may use var for mutables in the future)
+	buildExpr<CustRecord,string>("Locations.[0]") // The F# style '.' is optional :)
+	buildExpr<CustRecord,string>("if Age > 40 then 'Old' else 'Young'")
+	buildExpr<CustRecord,int>("let x = Age + 1 in x") // or..
+	buildExpr<CustRecord,int>("var x = Age + 1 in x") // (although, I may use var for mutables in the future)
 
 ...and some fancier ones from F#
 
-e.g. buildExpr<unit,seq<int>>("{ 1 .. 5 }") // Returns 1,2,3,4,5
-e.g. buildExpr<unit,seq<int>>("{ 1 .. 2 .. 10 }") // Returns 1,3,5,7,9
-e.g. buildExpr<unit,seq<int>>("(1, 2, 3)") // Returns 1,2,3
+	buildExpr<unit,seq<int>>("{ 1 .. 5 }") // Returns 1,2,3,4,5
+	buildExpr<unit,seq<int>>("{ 1 .. 2 .. 10 }") // Returns 1,3,5,7,9
+	buildExpr<unit,seq<int>>("(1, 2, 3)") // Returns 1,2,3
 
 ...all looping must currently be handled with lambda recursion
 
-e.g. buildExpr<unit,seq<int>>("let recfun = fun x -> if x > 1 then x else recfun (x + 1) in recfun 0") 
+	buildExpr<unit,seq<int>>("let recfun = fun x -> if x > 1 then x else recfun (x + 1) in recfun 0") 
 
 ...but it's still growing and more features are being added all the time.
 
