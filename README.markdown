@@ -77,13 +77,15 @@ The best way to think about Barb is over some collection of records (data classe
 			Locations: string array
 		}
 
-1. As mentioned above, Barb is great for writing queries.
+- As mentioned above, Barb is great for writing queries.
+
+In Barb you can choose either the words "and"/"or" or use "&&"/"||", whichever makes you more comfortable.
 
 	let predicate = buildExpr<CustRecord,bool>("Name.Contains "John" and (Age > 20 or Weight > 200)")
 
 This will will return a predicate which you can then use to filter over large numbers of records.
 
-2. It can also be used to for user specified reflection. One case where I use this is for writing out CSV files. 
+- It can also be used to for user specified reflection. One case where I use this is for writing out CSV files. 
 
 Given a set of record field specifying strings, you can easily build functions which will grab the specified data.  
  
