@@ -87,12 +87,15 @@ This will will return a predicate which you can then use to filter over large nu
 Given a set of record field specifying strings, you can easily build functions which will grab the specified data.  
 
 	let fld1Getter = buildExpr<CustRecord,int>("Weight") 
+
 Quite simple right? Barb will also convert to the correct output type if able.
  
 	let fld1Getter = buildExpr<CustRecord,string>("Weight") 
+
 Here the integer will be converted on the fly to string because it's what you statically specified.
  
 	let fld1Getter = buildExpr<CustRecord,string>("Source.Url")
+
 Barb can will also reflect into the real type of a given obj, which can be quite handy for taking the hard work out of accessing untyped data.
 
 
