@@ -77,7 +77,7 @@ The best way to think about Barb is over some collection of records (data classe
 			Locations: string array
 		}
 
-- As mentioned above, Barb is great for writing queries.
+#### As mentioned above, Barb is great for writing queries. ####
 
 In Barb you can choose either the words "and"/"or" or use "&&"/"||", whichever makes you more comfortable.
 
@@ -85,9 +85,9 @@ In Barb you can choose either the words "and"/"or" or use "&&"/"||", whichever m
 
 This will will return a predicate which you can then use to filter over large numbers of records.
 
-- It can also be used to for user specified reflection. One case where I use this is for writing out CSV files. 
+#### It can also be used to for user specified reflection. ####
 
-Given a set of record field specifying strings, you can easily build functions which will grab the specified data.  
+One case where I use this is for writing out CSV files. Given a set of record field specifying strings, you can easily build functions which will grab the specified data.  
  
 	let fld1Getter = buildExpr<CustRecord,int>("Weight") 
 
@@ -102,7 +102,7 @@ Here the integer will be converted on the fly to string because it's what you st
 Barb can will also reflect into the real type of a given obj, which can be quite handy for taking the hard work out of accessing untyped data.
 
 
-3. Barb supports many of the constructs a F# user would expect
+#### Barb supports many of the constructs a F# user would expect ####
 
 	buildExpr<CustRecord,string>("Locations.[0]") // The F# style '.' is optional :)
 	buildExpr<CustRecord,string>("if Age > 40 then 'Old' else 'Young'")
