@@ -8,9 +8,8 @@ Barb is a small dynamic scripting language for .NET with the following propertie
 This makes Barb an easy to learn language which you can give to your users for safely scripting over data in your application.  Best of all, you'll be able to use it without learning a bunch of new syntax.
 
 
-------------------------------------
----           Why Barb?          ---
-------------------------------------
+Why Barb?
+---------
 
 I created Barb because I needed a user language for my applications but yet no existing .NET language hosted nicely inside of my application and met my criteria:
 
@@ -34,9 +33,8 @@ It can do much more now, but still needs work to be friendly enoungh for a real 
 However, I thought it might be useful to others in its current form.  If you do play with it I hope you'll let me know what you think.
 
 
-------------------------------------
----       Current Features       ---
-------------------------------------
+Current Features <a id="features" />
+----------------
 
 - Recursive lambda bindings with F# or C# syntax
 - Value name binding with F# or C# syntax
@@ -46,9 +44,8 @@ However, I thought it might be useful to others in its current form.  If you do 
 - Tuples (any IEnumerable is treated as a tuple internally)
 
  
-------------------------------------
----        Things To do          ---
-------------------------------------
+Things To Do <a id="todo" />
+------------
 
 - Lambda interop with .NET
 - Extension method resolution
@@ -56,9 +53,9 @@ However, I thought it might be useful to others in its current form.  If you do 
 - Generalized Sequence Expressions
 
 
-------------------------------------
----     Planned Limitations      ---
-------------------------------------
+
+Planned Limitations <a id="limitations" />
+-------------------
 
 - All numbers are converted internally to Int64 or Double.  This will change but was necessary for now to keep 
   things simple.
@@ -66,9 +63,8 @@ However, I thought it might be useful to others in its current form.  If you do 
   fix this, but it will tone down optimization significantly.
 
 
-------------------------------------
----        Examples of Use       ---
------------------------------------- 
+Examples of Use <a id="examples" />
+---------------
 
 The best way to think about Barb is over some collection of records (data classes to you C# folks).
 
@@ -82,7 +78,7 @@ type CustRecord =
     }
 
 1. As mentioned above, Barb is great for writing queries.
-e.g.  let predicate = buildExpr<CustRecord,bool>("(Name.Contains "John" or Name.Contains "Mary") and (Age > 20 or Weight > 200)")
+e.g.  let predicate = buildExpr<CustRecord,bool>("Name.Contains "John" and (Age > 20 or Weight > 200)")
 This will will return a predicate which you can then use to filter over large numbers of records.
 
 
@@ -119,9 +115,8 @@ e.g. buildExpr<unit,seq<int>>("let recfun = fun x -> if x > 1 then x else recfun
 ...but it's still growing and more features are being added all the time.
 
 
-------------------------------------
---- Extra Nerdy Stuff Under Here ---
-------------------------------------
+Extra Nerdy Stuff Under Here <a id="nerdy" />
+----------------------------
 
 Compilation is done by n-tuple merging of expression nodes.  This is done initially to pre-compute as much as possible and the optimized result is then reduced again with the information given by the passed in data object.  Decisions can be made at runtime based on the contents of these tuples and their neighbors.  This allows for a huge amount of flexibility in deciding what to do.  Function/Value composition also allows for fast code to be built out of existing .NET constructs and eliminates the complexity of a intermediate representation.
 

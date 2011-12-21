@@ -166,6 +166,6 @@ let ``predicate language should support static methods on type names`` () =
 
 [<Fact>]
 let ``predicate language should convert output to the correct type`` () = 
-    let dudePredicate = buildExpr<unit,int> "1"
+    let dudePredicate = buildExpr<unit,string> "1"
     let result = dudePredicate ()    
-    Assert.Equal (result, 1)
+    Assert.Equal (result, "1")
