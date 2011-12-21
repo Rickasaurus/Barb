@@ -11,14 +11,13 @@ This makes Barb an easy to learn language which you can give to your users for s
 Why Barb?
 ---------
 
-I created Barb because I needed a user language for my applications but yet no existing .NET language hosted nicely inside of my application and met my criteria:
+I created Barb because I needed a user language for my applications but yet no existing .NET language both hosted nicely inside of my application and met my criteria:
 
 - Simple/Terse Syntax
 - Expression Oriented (Any program should be able to be represented in a single line of code)
 - No casting necessary and transparent type conversions
 - Native .NET type system (No painful conversions!)
 - Tries really hard to do what a non-technical user would expect
-- Easy to maintain
 - Fast Execution (I use it to script over sets of records in the millions range)
 - Safe from accidental data corruption by non-technical users
 
@@ -28,9 +27,7 @@ The current implementation is still young and a bit rough around the edges. It's
 
 	(Name.Contains "John" or Name.Contains "Mary") and (Age > 20 or Weight > 200)
 
-It can do much more now, but still needs work to be friendly enoungh for a real release. In particular, it needs better error messages and a friendly API for hosting.
-
-However, I thought it might be useful to others in its current form.  If you do play with it I hope you'll let me know what you think.
+It can do much more now, but still needs work to be friendly enoungh for a real release. In particular, it needs better error messages and a friendly API for hosting. However, I thought it might be useful to others in its current form.  If you do play with it I hope you'll let me know what you think.
 
 
 Current Features <a id="features" />
@@ -43,24 +40,23 @@ Current Features <a id="features" />
 - Numerical sequence expressions (Identical to F#'s)
 - Tuples (any IEnumerable is treated as a tuple internally)
 
- 
+
+Planned Limitations <a id="limitations" />
+-------------------
+
+- All numbers are converted internally to Int64 or Double.  This will change but was necessary for now to keep things simple.
+- Barb may cause unexpected behavior when making calls that mutate things.  There is a settings option which fixes this, but it tones down optimization significantly.
+
+
 Things To Do <a id="todo" />
 ------------
 
 - Lambda interop with .NET
 - Extension method resolution
-- A resonable API with configuration options
 - Generalized Sequence Expressions
-
-
-
-Planned Limitations <a id="limitations" />
--------------------
-
-- All numbers are converted internally to Int64 or Double.  This will change but was necessary for now to keep 
-  things simple.
-- Barb may cause unexpected behavior when making calls that mutate things.  I do plan on adding an API option to 
-  fix this, but it will tone down optimization significantly.
+- Better Looping Constructs
+- Pattern Matching
+- Optimized Numeric Type Handling
 
 
 Examples of Use <a id="examples" />
@@ -121,6 +117,21 @@ Barb can will also reflect into the real type of a given obj, which can be quite
 
 ...but it's still growing and more features are being added all the time.
 
+Language Details <a id="details" />
+----------------
+
+#### Subexpression Forms ####
+	
+	Subscope: 		( <code> )
+	Tuple: 			<code>, <code>, <code>
+	Lambda (F#): 	fun <binding> -> <code> ...
+	Lambda (C#): 	... <binding> => <code> ...
+	Branching:		if <code> then <code> else <code> ...
+	Indexing:		<obj>[ <code> ]
+	Binding (F#):	let <name> = <code> in
+	Binding (C#):	var <name> = <code> in
+
+Note that '...' indicates an unbounded expression.  It can be bounded by a parent expression or explicitly by using a subscope.
 
 Extra Nerdy Stuff Under Here <a id="nerdy" />
 ----------------------------
