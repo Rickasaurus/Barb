@@ -85,7 +85,7 @@ This will will return a predicate which you can then use to filter over large nu
 
 2. It can also be used to for user specified reflection. One case where I use this is for writing out CSV files. 
 Given a set of record field specifying strings, you can easily build functions which will grab the specified data.  
-
+ 
 	let fld1Getter = buildExpr<CustRecord,int>("Weight") 
 
 Quite simple right? Barb will also convert to the correct output type if able.
