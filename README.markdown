@@ -26,7 +26,7 @@ Dynamic Linq, IronPython and IronRuby all failed for one of these reasons or ano
 
 The current implementation is still young and a bit rough around the edges. It's was originally designed for writing one-line expressions along these lines:
 
-"(Name.Contains "John" or Name.Contains "Mary") and (Age > 20 or Weight > 200)"
+	"(Name.Contains "John" or Name.Contains "Mary") and (Age > 20 or Weight > 200)"
 
 It can do much more now, but still needs work to be friendly enoungh for a real release. In particular, it needs better error messages and a friendly API for hosting.
 
