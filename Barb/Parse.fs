@@ -145,6 +145,24 @@ let generateNumIterator =
         Generator (SubExpression(starte), SubExpression(inc), SubExpression(ende))        
     | list -> failwith (sprintf "Incorrect generator syntax: %A" list)
 
+//let rec extractUnknowns exprs unknowns =
+//    match exprs with
+//    | [] -> unknowns
+//    | Unknown u :: rest -> extract rest [u :: unknowns]
+//    | _ :: rest -> extractUnknowns rest unknowns
+
+//let rec extractTopBindings exprs unknowns =
+//    match exprs with
+//    | [] -> unknowns
+//    | Binding b :: rest -> extract rest [b :: unknowns]
+//    | _ :: rest -> extractUnknowns rest unknowns
+
+//let generateLoop = 
+//    function
+//    | SubExpression(contents) :: SubExpression(predicate) :: SubExpression([]) :: [] ->
+//        let topBindings = extractTopBindings contents
+//    | list -> failwith (sprintf "Incorrect while syntax %A" list)
+
 let allExpressionTypes = 
     [
         { Pattern = [Open; RCap ","; Open];                         Func = (fun exprs -> Tuple exprs) }
@@ -156,6 +174,7 @@ let allExpressionTypes =
         { Pattern = [SCap "["; SCap "]"];                           Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
         { Pattern = [SCap "let"; SCap "="; SCap "in"];              Func = generateBind }
         { Pattern = [SCap "var"; SCap "="; SCap "in"];              Func = generateBind }
+//        { Pattern = [SCap "loop"; SCap "{"; SCap "}"];              Func = generateLoop }
     ]
 
 let (|NewExpression|_|) (text: StringWindow) =
@@ -183,7 +202,7 @@ let (|OngoingExpression|_|) (typesStack: SubexpressionType list) (text: StringWi
             |> Option.map (fun (mtext, subexp) -> subexp, text.Subwindow(mtext.Length))
         | _ -> None
 
-let (|RefineToOpenExpression|_|) (typesStack: SubexpressionType list) (text: StringWindow) =
+let (|RefineOpenExpression|_|) (typesStack: SubexpressionType list) (text: StringWindow) =
     let matches, str = 
         [ 
             for ct in allExpressionTypes do 
@@ -244,7 +263,7 @@ let parseProgram (startText: string) =
                 | _ -> failwith "Unexpected end of subexpression"
             let value = subExprs |> List.rev |> resolvedCap.Func 
             parseProgramInner rem (value :: result) currentCaptures
-        | RefineToOpenExpression currentCaptures (captures, crem) ->
+        | RefineOpenExpression currentCaptures (captures, crem) ->
             let rrem, rSubExprs, rCaptures = parseProgramInner crem [] captures
             rrem, SubExpression (result |> List.rev) :: rSubExprs, captures 
         | Skip " " res

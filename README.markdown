@@ -77,7 +77,7 @@ The best way to think about Barb is over some collection of records (data classe
 
 In Barb you can choose either the words "and"/"or" or use "&&"/"||", whichever makes you more comfortable.
 
-	let predicate = buildExpr<CustRecord,bool>("Name.Contains "John" and (Age > 20 or Weight > 200)")
+	let predicate = buildExpr<CustRecord,bool>("Name.Contains 'John' and (Age > 20 or Weight > 200)")
 
 This will will return a predicate which you can then use to filter over large numbers of records.
 

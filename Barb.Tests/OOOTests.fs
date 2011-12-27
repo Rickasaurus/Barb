@@ -11,35 +11,35 @@ type BoolRec = { HasHat: bool; Name: string }
 [<Fact>]
 let ``predicate language should preserve left-to-right order of operations with parens`` () = 
     let testRecord = { HasHat = true; Name = "Howard" }
-    let dudePredicate = buildExpr<BoolRec,bool> "HasHat and (Name = \"Howard\")"
-    let result = dudePredicate testRecord
+    let predicate = buildExpr<BoolRec,bool> "HasHat and (Name = \"Howard\")"
+    let result = predicate testRecord
     Assert.True(result)    
 
 [<Fact>]
 let ``predicate language should preserve left-to-right order of operations with record bool`` () = 
     let testRecord = { HasHat = true; Name = "Howard" }
-    let dudePredicate = buildExpr<BoolRec,bool> "HasHat and Name = \"Howard\""
-    let result = dudePredicate testRecord
+    let predicate = buildExpr<BoolRec,bool> "HasHat and Name = \"Howard\""
+    let result = predicate testRecord
     Assert.True(result)    
 
 [<Fact>]
 let ``predicate language should preserve left-to-right order of operations with explicit bool`` () = 
     let testRecord = { HasHat = false; Name = "Don" }
-    let dudePredicate = buildExpr<BoolRec,bool> "HasHat = false and Name = \"Don\""
-    let result = dudePredicate testRecord
+    let predicate = buildExpr<BoolRec,bool> "HasHat = false and Name = \"Don\""
+    let result = predicate testRecord
     Assert.True(result)    
 
 [<Fact>]
 let ``predicate language should evalute order of boolean ops correctly`` () = 
     let testRecord = { HasHat = true; Name = "Don" }
-    let dudePredicate = buildExpr<BoolRec,bool> "true and HasHat or false"
-    let result = dudePredicate testRecord
+    let predicate = buildExpr<BoolRec,bool> "true and HasHat or false"
+    let result = predicate testRecord
     Assert.True(result)    
 
 [<Fact>]
 let ``predicate language should use correct order of operations`` () = 
-    let dudePredicate = buildExpr<unit,bool> "1 + 4 / 2 + 5 = 8"
-    let result = dudePredicate ()
+    let predicate = buildExpr<unit,bool> "1 + 4 / 2 + 5 = 8"
+    let result = predicate ()
     Assert.True(result)  
 
 type NumRec = 
@@ -49,18 +49,18 @@ type NumRec =
     
 [<Fact>]
 let ``predicate language should use correct order of operations with getters 1`` () = 
-    let dudePredicate = buildExpr<NumRec,bool> "Num + 4 / 4 = 3"
-    let result = dudePredicate { Num = 2 }
+    let predicate = buildExpr<NumRec,bool> "Num + 4 / 4 = 3"
+    let result = predicate { Num = 2 }
     Assert.True(result)    
 
 [<Fact>]
 let ``predicate language should use correct order of operations with getters 2`` () = 
-    let dudePredicate = buildExpr<NumRec,bool> "2 + Num / 4 = 3"
-    let result = dudePredicate { Num = 4 }
+    let predicate = buildExpr<NumRec,bool> "2 + Num / 4 = 3"
+    let result = predicate { Num = 4 }
     Assert.True(result)
 
 [<Fact>]
 let ``predicate language should use correct order of operations with getters 3`` () = 
-    let dudePredicate = buildExpr<NumRec,bool> "2 + 2 / Num = 3"
-    let result = dudePredicate { Num = 2 }
+    let predicate = buildExpr<NumRec,bool> "2 + 2 / Num = 3"
+    let result = predicate { Num = 2 }
     Assert.True(result)
