@@ -12,6 +12,11 @@ type BarbSettings =
 
 type MethodSig = ((obj array -> obj) * Type array) list
 
+type TupleStruct =
+   struct
+      val Items: obj array
+   end
+
 type ExprTypes = 
     | Unit
     | Invoke
@@ -23,7 +28,7 @@ type ExprTypes =
     | Postfix of (obj -> obj)
     | Infix of int * (obj -> obj -> obj) 
     | SubExpression of ExprTypes list
-    | Tuple of ExprTypes list
+    | Tuple of ExprTypes array
     | IndexArgs of ExprTypes
     | AppliedInvoke of string
     | Unknown of string
@@ -31,4 +36,7 @@ type ExprTypes =
     | Lambda of string list * ExprTypes list * ExprTypes
     | IfThenElse of ExprTypes list * ExprTypes list * ExprTypes list
     | Generator of ExprTypes * ExprTypes * ExprTypes
+    // Has no Unknowns
     | Resolved of ExprTypes
+    // Has Unknowns
+    | Unresolved of ExprTypes

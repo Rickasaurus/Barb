@@ -180,7 +180,7 @@ let executeIndexer (sigs: MethodSig) (param: obj) =
 let executeParameterizedMethod (sigs: MethodSig) (args: obj) =
     let arrayArgs =
         match args with
-        | :? (obj seq) as tuple -> tuple |> Seq.toArray 
+        | :? (obj array) as tuple -> tuple
         | _ as o -> [| o |]
     sigs
     |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = arrayArgs.Length)

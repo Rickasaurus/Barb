@@ -169,3 +169,12 @@ let ``predicate language should convert output to the correct type`` () =
     let predicate = buildExpr<unit,string> "1"
     let result = predicate ()    
     Assert.Equal (result, "1")
+
+type ValueCarrier = { Y: int }
+
+[<Fact>]
+let ``recursive calls should property preserve a lambda closure with external data`` () =
+    let v = { Y = 1 }
+    let func = buildExpr<ValueCarrier,int> "let fn = (fun x -> x + Y) in let Y = 2 in fn 1"
+    let result = func v
+    Assert.Equal(2, result)

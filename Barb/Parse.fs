@@ -165,7 +165,7 @@ let generateNumIterator =
 
 let allExpressionTypes = 
     [
-        { Pattern = [Open; RCap ","; Open];                         Func = (fun exprs -> Tuple exprs) }
+        { Pattern = [Open; RCap ","; Open];                         Func = (fun exprs -> Tuple (exprs |> List.rev |> List.toArray)) }
         { Pattern = [Open; SCap "=>"; Open];                        Func = generateLambda }
         { Pattern = [SCap "fun"; SCap "->"; Open];                  Func = generateLambda }
         { Pattern = [SCap "if"; SCap "then"; SCap "else"; Open];    Func = generateIfThenElse }
