@@ -280,6 +280,7 @@ let addObjects (obj1: obj) (obj2: obj) =
     | (:? int64 as b1), (:? int64 as b2) -> (b1 + b2) :> obj
     | (:? float as d1), (:? int64 as b2) -> (d1 + float b2) :> obj
     | (:? int64 as b1), (:? float as d2) -> (float b1 + d2) :> obj
+    | (:? string as s1), (:? string as s2) -> s1 + s2 :> obj
     | _ -> failwith (sprintf "Cannot add %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))
 
 let subObjects (obj1: obj) (obj2: obj) =

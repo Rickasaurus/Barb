@@ -143,7 +143,18 @@ let ``predicate language should support recursive array iteration`` () =
     let predText = 
         "let maxVal = (fun i best -> let nextbest = (if best > Scores[i] then best else Scores[i]) in
                                        (if i = 0 then nextbest else maxVal (i - 1) nextbest))
-                      in maxVal (Scores.Length - 1) 0 = 0.8"
+         in maxVal (Scores.Length - 1) 0 = 0.8"
+    let pred = buildExpr<NameScores,bool> predText
+    let result = pred record
+    Assert.True(result)
+
+[<Fact>]
+let ``predicate language should support recursive array iteration _open_`` () =  
+    let record = { Names1 = [||]; Names2 = [||]; Scores = [|0.0; 0.8; 0.5; 0.6|] }   
+    let predText = 
+        "let maxVal = fun i best -> let nextbest = if best > Scores[i] then best else Scores[i] in
+                                       if i = 0 then nextbest else maxVal (i - 1) nextbest
+         in maxVal (Scores.Length - 1) 0 = 0.8"
     let pred = buildExpr<NameScores,bool> predText
     let result = pred record
     Assert.True(result)
@@ -178,3 +189,14 @@ let ``recursive calls should property preserve a lambda closure with external da
     let func = buildExpr<ValueCarrier,int> "let fn = (fun x -> x + Y) in let Y = 2 in fn 1"
     let result = func v
     Assert.Equal(2, result)
+
+[<Fact>]
+let ``plus should concatinate strings`` () = 
+    let func = buildExpr<unit,bool> "'hello' + ' ' + 'world' = 'hello world'"
+    Assert.True(func())
+
+[<Fact>]
+let ``tuple implementation should support Length property`` () =
+    let func = buildExpr<unit,bool> "let tpl = (1,2,3) in tpl.Length = 3"
+    Assert.True(func())
+
