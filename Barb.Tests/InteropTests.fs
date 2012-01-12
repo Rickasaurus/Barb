@@ -200,6 +200,13 @@ let ``tuple implementation should support Length property`` () =
     let func = buildExpr<unit,bool> "let tpl = (1,2,3) in tpl.Length = 3"
     Assert.True(func())
 
+type StrArrayType = { Strs: string array }
+
+[<Fact>]
+let ``records contents should be resolved within lambdas`` () =
+    let func = buildExpr<StrArrayType, int> "let f = (fun i -> if i >= Strs.Length then 0 else (f (i + 1)) + Strs.[i].Length) in f 0"
+    let res = func { Strs = [|"1"; "22"; "333" |] }
+    Assert.Equal(6, res)
 
 //
 // Wish List / Ideas

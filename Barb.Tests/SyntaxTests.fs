@@ -201,7 +201,7 @@ let ``should support functions with multiple parameters`` () =
 [<Fact>]
 let ``should support internal use of lambdas with more than one parameter`` () = 
     let testRecord = { HasHat = false; Name = "Don" }
-    let predicate = buildExpr<BoolRec,bool> "let fx = (fun x y -> x = \"Don\" and not y) in fx Name HasHat"
+    let predicate = buildExpr<BoolRec,bool> "let fxy = (fun x y -> x = \"Don\" and not y) in fxy Name HasHat"
     let result = predicate testRecord
     Assert.True(result) 
 
