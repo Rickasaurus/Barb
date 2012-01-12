@@ -36,8 +36,8 @@ module Compiler =
 
         let reducedExpression = 
             if settings.OptimizeForImmutability then
-                resolveExpression parsedTokens Map.empty false |> List.rev
-            else parsedTokens
+                resolveExpression [parsedTokens] Map.empty false |> List.rev
+            else [parsedTokens]
 
     #if DEBUG
         printfn ""

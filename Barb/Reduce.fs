@@ -12,13 +12,13 @@ let indexIntoTuple (elements: ExprTypes array) (index: obj) =
     | :? int64 as idx -> elements.[int idx] 
     | _ -> failwith (sprintf "Bad type for tuple index: %A" index)
 
-let tupleToSequence (tuple: ExprTypes array) = 
+let tupleToObj (tuple: ExprTypes array) = 
     tuple |> Array.map (function | Obj v -> v | other -> failwith (sprintf "Cannot resolve the given tuple-internal expression to a object type: %A" other))
 
 let resolveExpressionResult (input: ExprTypes list) =
     match input with
     | Obj (res) :: [] -> res
-    | Tuple (items) :: [] -> tupleToSequence items |> box
+    | Tuple (items) :: [] -> tupleToObj items |> box
     | otherTokens -> failwith (sprintf "Unexpected result: %A" otherTokens)
 
 let resolveExpression exprs initialBindings (finalReduction: bool) = 
@@ -56,10 +56,10 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
                 |> Some
             | Tuple tc -> 
                 let reducedTuples = tc |> Array.map (fun t -> match reduceExpressions [] [t] bindings with | Obj o :: [] -> Obj o | res -> SubExpression res)
-                reducedTuples |> Tuple 
-                |> if reducedTuples |> Array.forall (function | Obj o -> true | _ -> false) then Resolved else Unresolved
-                |> Some
-            | Resolved (Tuple tc) -> Obj (tupleToSequence tc |> box) |> Some                
+                match reducedTuples |> Array.forall (function | Obj o -> true | _ -> false) with
+                | true -> reducedTuples |> (fun tc -> Obj (tupleToObj tc |> box))
+                | false -> reducedTuples |> Tuple |> Unresolved
+                |> Some           
             | Unknown unk -> bindings |> Map.tryFind unk |> Option.bind (fun res -> Some <| res.Force())
             | Generator (Obj(s), Obj(i), Obj(e)) ->
                 match s, i, e with
@@ -99,7 +99,7 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
             | Prefix l, Obj r -> Obj (l r) |> Some
             | Method l, Unit -> executeUnitMethod l
             | Method l, Obj r -> executeParameterizedMethod l r 
-            | Unknown l, AppliedInvoke r -> cachedResolveStatic (l, r)
+            | Unknown l, AppliedInvoke r when finalReduction -> cachedResolveStatic (l, r)
             | Invoke, Unknown r -> AppliedInvoke r |> Some
             | Invoke, IndexArgs r -> IndexArgs r |> Some // Here for F#-like indexing (if you want it)            
             | Obj l, AppliedInvoke r when finalReduction -> resolveInvoke l r

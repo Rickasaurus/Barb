@@ -153,6 +153,7 @@ and convertToSameType (obj1: obj) (obj2: obj) : (obj * obj) =
                     | _ -> obj1, System.Convert.ChangeType(obj2, obj1.GetType())
     with _ -> failwith (sprintf "Failed to find a conversion for %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))   
 
+
 let convertToTargetType (ttype: Type) (param: obj) = 
     if param = null then Some null
     else
@@ -161,6 +162,28 @@ let convertToTargetType (ttype: Type) (param: obj) =
         | true -> Some <| des.ConvertFrom(param)
         | false -> try Some <| System.Convert.ChangeType(param, ttype) with _ -> None
 
+// DOES NOT WORK
+// Array.ConvertAll<obj array, int array>(x, (fun y -> Array.ConvertAll<obj, int>(y, (fun o -> o :?> int))));;
+let cachedArrayBuilder = new CachingReflectiveArrayBuilder()
+let convertToArrayType (ttype: Type) (param: obj) =
+    let rec inner (ptype: Type) (ttype: Type) =
+        match ptype.GetElementType(), ttype.GetElementType() with
+        | null, null -> (fun (o: obj) -> convertToTargetType ttype o |> function | Some res -> res | None -> failwith "convert failed")
+        | null, _
+        | _, null -> failwith "nope"
+        | pet, tet ->
+            printfn "%s, %s" ptype.Name ttype.Name
+            let cfunc =
+                (fun p -> 
+                    printfn "%s - %s" ptype.Name ttype.Name
+                    typeof<Array>
+                     .GetMethod("ConvertAll", BindingFlags.Public ||| BindingFlags.Static)
+                     .MakeGenericMethod([|ptype; ttype|])
+                     .Invoke(null, [|p; inner pet tet|]))
+            cfunc
+    let cfunc = inner (param.GetType()) ttype 
+    cfunc param
+// DOES NOT WORK
 
 let executeUnitMethod (sigs: MethodSig) =
     sigs 
