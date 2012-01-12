@@ -249,31 +249,31 @@ let (|FinishOpenExpression|_|) (typesStack: SubexpressionType list) (text: Strin
         | _ -> None
 
 let parseProgram (startText: string) = 
-    let rec parseProgramInner (str: StringWindow) (result: ExprTypes list) (currentCaptures: SubexpressionType list) : (StringWindow * ExprTypes * SubexpressionType list) =
+    let rec parseProgramInner (str: StringWindow) (result: ExprTypes list) (currentCaptures: SubexpressionType list) : (StringWindow * ExprTypes) =
         match result with
         | SubExpression cSubExpr :: rSubExprs -> 
             match str with
             | FinishOpenExpression currentCaptures (subtype, crem) ->
                 let innerResult = SubExpression (cSubExpr |> List.rev) :: rSubExprs  
                 let value = innerResult |> List.rev |> subtype.Func in 
-                    crem, value, currentCaptures         
-            | _ when str.Length = 0 -> str, SubExpression (SubExpression (cSubExpr |> List.rev) :: rSubExprs), currentCaptures
-            
+                    crem, value         
+            | _ when str.Length = 0 -> str, SubExpression (SubExpression (cSubExpr |> List.rev) :: rSubExprs)            
             | OngoingExpression currentCaptures (captures, crem) ->
                 match captures with
                 // Expression is Finished
                 | { Pattern = []; Func = func } :: parents -> 
                     let innerResult = SubExpression (cSubExpr |> List.rev) :: rSubExprs  
                     let value = innerResult |> List.rev |> func in 
-                        crem, value, captures   
+                        crem, value   
                 // Expression Continues
                 | { Pattern = h :: rest; Func = _ } :: parents -> parseProgramInner crem (SubExpression [] :: SubExpression (cSubExpr |> List.rev) :: rSubExprs) captures
                 | [] -> failwith "Unexpected output from OngoingExpression"
             | RefineOpenExpression currentCaptures (subtype, crem) ->
-                let rem, value, _ = parseProgramInner crem (SubExpression [] :: cSubExpr) (subtype :: currentCaptures)               
+                // Mid-Expression we've realized we're actually in a different kind.
+                let rem, value = parseProgramInner crem (SubExpression [] :: cSubExpr) (subtype :: currentCaptures)               
                 parseProgramInner rem (SubExpression ([value]) :: rSubExprs) currentCaptures    
             | NewExpression currentCaptures (subtype, crem) ->
-                let rem, value, _ = parseProgramInner crem [SubExpression []] (subtype :: currentCaptures)               
+                let rem, value = parseProgramInner crem [SubExpression []] (subtype :: currentCaptures)               
                 parseProgramInner rem (SubExpression (value :: cSubExpr) :: rSubExprs) currentCaptures
             | Skip " " res
             | Skip "\t" res
@@ -308,4 +308,4 @@ let parseProgram (startText: string) =
                 parseProgramInner rem (SubExpression (Unknown token :: cSubExpr) :: rSubExprs) currentCaptures
             | str -> parseProgramInner (str.Subwindow(1)) result currentCaptures
         | _ -> failwith "Expected a SubExpression"
-    let _, res, _ = parseProgramInner (StringWindow(startText, 0)) [SubExpression []] [] in res
+    let _, res = parseProgramInner (StringWindow(startText, 0)) [SubExpression []] [] in res
