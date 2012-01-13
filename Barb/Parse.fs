@@ -59,15 +59,16 @@ open System.Numerics
 let whitespace = [| " "; "\r"; "\n"; "\t"; |]
 
 let (|Num|_|) (text: StringWindow) =
-    let numChars = [| '0'; '1'; '2'; '3'; '4'; '5'; '6'; '7'; '8'; '9' |]
+//    let numChars = [| '0'; '1'; '2'; '3'; '4'; '5'; '6'; '7'; '8'; '9' |]
+    let isnumchar c = c >= '0' && c <= '9' 
     let sb = new StringBuilder()
-    if numChars.Contains(text.[0]) then
+    if isnumchar text.[0] then
         let rec inner = 
             function
             | i, dot when i >= text.Length -> i, dot
             | i, true when text.[i] = '.' -> i, true
             | i, false when text.[i] = '.' -> sb.Append(text.[i]) |> ignore; inner (i+1, true)
-            | i, dotSeen when numChars.Contains(text.[i]) -> sb.Append(text.[i]) |> ignore; inner (i+1, dotSeen)
+            | i, dotSeen when isnumchar text.[i] -> sb.Append(text.[i]) |> ignore; inner (i+1, dotSeen)
             | i, dot -> i, dot
         let resi, dot = inner (0, false)
         let tokenStr = 
@@ -78,7 +79,7 @@ let (|Num|_|) (text: StringWindow) =
         Some (Some (tokenStr), rest)
     else None
         
-let (|TextCapture|_|) (b: char) (text: StringWindow) = 
+let (|CaptureString|_|) (b: char) (text: StringWindow) = 
     if text.[0] = b then 
         let sb = new StringBuilder()
         let rec findSafeIndex i =
@@ -92,18 +93,19 @@ let (|TextCapture|_|) (b: char) (text: StringWindow) =
         findSafeIndex 1
     else None  
 
-let (|FreeToken|_|) (endTokens: string list) (text: StringWindow) =
+let (|CaptureUnknown|_|) (endTokens: string list) (text: StringWindow) =
     let endIndices = 
         endTokens 
         |> List.map (fun e -> text.IndexOf e)
         |> List.filter (fun i -> i >= 0)
     match endIndices with
-    | [] -> Some (text.ToString(), StringWindow("", 0))
+    | [] -> Some (Some (Unknown (text.ToString())), StringWindow("", 0))
     | list -> 
         let index = list |> List.min 
         let tokenText = text.Substring(0, index)
         let remainder = text.Subwindow(index)
-        if index > 0 then Some (tokenText, remainder) 
+        if index > 0 then 
+            Some (Some (Unknown tokenText), remainder) 
         else None
 
 let generateBind : ExprTypes list -> ExprTypes = 
@@ -149,6 +151,8 @@ let generateNumIterator =
 //        let topBindings = extractTopBindings contents
 //    | list -> failwith (sprintf "Incorrect while syntax %A" list)
 
+let whitespaceVocabulary = [" "; "\t"; "\r"; "\n"] 
+
 let allExpressionTypes = 
     [
         { Pattern = [Open; RCap ","; Open];                         Func = (fun exprs -> Tuple (exprs |> List.toArray)) }
@@ -163,7 +167,7 @@ let allExpressionTypes =
 //        { Pattern = [SCap "loop"; SCap "{"; SCap "}"];              Func = generateLoop }
     ]
 
-let allSimpleTypes = 
+let allSimpleMappings = 
     [
         ["."], Invoke
         ["()"], Unit
@@ -185,16 +189,34 @@ let allSimpleTypes =
         ["-"], Infix (2, subObjects)
     ]
 
+let endUnknownChars = 
+    seq {
+        for c in whitespaceVocabulary do
+            yield c.[0]
+        for e in allExpressionTypes do
+            for token in e.Pattern do
+                match token with
+                | Open -> ()
+                | SCap (s) 
+                | RCap (s) -> yield s.[0]
+        for tokens, expr in allSimpleMappings do
+            for token in tokens do
+                yield token.[0]
+    } 
+    |> Seq.filter (fun c -> not (c >= 'A' && c <= 'Z') && not (c >= 'a' && c <= 'z'))
+    |> Set.ofSeq
+    |> Set.toList
+    |> List.map (fun c -> string c)    
+
 let (|Skip|_|) (skipStrs: string list) (text: StringWindow) =
     skipStrs 
     |> List.tryFind (fun sstr -> text.StartsWith(sstr))
     |> Option.map (fun m -> None, text.Subwindow(m.Length))
 
-
 let (|MapSymbol|_|) (text: StringWindow) =
     let matches, str = 
         [
-            for matchStrs, expr in allSimpleTypes do
+            for matchStrs, expr in allSimpleMappings do
                 for matchStr in matchStrs do
                     if text.StartsWith(matchStr) then yield matchStr, expr
         ] |> List.allMaxBy (fun (m, expr) -> m.Length)
@@ -291,17 +313,16 @@ let parseProgram (startText: string) =
             | NewExpression currentCaptures (subtype, crem) ->
                 let rem, value = parseProgramInner crem [SubExpression []] (subtype :: currentCaptures)               
                 parseProgramInner rem (SubExpression (value :: cSubExpr) :: rSubExprs) currentCaptures
-            | Skip [" "; "\t"; "\r"; "\n"] res
+            | Skip whitespaceVocabulary res
             | MapSymbol res
-            | TextCapture '"' res
-            | TextCapture ''' res 
-            | Num res ->
+            | CaptureString '"' res
+            | CaptureString ''' res 
+            | Num res
+            | CaptureUnknown endUnknownChars res ->
                 let v, rem = res 
                 match v with
                 | Some value -> parseProgramInner rem (SubExpression (value :: cSubExpr) :: rSubExprs) currentCaptures
                 | None -> parseProgramInner rem result currentCaptures
-            | FreeToken ["."; " "; "("; ")"; ","; "."; "]"; "["; "\r"; "\n"; "\t"] (token, rem) ->
-                parseProgramInner rem (SubExpression (Unknown token :: cSubExpr) :: rSubExprs) currentCaptures
             | str -> parseProgramInner (str.Subwindow(1)) result currentCaptures
         | _ -> failwith "Expected a SubExpression"
     let _, res = parseProgramInner (StringWindow(startText, 0)) [SubExpression []] [] in res

@@ -335,6 +335,12 @@ let ``should support nested tuples internally`` () =
     let predicate = buildExpr<unit,bool> "((1,2), (3,4), (5,6)).[1] = (3,4)"
     Assert.True(predicate())
 
+[<Fact>]
+let ``expressions should not need spaces`` () = 
+    let predicate = buildExpr<unit,int> "3+5"
+    let result = predicate ()
+    Assert.Equal(8, result)  
+
 //
 // Wish List / Ideas
 //

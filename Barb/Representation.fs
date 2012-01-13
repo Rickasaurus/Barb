@@ -12,10 +12,10 @@ type BarbSettings =
 
 type MethodSig = ((obj array -> obj) * Type array) list
 
-type TupleStruct =
-   struct
-      val Items: obj array
-   end
+//type TupleStruct =
+//   struct
+//      val Items: obj array
+//   end
 
 type ExprTypes = 
     | Unit
