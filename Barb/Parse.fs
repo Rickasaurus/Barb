@@ -42,20 +42,6 @@ type StringWindow =
         member t.Item with get(x) = t.Text.[x + t.Offset]
         override t.ToString () = t.Text.Substring(t.Offset) 
 
-let (|Skip|_|) (mStr: string) (text: StringWindow) =
-    if text.StartsWith(mStr) then 
-        Some (None, text.Subwindow(mStr.Length))
-    else None
-
-let (|StrToVal|_|) (mStr: string) (result: ExprTypes) (text: StringWindow) =
-    if text.StartsWith(mStr) then 
-        Some (Some(result), text.Subwindow(mStr.Length))
-    else None
-
-let (|StrsToVal|_|) (mStrs: string list) (result: ExprTypes) (text: StringWindow) =
-    match mStrs |> List.tryFind (fun mStr -> text.StartsWith(mStr)) with
-    | Some (matched) -> Some (Some(result), text.Subwindow(matched.Length))
-    | None -> None
 
 type DelimType =
     | Open
@@ -177,13 +163,45 @@ let allExpressionTypes =
 //        { Pattern = [SCap "loop"; SCap "{"; SCap "}"];              Func = generateLoop }
     ]
 
-let startingExpressionType =
-    { Pattern = [Open]; Func = (fun exprs -> SubExpression exprs) }
+let allSimpleTypes = 
+    [
+        ["."], Invoke
+        ["()"], Unit
+        ["null"], Obj null
+        ["true"], Obj true
+        ["false"], Obj false
+        ["=="; "="], Infix (3, objectsEqual)
+        ["<>"; "!="], Infix (3, objectsNotEqual)
+        [">="], Infix (3, compareObjects (>=))
+        ["<="], Infix (3, compareObjects (<=))
+        [">"], Infix (3, compareObjects (>))
+        ["<"], Infix (3, compareObjects (<))
+        ["!"; "not"], Prefix notOp
+        ["&"; "&&"; "and"], Infix (4, andOp)
+        ["|"; "||"; "or"], Infix (4, orOp)
+        ["/"], Infix (1, divideObjects)
+        ["*"], Infix (1, multObjects)
+        ["+"], Infix (2, addObjects)
+        ["-"], Infix (2, subObjects)
+    ]
 
-let (|FirstExpression|_|) (typesStack: SubexpressionType list) (text: StringWindow) =
-    match typesStack with
-    | [] -> Some (startingExpressionType, text)
-    | _ -> None
+let (|Skip|_|) (skipStrs: string list) (text: StringWindow) =
+    skipStrs 
+    |> List.tryFind (fun sstr -> text.StartsWith(sstr))
+    |> Option.map (fun m -> None, text.Subwindow(m.Length))
+
+
+let (|MapSymbol|_|) (text: StringWindow) =
+    let matches, str = 
+        [
+            for matchStrs, expr in allSimpleTypes do
+                for matchStr in matchStrs do
+                    if text.StartsWith(matchStr) then yield matchStr, expr
+        ] |> List.allMaxBy (fun (m, expr) -> m.Length)
+    match matches with
+    | [] -> None
+    | [(matched, expr)] -> Some (Some(expr), text.Subwindow(matched.Length))
+    | _ -> failwith (sprintf "Ambiguous symbol match: %A" matches)
 
 let (|NewExpression|_|) (typesStack: SubexpressionType list) (text: StringWindow) =
     let matches, str = 
@@ -273,28 +291,8 @@ let parseProgram (startText: string) =
             | NewExpression currentCaptures (subtype, crem) ->
                 let rem, value = parseProgramInner crem [SubExpression []] (subtype :: currentCaptures)               
                 parseProgramInner rem (SubExpression (value :: cSubExpr) :: rSubExprs) currentCaptures
-            | Skip " " res
-            | Skip "\t" res
-            | Skip "\r" res
-            | Skip "\n" res
-            | StrToVal "." Invoke res
-            | StrToVal "()" Unit res
-            | StrToVal "null" (Obj null) res
-            | StrToVal "true" (Obj true) res 
-            | StrToVal "false" (Obj false) res 
-            | StrsToVal ["=="; "="] (Infix (3, objectsEqual)) res 
-            | StrsToVal ["<>"; "!="] (Infix (3, objectsNotEqual)) res
-            | StrToVal ">=" (Infix (3, compareObjects (>=))) res
-            | StrToVal "<=" (Infix (3, compareObjects (<=))) res
-            | StrToVal ">" (Infix (3, compareObjects (>))) res
-            | StrToVal "<" (Infix (3, compareObjects (<))) res 
-            | StrsToVal ["!"; "not"] (Prefix notOp) res
-            | StrsToVal ["&"; "&&"; "and"] (Infix (4, andOp)) res
-            | StrsToVal ["|"; "||"; "or"] (Infix (4, orOp)) res 
-            | StrToVal "/" (Infix (1, divideObjects)) res
-            | StrToVal "*" (Infix (1, multObjects)) res
-            | StrToVal "+" (Infix (2, addObjects)) res 
-            | StrToVal "-" (Infix (2, subObjects)) res
+            | Skip [" "; "\t"; "\r"; "\n"] res
+            | MapSymbol res
             | TextCapture '"' res
             | TextCapture ''' res 
             | Num res ->
