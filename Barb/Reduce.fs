@@ -127,14 +127,18 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
     and reduceExpressions lleft lright (bindings: (string, ExprTypes Lazy) Map) =
         match lleft, lright with
         | left, Unresolved(expr) :: rt -> reduceExpressions (expr :: left) rt bindings
-        | left, (Binding (name, expr) :: rt) ->
+        | left, (Binding (name, expr) :: rt)  ->
             match reduceExpressions [] [expr] bindings with
             // Lambda Binding, may be recursive
             | Lambda(p,a,lexpr) :: [] when not finalReduction -> 
-                let recLambda = Binding(name, Lambda(p,a,SubExpression [Binding(name, Lambda(p,a,lexpr)); lexpr])) |> Unresolved
+                let cleanBinds = p |> List.fold (fun bnds pn -> if bnds |> Map.containsKey pn then bnds |> Map.remove pn else bnds) bindings         
+                let reducedExpr = reduceExpressions [] [lexpr] cleanBinds |> SubExpression
+                let recLambda = Binding(name, Lambda(p,a,SubExpression [Binding(name, Lambda(p,a,reducedExpr)); reducedExpr])) |> Unresolved
                 reduceExpressions left (recLambda :: rt) bindings
             // Normal Value Binding
-            | rexpr -> let newbindings = bindings |> Map.add name (lazy SubExpression rexpr) in reduceExpressions left rt newbindings
+            | rexpr -> 
+                let newbindings = bindings |> Map.add name (lazy SubExpression rexpr) in
+                    reduceExpressions left rt newbindings
         | ResolveSingle bindings (res, lt, rt)
         | ResolveTuple bindings (res, lt, rt) 
         | ResolveTriple (res, lt, rt) -> reduceExpressions lt (res :: rt) bindings

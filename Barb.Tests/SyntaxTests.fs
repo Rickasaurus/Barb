@@ -206,12 +206,18 @@ let ``should support internal use of lambdas with more than one parameter`` () =
     Assert.True(result) 
 
 [<Fact>]
-let ``lambda parameters should scope external bindings`` () = 
+let ``lambda parameters should close over external bindings`` () = 
+    let testRecord = { HasHat = false; Name = "Don" }
+    let predicate = buildExpr<BoolRec,bool> "let x = 1 in let fy = (fun y -> x = 1) in fy Name"
+    let result = predicate testRecord
+    Assert.True(result) 
+
+[<Fact>]
+let ``lambda parameters should subscope external bindings`` () = 
     let testRecord = { HasHat = false; Name = "Don" }
     let predicate = buildExpr<BoolRec,bool> "let x = 1 in let fx = (fun x -> x = \"Don\") in fx Name"
     let result = predicate testRecord
     Assert.True(result) 
-
 
 [<Fact>]
 let ``should support int addition`` () = 

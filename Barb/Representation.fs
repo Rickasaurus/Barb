@@ -33,6 +33,7 @@ type ExprTypes =
     | AppliedInvoke of string
     | Unknown of string
     | Binding of string * ExprTypes
+    // Lambda: Parameters, Args, Contents
     | Lambda of string list * ExprTypes list * ExprTypes
     | IfThenElse of ExprTypes list * ExprTypes list * ExprTypes list
     | Generator of ExprTypes * ExprTypes * ExprTypes
