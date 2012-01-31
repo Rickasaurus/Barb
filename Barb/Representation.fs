@@ -6,9 +6,15 @@ open System.Collections.Generic
 type BarbSettings = 
     {
         BindGlobalsWhenReducing: bool
+        Namespaces: string Set
         AdditionalBindings: IDictionary<string,obj>
     }
-    with static member Default = { BindGlobalsWhenReducing = true; AdditionalBindings = [] |> dict }
+    with static member Default = 
+        { 
+            BindGlobalsWhenReducing = true
+            AdditionalBindings = [] |> dict
+            Namespaces = [null; ""; "System"] |> Set.ofList
+        }
 
 type MethodSig = ((obj array -> obj) * Type array) list
 

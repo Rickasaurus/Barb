@@ -99,14 +99,15 @@ let cachedResolveMember =
     let resolveMember (rtype, caseName) = resolveMember rtype caseName
     memoizeBy inputToKey resolveMember
 
-let getTypeByName (typename: string) = 
-    AppDomain.CurrentDomain.GetAssemblies() 
+let getTypeByName (namespaces: string Set) (typename: string) = 
+    AppDomain.CurrentDomain.GetAssemblies()  
     |> Seq.collect (fun a -> a.GetTypes())
     |> Seq.filter (fun typ -> typ.Name = typename)
+    |> Seq.filter (fun typ -> namespaces.Contains(typ.Namespace))
     |> Seq.toList
 
-let resolveStatic (rtypename: string) (memberName: string) : ExprTypes option =
-    match getTypeByName rtypename with
+let resolveStatic (namespaces: string Set) (rtypename: string) (memberName: string) : ExprTypes option =
+    match getTypeByName namespaces rtypename with
     | [] -> None
     | rtype :: [] ->        
         rtype.GetProperty(memberName) |> nullableToOption |> Option.map propertyToExpr
@@ -117,8 +118,8 @@ let resolveStatic (rtypename: string) (memberName: string) : ExprTypes option =
 
 // Note: may not properly fail if types are loaded later, but I'm willing to sacrifice this for now in the name of complexity reduction
 let cachedResolveStatic =
-    let inputToKey (typename, membername) = typename + "~" + membername
-    let resolveMember (typename, membername) = resolveStatic typename membername
+    let inputToKey (namespaces, typename, membername) = typename + "~" + membername
+    let resolveMember (namespaces, typename, membername) = resolveStatic namespaces typename membername
     memoizeBy inputToKey resolveMember
 
 let resolveInvoke (o: obj) (memberName: string) =
