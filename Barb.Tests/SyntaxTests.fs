@@ -1,4 +1,4 @@
-﻿module PredicateLanguage
+﻿module Barb.Tests.PredicateLanguage
 
 open Barb.Compiler
 

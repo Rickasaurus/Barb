@@ -1,4 +1,4 @@
-﻿module PredicateLanguageInteropTests
+﻿module Barb.Tests.PredicateLanguageInteropTests
 
 open System
 
@@ -216,7 +216,7 @@ type StaticTestThingy () =
 
 [<Fact>]
 let ``when binding globals before execution should cause them to only be bound once`` () =
-    let settings = { BarbSettings.Default with BindGlobalsWhenReducing = true }
+    let settings = { BarbSettings.Default with BindGlobalsWhenReducing = true; Namespaces = BarbSettings.Default.Namespaces |> Set.add "Barb.Tests" }
     let func = buildExprWithSettings<unit, int> settings "StaticTestThingy.IncrementAndReturn"
     Assert.Equal(func(), 1)
     Assert.Equal(func(), 1)
