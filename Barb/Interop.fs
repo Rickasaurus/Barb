@@ -11,6 +11,8 @@ open System.Collections.Concurrent
 open System.Collections.Generic
 open System.Runtime.CompilerServices
 
+open System.Linq.Expressions
+
 open Barb.Helpers
 open Barb.Representation
 
@@ -41,7 +43,7 @@ let (|DecomposeOption|_|) (o: obj) =
         | _ -> None  
        
 let (|SupportedNumberType|_|) (input: obj) =
-    match input with
+    match input with    
     | (:? byte as num) -> Some (int64 (int num) :> obj)
     | (:? sbyte as num) -> Some (int64 (int num) :> obj)
     | (:? int16 as num) -> Some (int64 (int32 num) :> obj)
@@ -64,8 +66,9 @@ let rec resolveResultType (output: obj) =
     | other -> Obj other
 
 let fieldToExpr (fld: FieldInfo) =
-    fun (obj: obj) -> fld.GetValue(obj, null) |> Returned
-
+    fun (obj: obj) ->
+        fld.GetValue(obj, null) |> Returned
+    
 let propertyToExpr (prop: PropertyInfo) =
     match prop.GetIndexParameters() with
     | [||] -> (fun obj -> prop.GetValue(obj, null) |> Returned)
@@ -161,29 +164,6 @@ let convertToTargetType (ttype: Type) (param: obj) =
         match des.CanConvertFrom(param.GetType()) with
         | true -> Some <| des.ConvertFrom(param)
         | false -> try Some <| System.Convert.ChangeType(param, ttype) with _ -> None
-
-// DOES NOT WORK
-// Array.ConvertAll<obj array, int array>(x, (fun y -> Array.ConvertAll<obj, int>(y, (fun o -> o :?> int))));;
-let cachedArrayBuilder = new CachingReflectiveArrayBuilder()
-let convertToArrayType (ttype: Type) (param: obj) =
-    let rec inner (ptype: Type) (ttype: Type) =
-        match ptype.GetElementType(), ttype.GetElementType() with
-        | null, null -> (fun (o: obj) -> convertToTargetType ttype o |> function | Some res -> res | None -> failwith "convert failed")
-        | null, _
-        | _, null -> failwith "nope"
-        | pet, tet ->
-            printfn "%s, %s" ptype.Name ttype.Name
-            let cfunc =
-                (fun p -> 
-                    printfn "%s - %s" ptype.Name ttype.Name
-                    typeof<Array>
-                     .GetMethod("ConvertAll", BindingFlags.Public ||| BindingFlags.Static)
-                     .MakeGenericMethod([|ptype; ttype|])
-                     .Invoke(null, [|p; inner pet tet|]))
-            cfunc
-    let cfunc = inner (param.GetType()) ttype 
-    cfunc param
-// DOES NOT WORK
 
 let executeUnitMethod (sigs: MethodSig) =
     sigs 
@@ -294,7 +274,7 @@ let orOp (obj1: obj) (obj2: obj) =
     | (:? bool as b1), (:? bool as b2) -> box (b1 || b2)
     | w1, w2 -> failwith (sprintf "Unexcepted arguments for 'or' operation: %A or %A" w1 w2)  
 
-open System.Numerics
+open System.Numerics  
 
 let addObjects (obj1: obj) (obj2: obj) =
     if obj1 = null || obj2 = null then failwith "Unexpected null in addition"

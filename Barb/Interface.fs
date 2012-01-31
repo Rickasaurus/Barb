@@ -1,7 +1,6 @@
 ﻿namespace Barb
 
 // TODO:
-// Add option to disable optimization (for mutable interactions)
 // Add "global world" bindings which can be optimzied 
 
 open System
@@ -17,53 +16,70 @@ open Barb.Reduce
 
 module Compiler =
 
-    let buildExpression (localType: Type) (predicate: string) (settings: BarbSettings) : (obj -> obj) =
+    let parse (settings: BarbSettings) (predicate: string) : BarbData = 
+        
+        let parsedTokens = parseProgram predicate
 
+        #if DEBUG
+        printfn ""; printfn "PT: %A" parsedTokens; printfn ""
+        #endif
+
+        { BarbData.Default with Contents = [parsedTokens]; Settings = settings }
+
+    let reduce (parsed: BarbData) : BarbData =
+
+        let additionalBindings =
+            parsed.Settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, lazy (Obj kv.Value))
+
+        let reducedExpression = 
+            resolveExpression parsed.Contents Map.empty parsed.Settings false |> List.rev
+
+        #if DEBUG
+        printfn ""; printfn "RE: %A" reducedExpression; printfn ""
+        #endif
+           
+        { parsed with Contents = reducedExpression }
+
+    let setInput (inputType: Type) (data: BarbData) : BarbData =
+        { data with InputType = inputType }
+
+    let setOutput (outputType: Type) (data: BarbData) : BarbData =
+        { data with OutputType = outputType }
+
+    let toFunction (data: BarbData) : (obj -> obj) =
         let memberMap =
-            resolveMembers localType (BindingFlags.Instance ||| BindingFlags.Static ||| BindingFlags.NonPublic ||| BindingFlags.Public)
+            resolveMembers data.InputType (BindingFlags.Instance ||| BindingFlags.Static ||| BindingFlags.NonPublic ||| BindingFlags.Public)
             |> Map.ofSeq
         
         let additionalBindings =
-            settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, lazy (Obj kv.Value))
-              
-        let parsedTokens = parseProgram predicate
-
-    #if DEBUG
-        printfn ""
-        printfn "PT: %A" parsedTokens
-        printfn ""
-    #endif
-
-        let reducedExpression = 
-            if settings.OptimizeForImmutability then
-                resolveExpression [parsedTokens] Map.empty false |> List.rev
-            else [parsedTokens]
-
-    #if DEBUG
-        printfn ""
-        printfn "RE: %A" reducedExpression
-        printfn ""
-    #endif
-
+            data.Settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, lazy (Obj kv.Value))
+                    
         let calculateResult input = 
             let inputBindings =
                 additionalBindings               
                 |> Seq.fold (fun s (k,v) -> s |> Map.add k v )
-                    (memberMap |> Map.map (fun k prop -> lazy (prop input)))
-    
-    #if DEBUG
+                    (memberMap |> Map.map (fun k prop -> lazy (prop input)))        
+
+            #if DEBUG
             printfn ""
             printfn "IB: %A" inputBindings
             printfn ""
-    #endif
+            #endif
 
-            resolveExpression reducedExpression inputBindings true
+            resolveExpression data.Contents inputBindings data.Settings true
             |> resolveExpressionResult
 
-        calculateResult
+        fun input -> 
+            let naiveResult = calculateResult input
+            naiveResult
+            |> convertToTargetType data.OutputType 
+            |> function 
+               | Some (typedRes) -> typedRes       
+               | None -> naiveResult
 
     let buildExprWithSettings<'I, 'O> settings predicate =
-        let expression = buildExpression typeof<'I> predicate settings
+        let buildFunction = parse settings >> reduce >> setInput typeof<'I> >> setOutput typeof<'O> >> toFunction
+        let expression = buildFunction predicate 
         fun (input : 'I) -> 
             match expression input with
             | :? 'O as result -> result
@@ -73,7 +89,7 @@ module Compiler =
                                | None -> failwith (sprintf "Unexpected output type/format: %A/%s" untypedRes (untypedRes.GetType().Name))
 
     let buildExpr<'I,'O> predicate =
-        buildExprWithSettings<'I,'O> BarbSettings.Default predicate
+        buildExprWithSettings<'I,'O> BarbSettings.Default predicate   
 
 type BarbFunc<'I,'O> (predicate, ?settings) =
     let settings = defaultArg settings BarbSettings.Default

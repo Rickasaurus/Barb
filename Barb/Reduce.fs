@@ -21,7 +21,7 @@ let resolveExpressionResult (input: ExprTypes list) =
     | Tuple (items) :: [] -> tupleToObj items |> box
     | otherTokens -> failwith (sprintf "Unexpected result: %A" otherTokens)
 
-let resolveExpression exprs initialBindings (finalReduction: bool) = 
+let resolveExpression exprs initialBindings settings (finalReduction: bool) = 
 
     let rec applyArgToLambda bindings lambda (arg: obj) =
         let prms, eargs, expr = lambda
@@ -99,7 +99,7 @@ let resolveExpression exprs initialBindings (finalReduction: bool) =
             | Prefix l, Obj r -> Obj (l r) |> Some
             | Method l, Unit -> executeUnitMethod l
             | Method l, Obj r -> executeParameterizedMethod l r 
-            | Unknown l, AppliedInvoke r when finalReduction -> cachedResolveStatic (l, r)
+            | Unknown l, AppliedInvoke r when finalReduction || settings.BindGlobalsWhenReducing -> cachedResolveStatic (l, r)
             | Invoke, Unknown r -> AppliedInvoke r |> Some
             | Invoke, IndexArgs r -> IndexArgs r |> Some // Here for F#-like indexing (if you want it)            
             | Obj l, AppliedInvoke r when finalReduction -> resolveInvoke l r

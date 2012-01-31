@@ -257,7 +257,7 @@ let ``should support decimal subtraction`` () =
     Assert.True(result)
     
 [<Fact>]
-let ``should support decimal div.0ision`` () = 
+let ``should support decimal division`` () = 
     let predicate = buildExpr<unit,bool> "4 / 2.0 = 2.0"
     let result = predicate ()
     Assert.True(result) 

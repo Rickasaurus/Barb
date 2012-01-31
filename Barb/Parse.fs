@@ -136,24 +136,6 @@ let generateNumIterator =
         Generator (SubExpression(starte), SubExpression(inc), SubExpression(ende))        
     | list -> failwith (sprintf "Incorrect generator syntax: %A" list)
 
-//let rec extractUnknowns exprs unknowns =
-//    match exprs with
-//    | [] -> unknowns
-//    | Unknown u :: rest -> extract rest [u :: unknowns]
-//    | _ :: rest -> extractUnknowns rest unknowns
-
-//let rec extractTopBindings exprs unknowns =
-//    match exprs with
-//    | [] -> unknowns
-//    | Binding b :: rest -> extract rest [b :: unknowns]
-//    | _ :: rest -> extractUnknowns rest unknowns
-
-//let generateLoop = 
-//    function
-//    | SubExpression(contents) :: SubExpression(predicate) :: SubExpression([]) :: [] ->
-//        let topBindings = extractTopBindings contents
-//    | list -> failwith (sprintf "Incorrect while syntax %A" list)
-
 let whitespaceVocabulary = [" "; "\t"; "\r"; "\n"] 
 
 let allExpressionTypes = 
@@ -167,7 +149,6 @@ let allExpressionTypes =
         { Pattern = [SCap "["; SCap "]"];                           Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
         { Pattern = [SCap "let"; SCap "="; SCap "in"];              Func = generateBind }
         { Pattern = [SCap "var"; SCap "="; SCap "in"];              Func = generateBind }
-//        { Pattern = [SCap "loop"; SCap "{"; SCap "}"];              Func = generateLoop }
     ]
 
 let allSimpleMappings = 

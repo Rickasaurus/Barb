@@ -3,6 +3,7 @@
 open System
 
 open Barb.Compiler
+open Barb.Representation
 
 open Xunit
 
@@ -207,6 +208,19 @@ let ``records contents should be resolved within lambdas`` () =
     let func = buildExpr<StrArrayType, int> "let f = (fun i -> if i >= Strs.Length then 0 else (f (i + 1)) + Strs.[i].Length) in f 0"
     let res = func { Strs = [|"1"; "22"; "333" |] }
     Assert.Equal(6, res)
+
+type StaticTestThingy () =
+    static let mutable x = 0
+    static member IncrementAndReturn 
+        with get () = x <- x + 1; x
+
+[<Fact>]
+let ``when binding globals before execution should cause them to only be bound once`` () =
+    let settings = { BarbSettings.Default with BindGlobalsWhenReducing = true }
+    let func = buildExprWithSettings<unit, int> settings "StaticTestThingy.IncrementAndReturn"
+    Assert.Equal(func(), 1)
+    Assert.Equal(func(), 1)
+    Assert.Equal(func(), 1)
 
 //
 // Wish List / Ideas

@@ -5,17 +5,12 @@ open System.Collections.Generic
 
 type BarbSettings = 
     {
-        OptimizeForImmutability: bool
+        BindGlobalsWhenReducing: bool
         AdditionalBindings: IDictionary<string,obj>
     }
-    with static member Default = { OptimizeForImmutability = true; AdditionalBindings = [] |> dict }
+    with static member Default = { BindGlobalsWhenReducing = true; AdditionalBindings = [] |> dict }
 
 type MethodSig = ((obj array -> obj) * Type array) list
-
-//type TupleStruct =
-//   struct
-//      val Items: obj array
-//   end
 
 type ExprTypes = 
     | Unit
@@ -41,3 +36,12 @@ type ExprTypes =
     | Resolved of ExprTypes
     // Has Unknowns
     | Unresolved of ExprTypes
+
+type BarbData = 
+    {
+        InputType: Type
+        OutputType: Type
+        Contents: ExprTypes list
+        Settings: BarbSettings
+    }
+    with static member Default = { InputType = typeof<unit>; OutputType = typeof<unit>; Contents = []; Settings = BarbSettings.Default }
