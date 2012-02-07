@@ -222,6 +222,16 @@ let ``when binding globals before execution should cause them to only be bound o
     Assert.Equal(func(), 1)
     Assert.Equal(func(), 1)
 
+[<Fact>]
+let ``should be able to create new objects with new`` () =
+    let func = buildExpr<unit,bool> "new Uri(\"http://twitter.com\").IsWellFormedOriginalString()"
+    Assert.True(func())
+
+[<Fact>]
+let ``should be able to create new objects without new`` () =
+    let func = buildExpr<unit,bool> "Uri(\"http://twitter.com\").IsWellFormedOriginalString()"
+    Assert.True(func())
+
 //
 // Wish List / Ideas
 //

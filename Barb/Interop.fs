@@ -121,19 +121,20 @@ let resolveStatic (namespaces: string Set) (rtypename: string) (memberName: stri
         |> function | Some (objToExpr) -> Some (objToExpr null) | None -> failwith (sprintf "Member name of %s was ambiguous: %s" rtypename memberName)            
     | manytype -> failwith (sprintf "Type name was ambiguous: %s" rtypename) 
 
-let executeConstructor (namespaces: string Set) (rtypename: string) (parameters: obj) : ExprTypes option =
-    let args = convertPotentiallyTupled parameters
-    let paramTypes = args |> Array.map (fun p -> p.GetType())
-    match getTypeByName namespaces rtypename with
-    | [] -> None
-    | rtype :: [] -> rtype.GetConstructor paramTypes |> nullableToOption |> Option.map (fun ctor -> ctor.Invoke(args) |> Obj )         
-    | manytype -> failwith (sprintf "Type name was ambiguous: %s" rtypename) 
-
 // Note: may not properly fail if types are loaded later, but I'm willing to sacrifice this for now in the name of complexity reduction
 let cachedResolveStatic =
     let inputToKey (namespaces, typename, membername) = typename + "~" + membername
     let resolveMember (namespaces, typename, membername) = resolveStatic namespaces typename membername
     memoizeBy inputToKey resolveMember
+
+let executeConstructor (namespaces: string Set) (rtypename: string) (parameters: obj) : ExprTypes option =
+    match getTypeByName namespaces rtypename with
+    | [] -> None
+    | rtype :: [] -> 
+        let args = convertPotentiallyTupled parameters
+        let paramTypes = args |> Array.map (fun p -> p.GetType())
+        rtype.GetConstructor paramTypes |> nullableToOption |> Option.map (fun ctor -> ctor.Invoke(args) |> Obj )         
+    | manytype -> failwith (sprintf "Type name was ambiguous: %s" rtypename) 
 
 let resolveInvoke (o: obj) (memberName: string) =
     if o = null then None
