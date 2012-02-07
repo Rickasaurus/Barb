@@ -155,6 +155,7 @@ let allSimpleMappings =
     [
         ["."], Invoke
         ["()"], Unit
+        ["new"], New
         ["null"], Obj null
         ["true"], Obj true
         ["false"], Obj false
@@ -299,7 +300,6 @@ let parseProgram (startText: string) =
                     let rem, value = parseProgramInner crem [SubExpression []] (subtype :: currentCaptures)               
                     parseProgramInner rem (SubExpression (value :: cSubExpr) :: rSubExprs) currentCaptures
                 | Skip whitespaceVocabulary res
-                | Skip ["new"] res
                 | MapSymbol res
                 | CaptureString '"' res
                 | CaptureString ''' res 

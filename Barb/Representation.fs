@@ -21,6 +21,7 @@ type MethodSig = ((obj array -> obj) * Type array) list
 type ExprTypes = 
     | Unit
     | Invoke
+    | New
     | Method of MethodSig
     | IndexedProperty of MethodSig
     | Obj of obj

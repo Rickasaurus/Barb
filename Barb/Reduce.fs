@@ -100,6 +100,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
             | Method l, Unit -> executeUnitMethod l
             | Method l, Obj r -> executeParameterizedMethod l r 
             | Unknown l, AppliedInvoke r when finalReduction || settings.BindGlobalsWhenReducing -> cachedResolveStatic (settings.Namespaces, l, r)
+            | New, Unknown r -> Unknown r |> Some
             | Unknown l, Obj r -> executeConstructor settings.Namespaces l r
             | Invoke, Unknown r -> AppliedInvoke r |> Some
             | Invoke, IndexArgs r -> IndexArgs r |> Some // Here for F#-like indexing (if you want it)            
