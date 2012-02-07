@@ -45,7 +45,6 @@
     <Compile Include="Parse.fs" />
     <Compile Include="Reduce.fs" />
     <Compile Include="Interface.fs" />
-    <EmbeddedResource Include="DefaultLib.txt" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />

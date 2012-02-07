@@ -58,6 +58,11 @@ let (|SupportedNumberType|_|) (input: obj) =
     | (:? single as num) -> Some (float num :> obj)
     | value -> None
 
+let convertPotentiallyTupled  (args: obj) =
+    match args with
+    | :? (obj array) as tuple -> tuple
+    | _ as o -> [| o |]
+
 let rec resolveResultType (output: obj) = 
     match output with
     | null -> Obj null
@@ -116,6 +121,14 @@ let resolveStatic (namespaces: string Set) (rtypename: string) (memberName: stri
         |> function | Some (objToExpr) -> Some (objToExpr null) | None -> failwith (sprintf "Member name of %s was ambiguous: %s" rtypename memberName)            
     | manytype -> failwith (sprintf "Type name was ambiguous: %s" rtypename) 
 
+let executeConstructor (namespaces: string Set) (rtypename: string) (parameters: obj) : ExprTypes option =
+    let args = convertPotentiallyTupled parameters
+    let paramTypes = args |> Array.map (fun p -> p.GetType())
+    match getTypeByName namespaces rtypename with
+    | [] -> None
+    | rtype :: [] -> rtype.GetConstructor paramTypes |> nullableToOption |> Option.map (fun ctor -> ctor.Invoke(args) |> Obj )         
+    | manytype -> failwith (sprintf "Type name was ambiguous: %s" rtypename) 
+
 // Note: may not properly fail if types are loaded later, but I'm willing to sacrifice this for now in the name of complexity reduction
 let cachedResolveStatic =
     let inputToKey (namespaces, typename, membername) = typename + "~" + membername
@@ -160,6 +173,7 @@ and convertToSameType (obj1: obj) (obj2: obj) : (obj * obj) =
 
 let convertToTargetType (ttype: Type) (param: obj) = 
     if param = null then Some null
+    elif ttype.IsGenericType then Some param
     else
         let des = TypeDescriptor.GetConverter(ttype)
         match des.CanConvertFrom(param.GetType()) with
@@ -181,13 +195,12 @@ let executeIndexer (sigs: MethodSig) (param: obj) =
     |> Option.map (fun (exec, converted) -> exec [| converted |])
     |> Option.map Returned
 
+
 let executeParameterizedMethod (sigs: MethodSig) (args: obj) =
-    let arrayArgs =
-        match args with
-        | :? (obj array) as tuple -> tuple
-        | _ as o -> [| o |]
+    let arrayArgs = convertPotentiallyTupled args
     sigs
     |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = arrayArgs.Length)
+    |> Option.tryResolve (fun () -> sigs |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = 1))
     |> Option.map (fun (exec, paramTypes) -> 
         Array.zip paramTypes arrayArgs
         |> Array.map (fun (tType, param) -> convertToTargetType tType param)
