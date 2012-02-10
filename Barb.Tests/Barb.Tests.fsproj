@@ -51,6 +51,7 @@
     <Compile Include="InteropTests.fs" />
     <Compile Include="TextTests.fs" />
     <Compile Include="OOOTests.fs" />
+    <Compile Include="LibTests.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Barb\Barb.fsproj">

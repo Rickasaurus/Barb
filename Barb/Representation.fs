@@ -13,7 +13,7 @@ type BarbSettings =
         { 
             BindGlobalsWhenReducing = true
             AdditionalBindings = [] |> dict
-            Namespaces = [null; ""; "System"; "Microsoft.FSharp"; "Microsoft.FSharp.Collections"] |> Set.ofList
+            Namespaces = [null; ""; "System"; "Microsoft.FSharp"; "Microsoft.FSharp.Collections"; "Barb.Lib"] |> Set.ofList
         }
 
 type MethodSig = ((obj array -> obj) * Type array) list
