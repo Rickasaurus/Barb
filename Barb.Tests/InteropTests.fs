@@ -79,20 +79,20 @@ type PropIndexerTester<'a,'b when 'a : comparison> (map: Map<'a,'b>) =
 type IndexerRecord<'a,'b when 'a : comparison> = 
     {
         Name: string
-        Table: PropIndexerTester<'a,'b>
+        PropTable: PropIndexerTester<'a,'b>
     }
 
 [<Fact>]
 let ``should support property indexers`` () = 
-    let testRecord = { Name = "Dude Duderson"; Table = new PropIndexerTester<int,int>([0..5] |> List.map (fun i -> i, i) |> Map.ofList) }
-    let predicate = buildExpr<IndexerRecord<int,int>,bool> "Table.Item[0] = 0"
+    let testRecord = { Name = "Dude Duderson"; PropTable = new PropIndexerTester<int,int>([0..5] |> List.map (fun i -> i, i) |> Map.ofList) }
+    let predicate = buildExpr<IndexerRecord<int,int>,bool> "PropTable.Item[0] = 0"
     let result = predicate testRecord
     Assert.True(result)    
 
 [<Fact>]
 let ``should support property indexers with strings`` () = 
-    let testRecord = { Name = "Dude Duderson"; Table = new PropIndexerTester<string,string>(["one"; "two"; "three"] |> List.map (fun i -> i, i) |> Map.ofList) }
-    let predicate = buildExpr<IndexerRecord<string,string>,bool> "Table.Item[\"two\"] = \"two\""
+    let testRecord = { Name = "Dude Duderson"; PropTable = new PropIndexerTester<string,string>(["one"; "two"; "three"] |> List.map (fun i -> i, i) |> Map.ofList) }
+    let predicate = buildExpr<IndexerRecord<string,string>,bool> "PropTable.Item[\"two\"] = \"two\""
     let result = predicate testRecord
     Assert.True(result)    
 

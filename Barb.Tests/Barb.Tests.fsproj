@@ -35,6 +35,19 @@
     <WarningLevel>3</WarningLevel>
     <DocumentationFile>bin\Release\Barb.Tests.XML</DocumentationFile>
   </PropertyGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\FSharp\1.0\Microsoft.FSharp.Targets" Condition="!Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
+  <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets" Condition=" Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
+  <ItemGroup>
+    <Compile Include="ParseTests.fs" />
+    <Compile Include="SyntaxTests.fs" />
+    <Compile Include="InteropTests.fs" />
+    <Compile Include="TextTests.fs" />
+    <Compile Include="OOOTests.fs" />
+    <Compile Include="LibTests.fs" />
+    <None Include="TSVTableTestFile.tsv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
   <ItemGroup>
     <Reference Include="mscorlib" />
     <Reference Include="FSharp.Core" />
@@ -44,24 +57,12 @@
     <Reference Include="xunit">
       <HintPath>..\tools\xunit\xunit.dll</HintPath>
     </Reference>
-  </ItemGroup>
-  <ItemGroup>
-    <Compile Include="ParseTests.fs" />
-    <Compile Include="SyntaxTests.fs" />
-    <Compile Include="InteropTests.fs" />
-    <Compile Include="TextTests.fs" />
-    <Compile Include="OOOTests.fs" />
-    <Compile Include="LibTests.fs" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Barb\Barb.fsproj">
       <Name>Barb</Name>
       <Project>{8909d27b-857d-4273-ba1a-c01236906fca}</Project>
       <Private>True</Private>
     </ProjectReference>
   </ItemGroup>
-  <Import Project="$(MSBuildExtensionsPath32)\FSharp\1.0\Microsoft.FSharp.Targets" Condition="!Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
-  <Import Project="$(MSBuildExtensionsPath32)\..\Microsoft F#\v4.0\Microsoft.FSharp.Targets" Condition=" Exists('$(MSBuildBinPath)\Microsoft.Build.Tasks.v4.0.dll')" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
 	     Other similar extension points exist, see Microsoft.Common.targets.
 	<Target Name="BeforeBuild">
