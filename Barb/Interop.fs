@@ -16,15 +16,6 @@ open System.Linq.Expressions
 open Barb.Helpers
 open Barb.Representation
 
-
-//let findAllExtensionMethods () = 
-//    AppDomain.CurrentDomain.GetAssemblies()   
-//    |> Seq.filter (fun a -> a.IsDefined(typeof<ExtensionAttribute>,false))
-//    |> Seq.collect (fun a -> a.GetTypes())
-//    |> Seq.filter (fun typ -> typ.IsSealed && not typ.IsNested)
-//    |> Seq.filter (fun typ -> typ.IsDefined(typeof<ExtensionAttribute>,false))
-//    |> Seq.collect (fun typ -> typ.GetMethods(BindingFlags.Static ||| BindingFlags.Public))
-
 let nullableToOption res =
     match res with
     | null -> None
@@ -41,7 +32,7 @@ let (|DecomposeOption|_|) (o: obj) =
             if gt = genericOptionType then t.InvokeMember("Value", bindingFlags, null, o, Array.empty) |> Some
             else None
         | _ -> None  
-       
+
 let (|SupportedNumberType|_|) (input: obj) =
     match input with    
     | (:? byte as num) -> Some (int64 (int num) :> obj)
@@ -58,6 +49,17 @@ let (|SupportedNumberType|_|) (input: obj) =
     | (:? single as num) -> Some (float num :> obj)
     | value -> None
 
+let (|ConvertSequence|_|) (o: obj) =
+    match o with
+    | (:? IEnumerable as enum) -> 
+        seq { 
+            for e in enum do
+                match e with
+                | SupportedNumberType num -> yield num
+                | other -> yield other
+        } |> Seq.toArray |> Some
+    | _ -> None
+
 let convertPotentiallyTupled  (args: obj) =
     match args with
     | :? (obj array) as tuple -> tuple
@@ -66,8 +68,10 @@ let convertPotentiallyTupled  (args: obj) =
 let rec resolveResultType (output: obj) = 
     match output with
     | null -> Obj null
+    | :? string -> Obj output
     | DecomposeOption contents -> resolveResultType contents
     | SupportedNumberType contents -> Obj contents
+    | ConvertSequence contents -> Obj contents
     | other -> Obj other
 
 let fieldToExpr (fld: FieldInfo) =
@@ -171,10 +175,10 @@ and convertToSameType (obj1: obj) (obj2: obj) : (obj * obj) =
                     | _ -> obj1, System.Convert.ChangeType(obj2, obj1.GetType())
     with _ -> failwith (sprintf "Failed to find a conversion for %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))   
 
-
 let convertToTargetType (ttype: Type) (param: obj) = 
     if param = null then Some null
-    elif ttype.IsGenericType then Some param
+    elif ttype.IsGenericTypeDefinition then Some param
+    elif ttype.IsAssignableFrom(param.GetType()) then Some param
     else
         let des = TypeDescriptor.GetConverter(ttype)
         match des.CanConvertFrom(param.GetType()) with
@@ -195,7 +199,6 @@ let executeIndexer (sigs: MethodSig) (param: obj) =
         |> Option.map (fun converted -> exec, converted))
     |> Option.map (fun (exec, converted) -> exec [| converted |])
     |> Option.map Returned
-
 
 let executeParameterizedMethod (sigs: MethodSig) (args: obj) =
     let arrayArgs = convertPotentiallyTupled args

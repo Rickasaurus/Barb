@@ -15,6 +15,22 @@ let ``should properly return false on hasIntersection`` () =
     let result = predicate ()
     Assert.False(result)
 
+type ArrayContainer = { Stuff: int array }
+
+[<Fact>] 
+let ``hasIntersection should work correctly on an external set`` () =
+    let arrayContainer = { Stuff = [| 4; 5 |] }
+    let predicate = buildExpr<ArrayContainer,bool> "Lib.hasIntersection (Stuff, (4,5))"
+    let result = predicate arrayContainer
+    Assert.True(result)
+
+[<Fact>] 
+let ``hasIntersection should work correctly on an empty set`` () =
+    let arrayContainer = { Stuff = [| |] }
+    let predicate = buildExpr<ArrayContainer,bool> "Lib.hasIntersection (Stuff, (4,5))"
+    let result = predicate arrayContainer
+    Assert.False(result)
+
 [<Fact>] 
 let ``should support union`` () =
     let predicate = buildExpr<unit,bool> "Lib.union ((1,2,3), (4,5)) = (1,2,3,4,5)"

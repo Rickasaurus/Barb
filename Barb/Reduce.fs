@@ -95,8 +95,8 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
         function 
         | l :: lt, r :: rt ->
             match l, r with
-            | Obj l, Postfix r -> Obj (r l) |> Some
-            | Prefix l, Obj r -> Obj (l r) |> Some
+            | Obj l, Postfix r -> Returned (r l) |> Some
+            | Prefix l, Obj r -> Returned (l r) |> Some
             | Method l, Unit -> executeUnitMethod l
             | Method l, Obj r -> executeParameterizedMethod l r 
             | Unknown l, AppliedInvoke r when finalReduction || settings.BindGlobalsWhenReducing -> cachedResolveStatic (settings.Namespaces, l, r)
