@@ -141,6 +141,13 @@ let ``should properly parse floating point numbers`` () =
     Assert.True(result)    
 
 [<Fact>]
+let ``should properly parse floating point numbers without a leading zero`` () = 
+    let testRecord = { Score = 0.90 }
+    let predicate = buildExpr<TestFloatRec,bool> "Score < .95"
+    let result = predicate testRecord
+    Assert.True(result)    
+
+[<Fact>]
 let ``should allow simple variable binding with let`` () = 
     let testRecord = { HasHat = true; Name = "Don" }
     let predicate = buildExpr<BoolRec,bool> "let x = true in x = HasHat"

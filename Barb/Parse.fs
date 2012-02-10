@@ -65,7 +65,7 @@ let whitespace = [| " "; "\r"; "\n"; "\t"; |]
 let (|Num|_|) (text: StringWindow) =
     let isnumchar c = c >= '0' && c <= '9' 
     let sb = new StringBuilder()
-    if isnumchar text.[0] then
+    if isnumchar text.[0] || (text.[0] = '.' && text.Length >= 2 && isnumchar text.[1]) then
         let rec inner = 
             function
             | i, dot when i >= text.Length -> i, dot
@@ -300,10 +300,10 @@ let parseProgram (startText: string) =
                     let rem, value = parseProgramInner crem [SubExpression []] (subtype :: currentCaptures)               
                     parseProgramInner rem (SubExpression (value :: cSubExpr) :: rSubExprs) currentCaptures
                 | Skip whitespaceVocabulary res
+                | Num res
                 | MapSymbol res
                 | CaptureString '"' res
                 | CaptureString ''' res 
-                | Num res
                 | CaptureUnknown endUnknownChars res ->
                     let v, rem = res 
                     match v with
