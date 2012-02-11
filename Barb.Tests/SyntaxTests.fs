@@ -354,13 +354,22 @@ let ``expressions should not need spaces`` () =
     let result = predicate ()
     Assert.Equal(8, result)  
 
+type InnerType = { Things: string array }
+type OuterType = { Stuff: InnerType }
+
+[<Fact>]
+let ``tuple parsing should not cause problems with nested property calls`` () =
+    let input = { Stuff = { Things = [|"one"; "two"; "three"|]} }
+    let predicate = buildExpr<OuterType, bool> "(Stuff.Things, ('four','five')) = (('one','two','three'),('four','five'))"
+    let result = predicate input
+    Assert.True(result)
 //
 // Wish List / Ideas
 //
 
 //[<Fact>] // Experimental
 let ``should support safe while syntax`` () = 
-    let predicate = buildExpr<unit,bool> "let x = 1 in { while x < 5 do x = x + 1 } x = 4"
+    let predicate = buildExpr<unit,bool> "let x = 1 in { while x < 5 do x <- x + 1 } x = 4"
     let result = predicate ()
     Assert.True(result)  
 
