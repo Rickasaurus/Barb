@@ -281,20 +281,22 @@ let parseProgram (startText: string) =
                 match str with
                 | FinishOpenExpression currentCaptures (subtype, crem) ->
                     let innerResult = SubExpression (cSubExpr |> List.rev) :: rSubExprs  
-                    let value = innerResult |> List.rev |> subtype.Func in crem, value         
+                    let value = innerResult |> List.rev |> subtype.Func in 
+                        crem, value         
                 | _ when str.Length = 0 -> str, SubExpression (SubExpression (cSubExpr |> List.rev) :: rSubExprs)            
                 | OngoingExpression currentCaptures (captures, crem) ->
                     match captures with
                     // Expression is Finished
                     | { Pattern = []; Func = func } :: parents -> 
                         let innerResult = SubExpression (cSubExpr |> List.rev) :: rSubExprs  
-                        let value = innerResult |> List.rev |> func in crem, value   
+                        let value = innerResult |> List.rev |> func in 
+                            crem, value   
                     // Expression Continues
                     | { Pattern = h :: rest; Func = _ } :: parents -> parseProgramInner crem (SubExpression [] :: SubExpression (cSubExpr |> List.rev) :: rSubExprs) captures
                     | [] -> failwith "Unexpected output from OngoingExpression"
                 | RefineOpenExpression currentCaptures (subtype, crem) ->
                     // Mid-Expression we've realized we're actually in a different kind.
-                    let rem, value = parseProgramInner crem (SubExpression [] :: cSubExpr) (subtype :: currentCaptures)               
+                    let rem, value = parseProgramInner crem (SubExpression [] :: SubExpression (cSubExpr |> List.rev) :: []) (subtype :: currentCaptures)               
                     parseProgramInner rem (SubExpression ([value]) :: rSubExprs) currentCaptures    
                 | NewExpression currentCaptures (subtype, crem) ->
                     let rem, value = parseProgramInner crem [SubExpression []] (subtype :: currentCaptures)               

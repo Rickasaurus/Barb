@@ -179,6 +179,7 @@ let convertToTargetType (ttype: Type) (param: obj) =
     if param = null then Some null
     elif ttype.IsGenericTypeDefinition then Some param
     elif ttype.IsAssignableFrom(param.GetType()) then Some param
+    elif ttype = typeof<IEnumerable> then Some ([| param |] |> box)
     else
         let des = TypeDescriptor.GetConverter(ttype)
         match des.CanConvertFrom(param.GetType()) with
