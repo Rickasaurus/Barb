@@ -178,6 +178,7 @@ and convertToSameType (obj1: obj) (obj2: obj) : (obj * obj) =
 let convertToTargetType (ttype: Type) (param: obj) = 
     if param = null then Some null
     elif ttype.IsGenericTypeDefinition then Some param
+    elif ttype = typeof<IEnumerable> && param.GetType() = typeof<string> then Some ([| param |] |> box)
     elif ttype.IsAssignableFrom(param.GetType()) then Some param
     elif ttype = typeof<IEnumerable> then Some ([| param |] |> box)
     else

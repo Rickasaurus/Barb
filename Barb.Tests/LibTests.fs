@@ -21,19 +21,25 @@ let ``hasIntersection should work one a single element`` () =
     let result = predicate ()
     Assert.True(result)
 
-type ArrayContainer = { Stuff: int array }
+[<Fact>] 
+let ``hasIntersection should work one a single string element`` () =
+    let predicate = buildExpr<unit,bool> "Lib.hasIntersection (('hello','duder'), ('duder'))"
+    let result = predicate ()
+    Assert.True(result)
+
+type ArrayContainer<'T> = { Stuff: 'T array }
 
 [<Fact>] 
 let ``hasIntersection should work correctly on an external set`` () =
     let arrayContainer = { Stuff = [| 4; 5 |] }
-    let predicate = buildExpr<ArrayContainer,bool> "Lib.hasIntersection (Stuff, (4,5))"
+    let predicate = buildExpr<ArrayContainer<int>,bool> "Lib.hasIntersection (Stuff, (4,5))"
     let result = predicate arrayContainer
     Assert.True(result)
 
 [<Fact>] 
 let ``hasIntersection should work correctly on an empty set`` () =
     let arrayContainer = { Stuff = [| |] }
-    let predicate = buildExpr<ArrayContainer,bool> "Lib.hasIntersection (Stuff, (4,5))"
+    let predicate = buildExpr<ArrayContainer<int>,bool> "Lib.hasIntersection (Stuff, (4,5))"
     let result = predicate arrayContainer
     Assert.False(result)
 
