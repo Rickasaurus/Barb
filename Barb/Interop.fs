@@ -71,7 +71,7 @@ let rec resolveResultType (output: obj) =
     | :? string -> Obj output
     | DecomposeOption contents -> resolveResultType contents
     | SupportedNumberType contents -> Obj contents
-    | ConvertSequence contents -> Obj contents
+//    | ConvertSequence contents -> Obj contents
     | other -> Obj other
 
 let fieldToExpr (fld: FieldInfo) =
@@ -215,12 +215,21 @@ let executeParameterizedMethod (sigs: MethodSig) (args: obj) =
     |> Option.map Returned
 
 let resolveObjectIndexer (rtype: System.Type) =
-    let indexers = rtype.GetCustomAttributes(typeof<DefaultMemberAttribute>, true) 
-                   |> Array.map (fun t -> t :?> DefaultMemberAttribute)
-    match indexers with
-    | [| |] -> None 
-    | attrs -> let memberName = attrs.[0].MemberName    
-               let pi = rtype.GetProperty(memberName) in Some (pi, pi.GetIndexParameters())
+    let indexers =
+        seq {
+            for itype in seq { yield rtype; yield! rtype.GetInterfaces() } do
+                yield! itype.GetCustomAttributes(typeof<DefaultMemberAttribute>, true) 
+                       |> Seq.map (fun attrib -> itype, (attrib :?> DefaultMemberAttribute).MemberName)
+                yield! itype.GetProperties(BindingFlags.Instance ||| BindingFlags.Public)
+                       |> Seq.filter (fun pi -> pi.GetIndexParameters().Length > 0)
+                       |> Seq.map (fun pi -> itype, pi.Name)
+        }
+    let defaultMembers = rtype.GetCustomAttributes(typeof<DefaultMemberAttribute>, true) 
+                         |> Seq.map (fun t -> rtype, (t :?> DefaultMemberAttribute).MemberName)
+    match Seq.concat [indexers; defaultMembers] with
+    | stuff when Seq.isEmpty stuff -> None 
+    | names -> let typ, memberName = names |> Seq.nth 0     
+               let pi = typ.GetProperty(memberName) in Some (pi, pi.GetIndexParameters())
 
 let cachedResolveObjectIndexer = 
     let inputToKey (rtype: System.Type) = rtype.FullName

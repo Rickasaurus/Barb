@@ -42,16 +42,18 @@ open System.Collections
 module Lib = 
     // Tuple Stuff
     let union (t1: IEnumerable) (t2: IEnumerable) = Seq.append (t1 |> Seq.cast<obj>) (t2 |> Seq.cast<obj>) |> Seq.toArray
+
     let intersection (t1: IEnumerable) (t2: IEnumerable) = 
         seq {
             for i1 in t1 do
                 for i2 in t2 do
-                    if i1 = i2 then yield i1
+                    if Barb.Interop.objectsEqualInner i1 i2 then yield i1
         } |> Seq.toArray
+
     let hasIntersection (t1: IEnumerable) (t2: IEnumerable) =
         let t1obj = t1 |> Seq.cast<obj>
         let t2obj = t2 |> Seq.cast<obj>
-        t1obj |> Seq.exists (fun i1 -> t2obj |> Seq.exists (fun i2 -> i1 = i2))
+        t1obj |> Seq.exists (fun i1 -> t2obj |> Seq.exists (fun i2 -> Barb.Interop.objectsEqualInner i1 i2))
 
 module Table =
     let loadTSV (filename: string) : string [] [] = 
@@ -64,11 +66,11 @@ module Table =
     let firstRowContaining (table: IEnumerable) (element: string) : string [] = 
         table
         |> Seq.cast<string []>
-        |> Seq.tryFind (fun row -> row |> Array.exists (fun e -> e = element))
+        |> Seq.tryFind (fun row -> row |> Array.exists (fun e -> Barb.Interop.objectsEqualInner e element))
         |> function | Some (row) -> row | None -> [| |]
 
     let allRowsContaining (table: IEnumerable) (element: string) : string [] [] = 
         table
         |> Seq.cast<string []>
-        |> Seq.filter (fun row -> row |> Array.exists (fun e -> e = element))
+        |> Seq.filter (fun row -> row |> Array.exists (fun e -> Barb.Interop.objectsEqualInner e element))
         |> Seq.toArray
