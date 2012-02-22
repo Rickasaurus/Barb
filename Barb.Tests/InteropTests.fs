@@ -88,6 +88,9 @@ let ``should support property indexers`` () =
     let predicate = buildExpr<IndexerRecord<int,int>,bool> "PropTable.Item[0] = 0"
     let result = predicate testRecord
     Assert.True(result)    
+    let predicate = buildExpr<IndexerRecord<int,int>,bool> "PropTable.Item[2] = 2"
+    let result = predicate testRecord
+    Assert.True(result)    
 
 [<Fact>]
 let ``should support property indexers with strings`` () = 
@@ -115,6 +118,23 @@ let ``should correctly reduce the contents of indexers before applying`` () =
     let predicate = buildExpr<IndexedName,bool> "Name[Index] = \"u\""
     let result = predicate testRecord
     Assert.True(result)    
+
+open System.Collections.Generic
+
+type DictTestRecord =  
+    {
+        Dict: IDictionary<string,string>
+    }
+
+[<Fact>]
+let ``should propertly index into IDictionary`` () =
+    let testRecord = { Dict = [("one", "1"); ("two", "2"); ("three", "3")] |> dict }
+    let predicate = buildExpr<DictTestRecord,bool> "Dict['two'] = '2'"
+    let result = predicate testRecord
+    Assert.True(result)
+
+let dictType = [|("one", "1")|] |> dict |> (fun t -> t.GetType()) |> (fun t -> t.GetInterfaces()) |> Array.map (fun i -> i.Name) 
+//dictType.GetProperties
 
 [<Fact>]
 let ``should support using the results of calls to build incremental tuples`` () = 
