@@ -133,8 +133,12 @@ let ``should propertly index into IDictionary`` () =
     let result = predicate testRecord
     Assert.True(result)
 
-let dictType = [|("one", "1")|] |> dict |> (fun t -> t.GetType()) |> (fun t -> t.GetInterfaces()) |> Array.map (fun i -> i.Name) 
-//dictType.GetProperties
+[<Fact>]
+let ``should propertly call IDictionary ContainsKey`` () =
+    let testRecord = { Dict = [("one", "1"); ("two", "2"); ("three", "3")] |> dict }
+    let predicate = buildExpr<DictTestRecord,bool> "Dict.ContainsKey('two')"
+    let result = predicate testRecord
+    Assert.True(result)
 
 [<Fact>]
 let ``should support using the results of calls to build incremental tuples`` () = 
