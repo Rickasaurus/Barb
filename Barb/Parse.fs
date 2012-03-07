@@ -168,6 +168,9 @@ let allSimpleMappings =
         ["!"; "not"], Prefix notOp
         ["&"; "&&"; "and"], Infix (4, andOp)
         ["|"; "||"; "or"], Infix (4, orOp)
+        ["\\/"], Infix (2, unionObjects)
+        ["/\\"], Infix (2, intersectObjects)
+        ["/?\\"], Infix (2, doObjectsIntersect)
         ["/"], Infix (1, divideObjects)
         ["*"], Infix (1, multObjects)
         ["+"], Infix (2, addObjects)

@@ -250,7 +250,6 @@ let ``should support int multiplication`` () =
     let result = predicate ()
     Assert.True(result)  
 
-
 [<Fact>]
 let ``should support decimal addition`` () = 
     let predicate = buildExpr<unit,bool> "1.0 + 2.0 = 3.0"
@@ -275,7 +274,6 @@ let ``should support decimal multiplication`` () =
     let result = predicate ()
     Assert.True(result)  
 
-
 [<Fact>]
 let ``should support if-then-else`` () = 
     let testRec = { Score = 101.0 } 
@@ -289,7 +287,6 @@ let ``should support if-then-else without an explicit subexpression`` () =
     let predicate = buildExpr<TestFloatRec,bool> "if Score >= 100 then true else false"
     let result = predicate testRec
     Assert.True(result)  
-
 
 [<Fact>]
 let ``should support if-then-else with initial/final spacing`` () = 
@@ -328,8 +325,6 @@ let ``should treat tuples properly even when in a right subexpression`` () =
     let result = predicate ()
     Assert.True(result)  
 
-//let fx = (fun x -> x = \"Don\") in fx Name"
-
 [<Fact>]
 let ``should support recursion`` () = 
     let predicate = buildExpr<unit,bool> "let fx = (fun x -> (if x = 0 then true else fx (x - 1))) in fx 5"
@@ -363,14 +358,40 @@ let ``tuple parsing should not cause problems with nested property calls`` () =
     let predicate = buildExpr<OuterType, bool> "(Stuff.Things, ('four','five')) = (('one','two','three'),('four','five'))"
     let result = predicate input
     Assert.True(result)
+
+[<Fact>]
+let ``union operator should union tuples`` () =
+    let predstr = @"(1,2,3) \/ (4,5,6) = (1,2,3,4,5,6)"
+    let predicate = buildExpr<unit, bool> predstr
+    let result = predicate ()
+    Assert.True(result)
+
+[<Fact>]
+let ``intersection operator should find the intersection of tuples`` () =
+    let predicate = buildExpr<unit, bool> @"(2,3,4) /\ (3,4,5) = (3,4)" 
+    let result = predicate ()
+    Assert.True(result)
+
+[<Fact>]
+let ``hasintersection operator should show if tuples have intersection`` () =
+    let predicate = buildExpr<unit, bool> @"(2,3,4) /?\ (3,4,5)" 
+    let result = predicate ()
+    Assert.True(result)
+
+[<Fact>]
+let ``hasintersection operator should show if tuples don't have intersection`` () =
+    let predicate = buildExpr<unit, bool> @"(1,2,3) /?\ (4,5,6)" 
+    let result = predicate ()
+    Assert.False(result)
+
 //
 // Wish List / Ideas
 //
+
 
 //[<Fact>] // Experimental
 let ``should support safe while syntax`` () = 
     let predicate = buildExpr<unit,bool> "let x = 1 in { while x < 5 do x <- x + 1 } x = 4"
     let result = predicate ()
     Assert.True(result)  
-
 
