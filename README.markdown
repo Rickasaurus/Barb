@@ -130,8 +130,32 @@ Language Details <a id="details" />
 	Indexing:		<obj>[ <code> ]
 	Binding (F#):	let <name> = <code> in
 	Binding (C#):	var <name> = <code> in
-
+	
 Note that '...' indicates an unbounded expression.  It can be bounded by a parent expression or explicitly by using a subscope.
+
+#### Operators and Keywords
+
+	(): 			Unit
+	new <name>:		Creates a new .NET instance of Class "name"
+	null: 			Creates a null instance
+	true:			Creates a boolean of value true
+	false:			Creates a boolean of value false
+	== or =:		Equals Operator
+	<> or !=:		Not-Equals Operator
+	>:				Greater than
+	>=:				Greater than or equal to
+	<:				Less than
+	<=:				Less than or equal to
+	! or not:		Invert Boolean
+	&, && or and:	Boolean And
+	|, || or or:	Boolean Or
+	/:				Arithmetic Divide
+	*:				Arithmetic Multiply
+	+:				Arithmetic Add
+	-:				Arithmetic Subtract
+	\/:				Set Union
+	/\:				Set Intersection
+	/?\:			Set Has Intersection
 
 Extra Nerdy Stuff Under Here <a id="nerdy" />
 ----------------------------
