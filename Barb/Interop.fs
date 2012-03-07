@@ -98,10 +98,11 @@ let overloadedMethodToExpr (methods: MethodInfo seq) =
             ]
         Method methodOverloads
 
-let resolveMember (rtype: System.Type) (memberName: string) : (obj -> ExprTypes) option =
+let rec resolveMember (rtype: System.Type) (memberName: string) : (obj -> ExprTypes) option =
     rtype.GetProperty(memberName) |> nullableToOption |> Option.map propertyToExpr
     |> Option.tryResolve (fun () -> match rtype.GetMethods() |> Array.filter (fun mi -> mi.Name = memberName) with | [||] -> None | methods -> methods |> overloadedMethodToExpr |> Some)
     |> Option.tryResolve (fun () -> rtype.GetField(memberName) |> nullableToOption |> Option.map fieldToExpr)
+    |> Option.tryResolve (fun () -> rtype.GetInterfaces() |> Seq.tryPick (fun i -> resolveMember i memberName))
 
 let cachedResolveMember = 
     let inputToKey (rtype: System.Type, caseName) = rtype.FullName + "~" + caseName
