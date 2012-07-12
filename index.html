@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8' />
+    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+    <meta name="description" content="Barb : A Simple Dynamic Scripting Language for .NET" />
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Barb</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/Rickasaurus/Barb">View on GitHub</a>
+
+          <h1 id="project_title">Barb</h1>
+          <h2 id="project_tagline">A Simple Dynamic Scripting Language for .NET</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/Rickasaurus/Barb/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/Rickasaurus/Barb/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <p>Barb is a small dynamic scripting language for .NET with the following properties:</p>
+
+<ul>
+<li>Syntax that makes both F# and C# devs feel at home</li>
+<li>Fully expression oriented (Whitespace is completely ignored)</li>
+<li>Paren based scoping rules (Lisp-like)</li>
+<li>Pure functional (No mutation allowed)</li>
+</ul><p>This makes Barb an easy to learn language which you can give to your users for safely scripting over data in your application.  Best of all, you'll be able to use it without learning a bunch of new syntax.</p>
+
+<h2>Why Barb?</h2>
+
+<p>I created Barb because I needed a user language for my applications but yet no existing .NET language both hosted nicely inside of my application and met my criteria:</p>
+
+<ul>
+<li>Simple/Terse Syntax</li>
+<li>Expression Oriented (Any program should be able to be represented in a single line of code)</li>
+<li>No casting necessary and transparent type conversions</li>
+<li>Native .NET type system (No painful conversions!)</li>
+<li>Tries really hard to do what a non-technical user would expect</li>
+<li>Fast Execution (I use it to script over sets of records in the millions range)</li>
+<li>Safe from accidental data corruption by non-technical users</li>
+</ul><p>Dynamic Linq, IronPython and IronRuby all failed for one of these reasons or another.</p>
+
+<p>The current implementation is still young and a bit rough around the edges. It's was originally designed for writing one-line expressions along these lines:</p>
+
+<pre><code>(Name.Contains "John" or Name.Contains "Mary") and (Age &gt; 20 or Weight &gt; 200)
+</code></pre>
+
+<p>It can do much more now, but still needs work to be friendly enoungh for a real release. In particular, it needs better error messages and a friendly API for hosting. However, I thought it might be useful to others in its current form.  If you do play with it I hope you'll let me know what you think.</p>
+
+<h2>Current Features <a></a>
+</h2>
+
+<ul>
+<li>Recursive lambda bindings with F# or C# syntax</li>
+<li>Value name binding with F# or C# syntax</li>
+<li>Order of operations </li>
+<li>Static or instance calls and indexers via cached reflection</li>
+<li>Numerical sequence expressions (Identical to F#'s)</li>
+<li>Tuples (any IEnumerable is treated as a tuple internally)</li>
+</ul><h2>Planned Limitations <a></a>
+</h2>
+
+<ul>
+<li>All numbers are converted internally to Int64 or Double.  This will change but was necessary for now to keep things simple.</li>
+<li>Barb may cause unexpected behavior when making calls that mutate things.  There is a settings option which fixes this, but it tones down optimization significantly.</li>
+</ul><h2>Things To Do <a></a>
+</h2>
+
+<ul>
+<li>Lambda interop with .NET</li>
+<li>Extension method resolution</li>
+<li>Generalized Sequence Expressions</li>
+<li>Better Looping Constructs</li>
+<li>Pattern Matching</li>
+<li>Optimized Numeric Type Handling</li>
+</ul><h2>Examples of Use <a></a>
+</h2>
+
+<p>The best way to think about Barb is over some collection of records (data classes to you C# folks).</p>
+
+<pre><code>type CustRecord =
+    {
+        Name: string
+        Age: int
+        Weight: int
+        Source: obj
+        Locations: string array
+    }
+</code></pre>
+
+<h4>As mentioned above, Barb is great for writing queries.</h4>
+
+<p>In Barb you can choose either the words "and"/"or" or use "&amp;&amp;"/"||", whichever makes you more comfortable.</p>
+
+<pre><code>let predicate = buildExpr&lt;CustRecord,bool&gt;("Name.Contains 'John' and (Age &gt; 20 or Weight &gt; 200)")
+</code></pre>
+
+<p>This will will return a predicate which you can then use to filter over large numbers of records.</p>
+
+<h4>It can also be used to for user specified reflection.</h4>
+
+<p>One case where I use this is for writing out CSV files. Given a set of record field specifying strings, you can easily build functions which will grab the specified data.  </p>
+
+<pre><code>let fld1Getter = buildExpr&lt;CustRecord,int&gt;("Weight") 
+</code></pre>
+
+<p>Quite simple right? Barb will also convert to the correct output type if able.</p>
+
+<pre><code>let fld1Getter = buildExpr&lt;CustRecord,string&gt;("Weight") 
+</code></pre>
+
+<p>Here the integer will be converted on the fly to string because it's what you statically specified.</p>
+
+<pre><code>let fld1Getter = buildExpr&lt;CustRecord,string&gt;("Source.Url")
+</code></pre>
+
+<p>Barb can will also reflect into the real type of a given obj, which can be quite handy for taking the hard work out of accessing untyped data.</p>
+
+<h4>Barb supports many of the constructs a F# user would expect</h4>
+
+<pre><code>buildExpr&lt;CustRecord,string&gt;("Locations.[0]") // The F# style '.' is optional :)
+buildExpr&lt;CustRecord,string&gt;("if Age &gt; 40 then 'Old' else 'Young'")
+buildExpr&lt;CustRecord,int&gt;("let x = Age + 1 in x") // or..
+buildExpr&lt;CustRecord,int&gt;("var x = Age + 1 in x") // (although, I may use var for mutables in the future)
+</code></pre>
+
+<p>...and some fancier ones from F#</p>
+
+<pre><code>buildExpr&lt;unit,seq&lt;int&gt;&gt;("{ 1 .. 5 }") // Returns 1,2,3,4,5
+buildExpr&lt;unit,seq&lt;int&gt;&gt;("{ 1 .. 2 .. 10 }") // Returns 1,3,5,7,9
+buildExpr&lt;unit,seq&lt;int&gt;&gt;("(1, 2, 3)") // Returns 1,2,3
+</code></pre>
+
+<p>...all looping must currently be handled with lambda recursion</p>
+
+<pre><code>buildExpr&lt;unit,seq&lt;int&gt;&gt;("let recfun = fun x -&gt; if x &gt; 1 then x else recfun (x + 1) in recfun 0") 
+</code></pre>
+
+<p>...but it's still growing and more features are being added all the time.</p>
+
+<h2>Language Details <a></a>
+</h2>
+
+<h4>Subexpression Forms</h4>
+
+<pre><code>Subscope:       ( &lt;code&gt; )
+Tuple:          ... &lt;code&gt;, &lt;code&gt;, &lt;code&gt; ...
+Lambda (F#):    fun &lt;binding&gt; -&gt; &lt;code&gt; ...
+Lambda (C#):    &lt;binding&gt; =&gt; &lt;code&gt; ...
+Branching:      if &lt;code&gt; then &lt;code&gt; else &lt;code&gt; ...
+Indexing:       &lt;obj&gt;[ &lt;code&gt; ]
+Binding (F#):   let &lt;name&gt; = &lt;code&gt; in
+Binding (C#):   var &lt;name&gt; = &lt;code&gt; in
+</code></pre>
+
+<p>Note that '...' indicates an unbounded expression.  It can be bounded by a parent expression or explicitly by using a subscope.</p>
+
+<h4>Operators and Keywords</h4>
+
+<pre><code>():             Unit
+new &lt;name&gt;:     Creates a new .NET instance of Class "name"
+null:           Creates a null instance
+true:           Creates a boolean of value true
+false:          Creates a boolean of value false
+== or =:        Equals Operator
+&lt;&gt; or !=:       Not-Equals Operator
+&gt;:              Greater than
+&gt;=:             Greater than or equal to
+&lt;:              Less than
+&lt;=:             Less than or equal to
+! or not:       Invert Boolean
+&amp;, &amp;&amp; or and:   Boolean And
+|, || or or:    Boolean Or
+/:              Arithmetic Divide
+*:              Arithmetic Multiply
++:              Arithmetic Add
+-:              Arithmetic Subtract
+\/:             Set Union
+/\:             Set Intersection
+/?\:            Set Has Intersection
+</code></pre>
+
+<h2>Extra Nerdy Stuff Under Here <a></a>
+</h2>
+
+<p>Compilation is done by n-tuple merging of expression nodes.  This is done initially to pre-compute as much as possible and the optimized result is then reduced again with the information given by the passed in data object.  Decisions can be made at runtime based on the contents of these tuples and their neighbors.  This allows for a huge amount of flexibility in deciding what to do.  Function/Value composition also allows for fast code to be built out of existing .NET constructs and eliminates the complexity of a intermediate representation.</p>
+
+<p>It's kind of Scheme-like under the hood, but I've worked hard to make it very C#/F#ish on the surface.</p>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Barb maintained by <a href="https://github.com/Rickasaurus">Rickasaurus</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+              <script type="text/javascript">
+            var gaJsHost = (("https:" == document.location.protocol) ? "https://ssl." : "http://www.");
+            document.write(unescape("%3Cscript src='" + gaJsHost + "google-analytics.com/ga.js' type='text/javascript'%3E%3C/script%3E"));
+          </script>
+          <script type="text/javascript">
+            try {
+              var pageTracker = _gat._getTracker("UA-33324690-1");
+            pageTracker._trackPageview();
+            } catch(err) {}
+          </script>
+
+
+  </body>
+</html>
