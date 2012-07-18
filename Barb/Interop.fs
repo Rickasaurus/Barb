@@ -345,41 +345,21 @@ let multObjects (obj1: obj) (obj2: obj) =
 
 let objToEnumerable (obj: obj) =
     match obj with
-    | (:? String as str1) -> [|str1|] :> IEnumerable
-    | (:? IEnumerable as en1) -> en1
-    | o -> [| o |] :> IEnumerable
+    | (:? String as str1) -> [|str1|] |> Seq.cast<obj>
+    | (:? IEnumerable as en1) -> en1 |> Seq.cast<obj>
+    | o -> [| o |] :> IEnumerable<obj>
 
-//let objToEnumerable (obj1: obj) (obj2: obj) =
-//    match obj1, obj2 with
-//    | (:? string as str1), (:? string as str2) ->
-//    | (:? IEnumerable as en1), (:? IEnumerable as en2) -> en1, en2
-//    | (:? IEnumerable as en1), _ -> en1, ([| obj2 |] :> IEnumerable)
-//    | _, (:? IEnumerable as en2) -> [| obj1 |] :> IEnumerable, en2
-//    | _, _ -> [| obj1 |] :> IEnumerable, [| obj2 |] :> IEnumerable        
+//let emptySingletonArray (enum: IEnumerable<obj>) =
+//    if enum.Int
 
 let unionObjects (obj1: obj) (obj2: obj) = 
     (objToEnumerable obj1, objToEnumerable obj2)
-    |> fun (t1,t2) -> 
-        let s1, s2 = (t1 |> Seq.cast<obj>), (t2 |> Seq.cast<obj>)
-        seq {
-            for i1 in s1 do
-                if not (Seq.exists (fun i2 -> objectsEqualInner i2 i1) s2) then yield i1
-            for i2 in s2 do
-                if not (Seq.exists (fun i1 -> objectsEqualInner i2 i1) s1) then yield i2                    
-        } |> Array.ofSeq :> obj
+    |> (fun (t1,t2) -> (t1 |> Seq.cast<obj>).Union((t2 |> Seq.cast<obj>)) |> Array.ofSeq :> obj)
 
 let intersectObjects (obj1: obj) (obj2: obj) = 
     (objToEnumerable obj1, objToEnumerable obj2)
-    |> fun (t1, t2) ->
-        seq {
-            for i1 in t1 do
-                for i2 in t2 do
-                    if objectsEqualInner i1 i2 then yield i1
-        } |> Seq.toArray :> obj
+    |> (fun (t1, t2) -> t1.Intersect(t2)) |> Seq.toArray :> obj
 
 let doObjectsIntersect (obj1: obj) (obj2: obj) =
     (objToEnumerable obj1, objToEnumerable obj2)
-    |> fun (t1, t2) -> 
-        let t1obj = t1 |> Seq.cast<obj>
-        let t2obj = t2 |> Seq.cast<obj>
-        t1obj |> Seq.exists (fun i1 -> t2obj |> Seq.exists (fun i2 -> objectsEqualInner i1 i2)) |> box
+    |> (fun (t1, t2) -> t1 |> Seq.exists (fun i1 -> t2 |> Seq.exists (fun i2 -> objectsEqualInner i1 i2))) |> box
