@@ -345,20 +345,24 @@ let multObjects (obj1: obj) (obj2: obj) =
 
 let objToEnumerable (obj: obj) =
     match obj with
+    | null -> Array.empty |> Seq.cast<obj>
     | (:? String as str1) -> [|str1|] |> Seq.cast<obj>
     | (:? IEnumerable as en1) -> en1 |> Seq.cast<obj>
     | o -> [| o |] :> IEnumerable<obj>
 
-//let emptySingletonArray (enum: IEnumerable<obj>) =
-//    if enum.Int
+let emptySingletonArray (enum: obj array) =
+    match enum.Length with
+    | 0 -> null |> box
+    | 1 -> enum.[0] |> box
+    | _ -> enum |> box
 
 let unionObjects (obj1: obj) (obj2: obj) = 
     (objToEnumerable obj1, objToEnumerable obj2)
-    |> (fun (t1,t2) -> (t1 |> Seq.cast<obj>).Union((t2 |> Seq.cast<obj>)) |> Array.ofSeq :> obj)
+    |> (fun (t1,t2) -> (t1 |> Seq.cast<obj>).Union((t2 |> Seq.cast<obj>))) |> Seq.toArray |> emptySingletonArray
 
 let intersectObjects (obj1: obj) (obj2: obj) = 
     (objToEnumerable obj1, objToEnumerable obj2)
-    |> (fun (t1, t2) -> t1.Intersect(t2)) |> Seq.toArray :> obj
+    |> (fun (t1, t2) -> t1.Intersect(t2)) |> Seq.toArray |> emptySingletonArray
 
 let doObjectsIntersect (obj1: obj) (obj2: obj) =
     (objToEnumerable obj1, objToEnumerable obj2)
