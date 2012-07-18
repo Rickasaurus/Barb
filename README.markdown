@@ -162,7 +162,7 @@ The '...' here indicates an unbounded expression and is not actual Barb syntax. 
 
 #### Set Operator Semantics ####
 
-Any instance can be thought of as a one element set except for null, which indicates an empty set.  Any IEnumerable will be considered at set containing the number of unique elements within it.
+Any instance can be thought of as a one element set except for null, which indicates an empty set.  Any IEnumerable will be considered a set containing the number of unique elements within it.
 
 
 #### Nullity Semantics ####
