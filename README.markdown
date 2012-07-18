@@ -162,12 +162,12 @@ The '...' here indicates an unbounded expression and is not actual Barb syntax. 
 
 #### Set Operator Semantics ####
 
-	Any instance can be thought of as a one element set except for null, which indicates an empty set.  Any IEnumerable will be considered at set containing the number of unique elements within it.
+Any instance can be thought of as a one element set except for null, which indicates an empty set.  Any IEnumerable will be considered at set containing the number of unique elements within it.
 
 
 #### Nullity Semantics ####
 
-	Outside of the context of sets or calls into .NET null should always consume.  That is, invoking something with a null member name returns null.  Similarly, invoking any member on null will return null.  In the context of arithmetic (1 * null = null), etc. 
+Outside of the context of sets or calls into .NET null should always consume.  That is, invoking something with a null member name returns null.  Similarly, invoking any member on null will return null.  In the context of arithmetic (1 * null = null), etc. 
 
 
 Extra Nerdy Stuff Under Here <a id="nerdy" />
