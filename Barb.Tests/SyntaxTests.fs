@@ -381,6 +381,17 @@ let ``union operator should union tuples with singltons on the left`` () =
     Assert.True(result)
 
 [<Fact>]
+let ``null should act as identity for the union operator`` () =
+    let predstr = @"null \/ (1,2,3) = (1,2,3)"
+    let predicate = buildExpr<unit, bool> predstr
+    let result = predicate ()
+    Assert.True(result)
+    let predstr = @"(1,2,3) \/ null = (1,2,3)"
+    let predicate = buildExpr<unit, bool> predstr
+    let result = predicate ()
+    Assert.True(result)
+
+[<Fact>]
 let ``intersection operator should find the intersection of tuples`` () =
     let predicate = buildExpr<unit, bool> @"(2,3,4) /\ (3,4,5) = (3,4)" 
     let result = predicate ()
@@ -389,6 +400,15 @@ let ``intersection operator should find the intersection of tuples`` () =
 [<Fact>]
 let ``intersection operator should find the intersection of tuples with a singleton`` () =
     let predicate = buildExpr<unit, bool> @"(2,3,4) /\ 3 = 3" 
+    let result = predicate ()
+    Assert.True(result)
+
+[<Fact>]
+let ``intersection operator on null should return null`` () =
+    let predicate = buildExpr<unit, bool> @"(2,3,4) /\ null = null" 
+    let result = predicate ()
+    Assert.True(result)
+    let predicate = buildExpr<unit, bool> @"null /\ (2,3,4) = null" 
     let result = predicate ()
     Assert.True(result)
 
@@ -421,6 +441,19 @@ let ``hasintersection operator should work with single elements on the left`` ()
     let predicate = buildExpr<unit, bool> @"4 /?\ (1,2,3)" 
     let result = predicate ()
     Assert.False(result)
+
+[<Fact>]
+let ``hasintersection operator should consider null to be the empty set`` () =
+    let predicate = buildExpr<unit, bool> @"null /?\ (1,2,3)" 
+    let result = predicate ()
+    Assert.False(result)
+    let predicate = buildExpr<unit, bool> @"(1,2,3) /?\ null" 
+    let result = predicate ()
+    Assert.False(result)
+    let predicate = buildExpr<unit, bool> @"null /?\ null" 
+    let result = predicate ()
+    Assert.False(result)
+
 
 //
 // Wish List / Ideas
