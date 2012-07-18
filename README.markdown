@@ -122,40 +122,53 @@ Language Details <a id="details" />
 
 #### Subexpression Forms ####
 	
-	Subscope: 		( <code> )
-	Tuple: 			... <code>, <code>, <code> ...
-	Lambda (F#): 	fun <binding> -> <code> ...
-	Lambda (C#): 	<binding> => <code> ...
-	Branching:		if <code> then <code> else <code> ...
-	Indexing:		<obj>[ <code> ]
-	Binding (F#):	let <name> = <code> in
-	Binding (C#):	var <name> = <code> in
+	Subscope: 				( <code> )
+	Tuple: 					... <code>, <code>, <code> ...
+	Lambda:		 			fun <binding> -> <code> ...
+	Lambda (alternate): 	<binding> => <code> ...
+	Branching:				if <code> then <code> else <code> ...
+	Indexing:				<obj>[ <code> ]
+	Binding:				let <name> = <code> in
+	Binding (Alternate*):	var <name> = <code> in
 	
-Note that '...' indicates an unbounded expression.  It can be bounded by a parent expression or explicitly by using a subscope.
+The '...' here indicates an unbounded expression and is not actual Barb syntax.  Any unbounded expression can be bounded implicitly by a parent expression or explicitly by creating a subscope with parentheses.
 
-#### Operators and Keywords
+*The var keyword may be used in the future to allow for locally mutable variables.
 
-	(): 			Unit
-	new <name>:		Creates a new .NET instance of Class "name"
-	null: 			Creates a null instance
-	true:			Creates a boolean of value true
-	false:			Creates a boolean of value false
-	== or =:		Equals Operator
-	<> or !=:		Not-Equals Operator
-	>:				Greater than
-	>=:				Greater than or equal to
-	<:				Less than
-	<=:				Less than or equal to
-	! or not:		Invert Boolean
-	&, && or and:	Boolean And
-	|, || or or:	Boolean Or
-	/:				Arithmetic Divide
-	*:				Arithmetic Multiply
-	+:				Arithmetic Add
-	-:				Arithmetic Subtract
-	\/:				Set Union
-	/\:				Set Intersection
-	/?\:			Set Has Intersection
+#### Operators and Keywords ####
+
+	()	 			Unit
+	new <name>		Creates a new .NET instance of Class "name"
+	.				Invocation or Decimal Point within a Number
+	null 			Creates an instance of null
+	true			Creates a boolean of value true
+	false			Creates a boolean of value false
+	== or =			Equals Operator
+	<> or !=		Not-Equals Operator
+	>				Greater than
+	>=				Greater than or equal to
+	<				Less than
+	<=				Less than or equal to
+	! or not		Invert Boolean
+	&, && or and	Boolean And
+	|, || or or		Boolean Or
+	/				Arithmetic Divide
+	*				Arithmetic Multiply
+	+				Arithmetic Add
+	-				Arithmetic Subtract
+	\/				Set Union
+	/\				Set Intersection
+	/?\				Set Has Intersection
+
+#### Set Operator Semantics ####
+
+	Any instance can be thought of as a one element set except for null, which indicates an empty set.  Any IEnumerable will be considered at set containing the number of unique elements within it.
+
+
+#### Nullity Semantics ####
+
+	Outside of the context of sets or calls into .NET null should always consume.  That is, invoking something with a null member name returns null.  Similarly, invoking any member on null will return null.  In the context of arithmetic (1 * null = null), etc. 
+
 
 Extra Nerdy Stuff Under Here <a id="nerdy" />
 ----------------------------
