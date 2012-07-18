@@ -204,7 +204,7 @@ let ``should support static methods on type names`` () =
 let ``should convert output to the correct type`` () = 
     let predicate = buildExpr<unit,string> "1"
     let result = predicate ()    
-    Assert.Equal (result, "1")
+    Assert.Equal<string> (result, "1")
 
 type ValueCarrier = { Y: int }
 
@@ -263,4 +263,4 @@ let ``should be able to create new objects without new`` () =
 //[<Fact>] // Need support, but the reflection is difficult
 let ``should support exporting nested tuples`` () =
     let predicate = buildExpr<unit,int array array> "((1,2), (3,4), (5,6))"
-    Assert.Equal([|[|1; 2|]; [|3;4|]; [|5;6|]|], predicate())
+    Assert.Equal<int array array>([|[|1; 2|]; [|3;4|]; [|5;6|]|], predicate())

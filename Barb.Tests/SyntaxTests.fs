@@ -384,6 +384,24 @@ let ``hasintersection operator should show if tuples don't have intersection`` (
     let result = predicate ()
     Assert.False(result)
 
+[<Fact>]
+let ``hasintersection operator should work with single elements on the right`` () =
+    let predicate = buildExpr<unit, bool> @"(1,2,3) /?\ 2" 
+    let result = predicate ()
+    Assert.True(result)
+    let predicate = buildExpr<unit, bool> @"(1,2,3) /?\ 4" 
+    let result = predicate ()
+    Assert.False(result)
+
+[<Fact>]
+let ``hasintersection operator should work with single elements on the left`` () =
+    let predicate = buildExpr<unit, bool> @"2 /?\ (1,2,3)" 
+    let result = predicate ()
+    Assert.True(result)
+    let predicate = buildExpr<unit, bool> @"4 /?\ (1,2,3)" 
+    let result = predicate ()
+    Assert.False(result)
+
 //
 // Wish List / Ideas
 //

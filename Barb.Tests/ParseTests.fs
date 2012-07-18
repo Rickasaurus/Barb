@@ -10,11 +10,11 @@ let ``StringWindow should correctly Subwindow`` () =
 
     let substr = str.Substring(1)
     let subwin = strwin.Subwindow(1)    
-    Assert.Equal(substr, subwin.ToString())
+    Assert.Equal<string>(substr, subwin.ToString())
 
     let substr = str.Substring(str.Length - 1)
     let subwin = strwin.Subwindow(strwin.Length - 1)    
-    Assert.Equal(substr, subwin.ToString())
+    Assert.Equal<string>(substr, subwin.ToString())
 
 
 [<Fact>]
@@ -24,11 +24,11 @@ let ``StringWindow should correctly Substring`` () =
 
     let substr = str.Substring(1, 2)
     let subwin = strwin.Substring(1, 2)
-    Assert.Equal(substr, subwin)
+    Assert.Equal<string>(substr, subwin)
 
     let substr = str.Substring(str.Length - 1, 1)
     let subwin = strwin.Substring(strwin.Length - 1, 1)
-    Assert.Equal(substr, subwin) 
+    Assert.Equal<string>(substr, subwin) 
 
 [<Fact>]
 let ``StringWindow should correctly Length`` () =
@@ -104,5 +104,5 @@ let ``StringWindow should correctly StartsWith -- regresssion`` () =
     let str = "true and true"
     let sw = StringWindow(str, 8)
     
-    Assert.Equal(sw.ToString(), " true")
+    Assert.Equal<string>(sw.ToString(), " true")
     Assert.True(sw.StartsWith(" "))    

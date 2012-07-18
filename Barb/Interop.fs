@@ -343,15 +343,22 @@ let multObjects (obj1: obj) (obj2: obj) =
     | (:? int64 as b1), (:? float as d2) -> (float b1 * d2) :> obj
     | _ -> failwith (sprintf "Cannot multiply %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))
 
-let objToEnumerable (obj1: obj) (obj2: obj) =
-    match obj1, obj2 with
-    | (:? IEnumerable as en1), (:? IEnumerable as en2) -> en1, en2
-    | (:? IEnumerable as en1), _ -> en1, ([| obj2 |] :> IEnumerable)
-    | _, (:? IEnumerable as en2) -> [| obj1 |] :> IEnumerable, en2
-    | _, _ -> [| obj1 |] :> IEnumerable, [| obj2 |] :> IEnumerable        
+let objToEnumerable (obj: obj) =
+    match obj with
+    | (:? String as str1) -> [|str1|] :> IEnumerable
+    | (:? IEnumerable as en1) -> en1
+    | o -> [| o |] :> IEnumerable
+
+//let objToEnumerable (obj1: obj) (obj2: obj) =
+//    match obj1, obj2 with
+//    | (:? string as str1), (:? string as str2) ->
+//    | (:? IEnumerable as en1), (:? IEnumerable as en2) -> en1, en2
+//    | (:? IEnumerable as en1), _ -> en1, ([| obj2 |] :> IEnumerable)
+//    | _, (:? IEnumerable as en2) -> [| obj1 |] :> IEnumerable, en2
+//    | _, _ -> [| obj1 |] :> IEnumerable, [| obj2 |] :> IEnumerable        
 
 let unionObjects (obj1: obj) (obj2: obj) = 
-    objToEnumerable obj1 obj2
+    (objToEnumerable obj1, objToEnumerable obj2)
     |> fun (t1,t2) -> 
         let s1, s2 = (t1 |> Seq.cast<obj>), (t2 |> Seq.cast<obj>)
         seq {
@@ -362,7 +369,7 @@ let unionObjects (obj1: obj) (obj2: obj) =
         } |> Array.ofSeq :> obj
 
 let intersectObjects (obj1: obj) (obj2: obj) = 
-    objToEnumerable obj1 obj2
+    (objToEnumerable obj1, objToEnumerable obj2)
     |> fun (t1, t2) ->
         seq {
             for i1 in t1 do
@@ -371,7 +378,7 @@ let intersectObjects (obj1: obj) (obj2: obj) =
         } |> Seq.toArray :> obj
 
 let doObjectsIntersect (obj1: obj) (obj2: obj) =
-    objToEnumerable obj1 obj2
+    (objToEnumerable obj1, objToEnumerable obj2)
     |> fun (t1, t2) -> 
         let t1obj = t1 |> Seq.cast<obj>
         let t2obj = t2 |> Seq.cast<obj>
