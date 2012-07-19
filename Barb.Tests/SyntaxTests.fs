@@ -455,6 +455,18 @@ let ``hasintersection operator should consider null to be the empty set`` () =
     Assert.False(result)
 
 
+[<Fact>] 
+let ``Any indexing on null should return null`` () =
+    let predicate = buildExpr<unit, bool> @"null.[5] = null" 
+    let result = predicate ()
+    Assert.True(result)    
+
+[<Fact>] 
+let ``Any out of bounds indexing should return null`` () =
+    let predicate = buildExpr<unit, bool> @"(1,2,3)[6] = null" 
+    let result = predicate ()
+    Assert.True(result)    
+
 //
 // Wish List / Ideas
 //

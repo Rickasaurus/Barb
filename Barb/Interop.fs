@@ -242,8 +242,12 @@ let callIndexedProperty (target: obj) (indexVal: obj) =
     else
         let ttype = target.GetType()
         match target, indexVal with
-        | (:? Array as arr),          (:? int64 as idx) -> arr.GetValue(idx) |> Returned |> Some
-        | (:? IEnumerable as enumer), (:? int64 as idx64) -> let idx = int idx64 in enumer |> Seq.cast<obj> |> Seq.nth idx |> Returned |> Some  
+        | (:? Array as arr),          (:? int64 as idx) -> 
+            if idx < 0L || idx >= int64 arr.Length then Returned null |> Some
+            else arr.GetValue(idx) |> Returned |> Some
+        | (:? IEnumerable as enumer), (:? int64 as idx) -> 
+            if idx < 0L then Returned null |> Some
+            else enumer |> Seq.cast<obj> |> Seq.nth (int idx) |> Returned |> Some  
         | _ ->
             match cachedResolveObjectIndexer ttype with
             | None -> None
