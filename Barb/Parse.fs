@@ -196,7 +196,7 @@ let endUnknownChars =
     |> Set.toList
     |> List.map (fun c -> string c)    
 
-let (|Skip|_|) (skipStrs: string list) (text: StringWindow) =
+let (|Skip|_|) (skipStrs: string list) (text: StringWindow) : (ExprTypes Option * StringWindow) Option =
     skipStrs 
     |> List.tryFind (fun sstr -> text.StartsWith(sstr))
     |> Option.map (fun m -> None, text.Subwindow(m.Length))

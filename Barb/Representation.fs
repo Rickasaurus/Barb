@@ -10,11 +10,11 @@ type BarbSettings =
         AdditionalBindings: IDictionary<string,obj>
     }
     with static member Default = 
-        { 
-            BindGlobalsWhenReducing = true
-            AdditionalBindings = [] |> dict
-            Namespaces = [null; ""; "System"; "Microsoft.FSharp"; "Microsoft.FSharp.Collections"; "Barb.Lib"] |> Set.ofList
-        }
+            { 
+                BindGlobalsWhenReducing = true
+                AdditionalBindings = [] |> dict
+                Namespaces = [null; ""; "System"; "Microsoft.FSharp"; "Microsoft.FSharp.Collections"; "Barb.Lib"] |> Set.ofList
+            }
 
 type MethodSig = ((obj array -> obj) * Type array) list
 

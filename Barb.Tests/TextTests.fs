@@ -1,4 +1,4 @@
-﻿module Barb.Tests.PredicateLanguageTextTests
+﻿module Barb.Tests.TextTests
 
 open Barb.Compiler
 
@@ -14,7 +14,7 @@ let ``should support quoted values`` () =
     Assert.True(result)
 
 [<Fact>] 
-let ``should support quoted values, even when they contain a .`` () =
+let ``should support quoted values even when they contain a period`` () =
     let testRecord = { Name = "Dude.Duderson"; Sex = 'f' }
     let predicate = buildExpr<DudeRecord, bool> "Name = \"Dude.Duderson\" and Sex = 'f'"
     let result = predicate testRecord
