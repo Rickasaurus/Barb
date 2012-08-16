@@ -1,6 +1,6 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
+Microsoft Visual Studio Solution File, Format Version 11.00
+# Visual Studio 2010
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Barb", "Barb\Barb.fsproj", "{8909D27B-857D-4273-BA1A-C01236906FCA}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Barb.Tests", "Barb.Tests\Barb.Tests.fsproj", "{482B4B14-7FDA-4857-8021-BA599ABEC8EB}"
