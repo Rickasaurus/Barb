@@ -126,7 +126,7 @@ let generateLambda (exprs: ExprRep list) : ExprRep =
     | { Expr = SubExpression(names) } :: contents :: [] ->
         let offset, length = exprRepListOffsetLength exprs
         let prms = names |> List.map (function | { Expr = Unknown n } -> n | other -> failwith (sprintf "Unexpected construct in lambda argument list: %A" other))
-        { Offset = offset; Length = length; Expr = Lambda (prms, Map.empty, contents) }
+        { Offset = offset; Length = length; Expr = Lambda { Params = prms; Bindings = Map.empty; Contents = contents } }
     | list -> failwith (sprintf "Incorrect lambda binding syntax: %A" list)
 
 let generateIfThenElse (exprs: ExprRep list) : ExprRep = 

@@ -18,8 +18,10 @@ type BarbSettings =
 
 type MethodSig = ((obj array -> obj) * Type array) list
 
+// Mutable so we can update the bindings with itself for easy recursion.
+type LambdaRecord = { Params: string list; mutable Bindings: Bindings; Contents: ExprRep }
 
-type ExprTypes = 
+and ExprTypes = 
     | Unit
     | Invoke
     | New
@@ -37,7 +39,7 @@ type ExprTypes =
     | Unknown of string
     | Binding of string * ExprRep
     // Lambda: Parameters, Bindings, Contents
-    | Lambda of string list * Bindings * ExprRep
+    | Lambda of LambdaRecord
     | IfThenElse of ExprRep list * ExprRep list * ExprRep list
     | Generator of ExprRep * ExprRep * ExprRep
     // Has no Unknowns
@@ -82,7 +84,7 @@ and exprExists (pred: ExprTypes -> bool) (expr: ExprTypes) =
     | Tuple (repArray) -> repArray |> Array.exists (exprExistsInRep pred)
     | IndexArgs (rep) -> exprExistsInRep pred rep
     | Binding (name, rep) -> exprExistsInRep pred rep
-    | Lambda (lnames, lapplied, rep) -> exprExistsInRep pred rep
+    | Lambda (lambda) -> exprExistsInRep pred (lambda.Contents)
     | IfThenElse (ifexpr, thenexpr, elseexpr) ->
         if ifexpr |> List.exists (exprExistsInRep pred) then true
         elif thenexpr |> List.exists (exprExistsInRep pred) then true
