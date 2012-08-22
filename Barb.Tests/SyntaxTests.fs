@@ -329,7 +329,7 @@ let ``should treat tuples properly even when in a left subexpression`` () =
 let ``should treat tuples properly even when in a right subexpression`` () = 
     let predicate = buildExpr<unit,bool> "(1,2,3) = ((1,2,3))"
     let result = predicate ()
-    Assert.True(result)  
+    Assert.True(result)        
 
 [<Fact>]
 let ``should support recursion`` () = 
