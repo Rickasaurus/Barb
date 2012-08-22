@@ -21,7 +21,8 @@ module Compiler =
         let parsedTokens = parseProgram predicate
 
         #if DEBUG
-        printfn ""; printfn "PT: %A" parsedTokens; printfn ""
+        let ptOutput = Environment.NewLine + (sprintf "PT: %A" parsedTokens) + Environment.NewLine in
+            System.Diagnostics.Debug.WriteLine(ptOutput)
         #endif
 
         { BarbData.Default with Contents = [parsedTokens]; Settings = settings }
@@ -35,7 +36,8 @@ module Compiler =
             resolveExpression parsed.Contents Map.empty parsed.Settings false |> List.rev
 
         #if DEBUG
-        printfn ""; printfn "RE: %A" reducedExpression; printfn ""
+        let reOutput = Environment.NewLine + (sprintf "RE: %A" reducedExpression) + Environment.NewLine in
+            System.Diagnostics.Debug.WriteLine(reOutput)
         #endif
            
         { parsed with Contents = reducedExpression }
@@ -61,9 +63,8 @@ module Compiler =
                     (memberMap |> Map.map (fun k prop -> lazy (prop input)))        
 
             #if DEBUG
-            printfn ""
-            printfn "IB: %A" inputBindings
-            printfn ""
+            let ibOutput = Environment.NewLine + (sprintf "IB: %A" inputBindings) + Environment.NewLine in
+                System.Diagnostics.Debug.WriteLine(ibOutput)
             #endif
 
             resolveExpression data.Contents inputBindings data.Settings true

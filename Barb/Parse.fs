@@ -151,7 +151,7 @@ let generateNumIterator: ExprRep list -> ExprRep =
       & { Expr = SubExpression(_) } :: { Expr = SubExpression(_) } :: [] -> 
         let length = (endRep.Offset + endRep.Length) - startRep.Offset
         // Report error for the whole generator if the middle is somehow wrong when missing
-        let missingVal = { Offset = startRep.Offset; Length = length; Expr = Obj 1 } 
+        let missingVal = { Offset = startRep.Offset; Length = length; Expr = Obj 1L } 
         { Offset = startRep.Offset; Length = length; Expr = Generator (startRep, missingVal, endRep) }
     | startRep :: midRep :: endRep :: [] 
       & { Expr = SubExpression(_) } :: { Expr = SubExpression(_) } :: { Expr = SubExpression(_) } :: [] -> 
