@@ -6,78 +6,78 @@ open Xunit
 [<Fact>]
 let ``StringWindow should correctly Subwindow`` () =
     let str = "hello"
-    let strwin = StringWindow(str, 0)
+    let strwin = StringWindow(str, 0u)
 
     let substr = str.Substring(1)
-    let subwin = strwin.Subwindow(1)    
+    let subwin = strwin.Subwindow(1u)    
     Assert.Equal<string>(substr, subwin.ToString())
 
     let substr = str.Substring(str.Length - 1)
-    let subwin = strwin.Subwindow(strwin.Length - 1)    
+    let subwin = strwin.Subwindow(strwin.Length - 1u)    
     Assert.Equal<string>(substr, subwin.ToString())
 
 
 [<Fact>]
 let ``StringWindow should correctly Substring`` () =
     let str = "hello"
-    let strwin = StringWindow(str, 0)
+    let strwin = StringWindow(str, 0u)
 
     let substr = str.Substring(1, 2)
-    let subwin = strwin.Substring(1, 2)
+    let subwin = strwin.Substring(1u, 2u)
     Assert.Equal<string>(substr, subwin)
 
     let substr = str.Substring(str.Length - 1, 1)
-    let subwin = strwin.Substring(strwin.Length - 1, 1)
+    let subwin = strwin.Substring(strwin.Length - 1u, 1u)
     Assert.Equal<string>(substr, subwin) 
 
 [<Fact>]
 let ``StringWindow should correctly Length`` () =
     let str = "hello"
     let strlen = str.Substring(1).Length
-    let winlen = StringWindow(str, 1).Length
+    let winlen = StringWindow(str, 1u).Length |> int
     Assert.Equal(strlen, winlen)
 
 
 [<Fact>]
 let ``StringWindow should correctly IndexOf`` () =
     let str = "1234567890"
-    let sw = StringWindow(str, 0)
+    let sw = StringWindow(str, 0u)
     let stridx = str.IndexOf("1")
-    let swidx = sw.IndexOf("1")
+    let swidx = sw.IndexOf("1") |> int
     Assert.Equal(stridx, swidx)
 
     let substr = str.Substring(2)
-    let subsw = sw.Subwindow(2)
+    let subsw = sw.Subwindow(2u)
     let stridx = substr.IndexOf("56")
-    let swidx = subsw.IndexOf("56")
+    let swidx = subsw.IndexOf("56") |> int
     Assert.Equal(stridx, swidx)
 
     let substr = str.Substring(9)
-    let subsw = sw.Subwindow(9)
+    let subsw = sw.Subwindow(9u)
     let stridx = substr.IndexOf("0")
-    let swidx = subsw.IndexOf("0")
+    let swidx = subsw.IndexOf("0") |> int
     Assert.Equal(stridx, swidx)
 
     let substr = str.Substring(10)
-    let subsw = sw.Subwindow(10)
+    let subsw = sw.Subwindow(10u)
     let stridx = substr.IndexOf("0")
-    let swidx = subsw.IndexOf("0")
+    let swidx = subsw.IndexOf("0") |> int
     Assert.Equal(stridx, swidx)
 
 [<Fact>]
 let ``StringWindow should correctly Index`` () =
     let str = "1234567890"
-    let sw = StringWindow(str, 0)
+    let sw = StringWindow(str, 0u)
 
     let substr = str.Substring(2)
-    let subsw = sw.Subwindow(2)
+    let subsw = sw.Subwindow(2u)
 
-    Assert.Equal (substr.[0], subsw.[0])
+    Assert.Equal (substr.[0], subsw.[0u])
 
 [<Fact>]
 let ``StringWindow should correctly StartsWith`` () =
     let str = "1234567890"
-    let sw = StringWindow(str, 0)
+    let sw = StringWindow(str, 0u)
 
     Assert.True(str.StartsWith(str))
     Assert.True(sw.StartsWith(str))
@@ -85,7 +85,7 @@ let ``StringWindow should correctly StartsWith`` () =
     Assert.True(sw.StartsWith("1"))
 
     let substr = str.Substring(2)    
-    let subsw = sw.Subwindow(2)
+    let subsw = sw.Subwindow(2u)
     Assert.True(subsw.StartsWith(substr))
 
     Assert.True(substr.StartsWith("34"))
@@ -102,7 +102,7 @@ let ``StringWindow should correctly StartsWith`` () =
 [<Fact>]
 let ``StringWindow should correctly StartsWith -- regresssion`` () =
     let str = "true and true"
-    let sw = StringWindow(str, 8)
+    let sw = StringWindow(str, 8u)
     
     Assert.Equal<string>(sw.ToString(), " true")
     Assert.True(sw.StartsWith(" "))    

@@ -49,8 +49,8 @@ and ExprTypes =
 
 and ExprRep =
     {
-        Offset: int
-        Length: int
+        Offset: uint32
+        Length: uint32
         Expr: ExprTypes
     }
 
