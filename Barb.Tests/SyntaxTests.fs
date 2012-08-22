@@ -193,6 +193,12 @@ let ``bound tuples should compare correctly with value-type lists`` () =
     Assert.True(result)    
 
 [<Fact>]
+let ``should support very simple lambdas`` () =
+    let predicate = buildExpr<unit,int> "let fx = fun x -> x + 1 in fx 2"
+    let result = predicate ()
+    Assert.Equal (3, result)
+
+[<Fact>]
 let ``should support internal use of lambdas`` () = 
     let testRecord = { HasHat = false; Name = "Don" }
     let predicate = buildExpr<BoolRec,bool> "let fx = (fun x -> x = \"Don\") in fx Name"

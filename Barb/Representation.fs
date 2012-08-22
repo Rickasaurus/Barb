@@ -69,3 +69,25 @@ let exprRepListOffsetLength (exprs: ExprRep seq) =
 let listToSubExpression (exprs: ExprRep list) =
     let offset, length = exprRepListOffsetLength exprs
     { Offset = offset; Length = length; Expr = SubExpression exprs }
+
+let rec exprExistsInRep (pred: ExprTypes -> bool)  (rep: ExprRep) =
+    exprExists pred rep.Expr
+and exprExists (pred: ExprTypes -> bool) (expr: ExprTypes) =
+    match expr with
+    | _ when pred expr -> true 
+    | SubExpression (repList) -> repList |> List.exists (exprExistsInRep pred)
+    | Tuple (repArray) -> repArray |> Array.exists (exprExistsInRep pred)
+    | IndexArgs (rep) -> exprExistsInRep pred rep
+    | Binding (name, rep) -> exprExistsInRep pred rep
+    | Lambda (lnames, lapplied, rep) -> exprExistsInRep pred rep
+    | IfThenElse (ifexpr, thenexpr, elseexpr) ->
+        if ifexpr |> List.exists (exprExistsInRep pred) then true
+        elif thenexpr |> List.exists (exprExistsInRep pred) then true
+        elif elseexpr |> List.exists (exprExistsInRep pred) then true
+        else false
+    | Generator (fromRep, incRep, toRep) -> [fromRep; incRep; toRep] |> List.exists (exprExistsInRep pred) 
+    // The two tagged cases
+    | Resolved (rep) -> exprExistsInRep pred rep
+    | Unresolved (expr) -> exprExists pred expr
+    // Nothing found
+    | _ -> false
