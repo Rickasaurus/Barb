@@ -29,26 +29,43 @@ type ExprTypes =
     | Prefix of (obj -> obj)    
     | Postfix of (obj -> obj)
     | Infix of int * (obj -> obj -> obj) 
-    | SubExpression of ExprTypes list
-    | Tuple of ExprTypes array
-    | IndexArgs of ExprTypes
+    | SubExpression of ExprRep list
+    | Tuple of ExprRep array
+    | IndexArgs of ExprRep
     | AppliedInvoke of string
     | Unknown of string
-    | Binding of string * ExprTypes
+    | Binding of string * ExprRep
     // Lambda: Parameters, Args, Contents
-    | Lambda of string list * ExprTypes list * ExprTypes
-    | IfThenElse of ExprTypes list * ExprTypes list * ExprTypes list
-    | Generator of ExprTypes * ExprTypes * ExprTypes
+    | Lambda of string list * ExprTypes list * ExprRep
+    | IfThenElse of ExprRep list * ExprRep list * ExprRep list
+    | Generator of ExprRep * ExprRep * ExprRep
     // Has no Unknowns
-    | Resolved of ExprTypes
+    | Resolved of ExprRep
     // Has Unknowns
     | Unresolved of ExprTypes
+
+and ExprRep =
+    {
+        Offset: int
+        Length: int
+        Expr: ExprTypes
+    }
 
 type BarbData = 
     {
         InputType: Type
         OutputType: Type
-        Contents: ExprTypes list
+        Contents: ExprRep list
         Settings: BarbSettings
     }
     with static member Default = { InputType = typeof<unit>; OutputType = typeof<unit>; Contents = []; Settings = BarbSettings.Default }
+
+let exprRepListOffsetLength (exprs: ExprRep seq) =
+    let offsets = exprs |> Seq.map (fun e -> e.Offset)
+    let max = offsets |> Seq.max 
+    let min = offsets |> Seq.min
+    min, max - min
+
+let listToSubExpression (exprs: ExprRep list) =
+    let offset, length = exprRepListOffsetLength exprs
+    { Offset = offset; Length = length; Expr = SubExpression exprs }

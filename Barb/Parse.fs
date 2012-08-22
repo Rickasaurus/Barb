@@ -47,23 +47,29 @@ type StringWindow =
         override t.ToString () = t.Text.Substring(t.Offset) 
 
 
+type MatchReturn = (ExprTypes option * StringWindow) option
+
 type DelimType =
     | Open
     | SCap of string
     | RCap of string
 
+
 type SubexpressionType = 
     {
         Pattern: DelimType list
-        Func: ExprTypes list -> ExprTypes
+        Func: ExprRep list -> ExprRep
     }
     
+type SubexpressionAndOffset = SubexpressionType * int
+
 open System.Numerics
 
 let whitespace = [| " "; "\r"; "\n"; "\t"; |]
 
-let (|Num|_|) (text: StringWindow) =
+let (|Num|_|) (text: StringWindow) : MatchReturn =
     let isnumchar c = c >= '0' && c <= '9' 
+    let textStartAt = text.Offset
     let sb = new StringBuilder()
     if isnumchar text.[0] || (text.[0] = '.' && text.Length >= 2 && isnumchar text.[1]) then
         let rec inner = 
@@ -82,7 +88,7 @@ let (|Num|_|) (text: StringWindow) =
         Some (Some (tokenStr), rest)
     else None
         
-let (|CaptureString|_|) (b: char) (text: StringWindow) = 
+let (|CaptureString|_|) (b: char) (text: StringWindow) : MatchReturn = 
     if text.[0] = b then 
         let sb = new StringBuilder()
         let rec findSafeIndex i =
@@ -96,7 +102,7 @@ let (|CaptureString|_|) (b: char) (text: StringWindow) =
         findSafeIndex 1
     else None  
 
-let (|CaptureUnknown|_|) (endTokens: string list) (text: StringWindow) =
+let (|CaptureUnknown|_|) (endTokens: string list) (text: StringWindow) : MatchReturn =
     let endIndices = 
         endTokens 
         |> List.map (fun e -> text.IndexOf e)
@@ -111,42 +117,67 @@ let (|CaptureUnknown|_|) (endTokens: string list) (text: StringWindow) =
             Some (Some (Unknown tokenText), remainder) 
         else None
 
-let generateBind : ExprTypes list -> ExprTypes = 
-    function 
-    | SubExpression([Unknown(name)]) :: expr :: [] -> Binding (name, expr) 
-    | list -> failwith (sprintf "Incorrect binding syntax: %A" list)
+let generateTuple (exprs: ExprRep list) : ExprRep = 
+    let offset, length = exprRepListOffsetLength exprs in 
+        { Offset = offset; Length = length; Expr = Tuple (exprs |> List.toArray) }
 
-let generateLambda : ExprTypes list -> ExprTypes = 
-    function 
-    | SubExpression(names) :: contents :: [] ->
-        let prms = names |> List.map (function | Unknown n -> n | other -> failwith (sprintf "Unexpected construct in lambda argument list: %A" other))
-        Lambda (prms, List.empty, contents) 
+let generateLambda (exprs: ExprRep list) : ExprRep = 
+    match exprs with 
+    | { Expr = SubExpression(names) } :: contents :: [] ->
+        let offset, length = exprRepListOffsetLength exprs
+        let prms = names |> List.map (function | { Expr = Unknown n } -> n | other -> failwith (sprintf "Unexpected construct in lambda argument list: %A" other))
+        { Offset = offset; Length = length; Expr = Lambda (prms, List.empty, contents) }
     | list -> failwith (sprintf "Incorrect lambda binding syntax: %A" list)
 
-let generateIfThenElse =
-    function
-    | SubExpression(ifexpr) :: SubExpression(thenexpr) :: SubExpression(elseexpr) :: [] -> IfThenElse (ifexpr, thenexpr, elseexpr)
+let generateIfThenElse (exprs: ExprRep list) : ExprRep = 
+    match exprs with
+    | { Expr = SubExpression(ifexpr) } :: { Expr = SubExpression(thenexpr) } :: { Expr = SubExpression(elseexpr) } :: [] -> 
+        let offset, length = exprRepListOffsetLength exprs
+        { Offset = offset; Length = length; Expr = IfThenElse (ifexpr, thenexpr, elseexpr) }
     | list -> failwith (sprintf "Incorrect if-then-else syntax: %A" list)
 
-let generateNumIterator = 
+let generateUnitOrSubExpression: ExprRep list -> ExprRep =  
     function
-    |  SubExpression(starte) :: SubExpression(ende) :: [] -> 
-        Generator (SubExpression(starte), Obj(box 1L), SubExpression(ende))
-    | SubExpression(starte) :: SubExpression(inc) :: SubExpression(ende) :: [] -> 
-        Generator (SubExpression(starte), SubExpression(inc), SubExpression(ende))        
+    // Unit
+    | [{Offset = offset; Length = length; Expr = SubExpression([]) }] -> { Offset = offset; Length = length; Expr = Unit }
+    // Subexpression
+    | exprs -> let offset, length = exprRepListOffsetLength exprs
+               { Offset = offset; Length = length; Expr = SubExpression exprs } 
+
+
+let generateNumIterator: ExprRep list -> ExprRep =  
+    function
+    | startRep :: endRep :: []
+      & { Expr = SubExpression(_) } :: { Expr = SubExpression(_) } :: [] -> 
+        let length = (endRep.Offset + endRep.Length) - startRep.Offset
+        // Report error for the whole generator if the middle is somehow wrong when missing
+        let missingVal = { Offset = startRep.Offset; Length = length; Expr = Obj 1 } 
+        { Offset = startRep.Offset; Length = length; Expr = Generator (startRep, missingVal, endRep) }
+    | startRep :: midRep :: endRep :: [] 
+      & { Expr = SubExpression(_) } :: { Expr = SubExpression(_) } :: { Expr = SubExpression(_) } :: [] -> 
+        let length = (endRep.Offset + endRep.Length) - startRep.Offset
+        { Offset = startRep.Offset; Length = length; Expr = Generator (startRep, midRep, endRep) }
     | list -> failwith (sprintf "Incorrect generator syntax: %A" list)
 
-let whitespaceVocabulary = [" "; "\t"; "\r"; "\n"] 
+let generateIndexArgs (exprs: ExprRep list) : ExprRep = 
+    let offset, length = exprRepListOffsetLength exprs
+    { Offset = offset; Length = length; Expr = IndexArgs <| { Offset = offset; Length = length; Expr = SubExpression exprs } }
+
+let generateBind : ExprRep list -> ExprRep = 
+    function
+    | exprs & { Offset = offset; Length = length; Expr = SubExpression([{ Expr = Unknown(name) }]) } :: expr :: [] -> 
+        { Offset = offset; Length = length; Expr = Binding (name, expr) }
+    | list -> failwith (sprintf "Incorrect binding syntax: %A" list)
 
 let allExpressionTypes = 
     [
-        { Pattern = [Open; RCap ","; Open];                         Func = (fun exprs -> Tuple (exprs |> List.toArray)) }
+        { Pattern = [Open; RCap ","; Open];                         Func = generateTuple }
         { Pattern = [Open; SCap "=>"; Open];                        Func = generateLambda }
         { Pattern = [SCap "fun"; SCap "->"; Open];                  Func = generateLambda }
         { Pattern = [SCap "if"; SCap "then"; SCap "else"; Open];    Func = generateIfThenElse }
-        { Pattern = [SCap "("; SCap ")"];                           Func = (function | [SubExpression([])] -> Unit | exprs -> SubExpression exprs) }
+        { Pattern = [SCap "("; SCap ")"];                           Func = generateUnitOrSubExpression }
         { Pattern = [SCap "{"; RCap ".."; SCap "}"];                Func = generateNumIterator }
-        { Pattern = [SCap "["; SCap "]"];                           Func = (fun exprs -> IndexArgs <| SubExpression exprs) }
+        { Pattern = [SCap "["; SCap "]"];                           Func = generateIndexArgs }
         { Pattern = [SCap "let"; SCap "="; SCap "in"];              Func = generateBind }
         { Pattern = [SCap "var"; SCap "="; SCap "in"];              Func = generateBind }
     ]
@@ -177,6 +208,8 @@ let allSimpleMappings =
         ["-"], Infix (2, subObjects)
     ]
 
+let whitespaceVocabulary = [" "; "\t"; "\r"; "\n"] 
+
 let endUnknownChars = 
     seq {
         for c in whitespaceVocabulary do
@@ -196,12 +229,12 @@ let endUnknownChars =
     |> Set.toList
     |> List.map (fun c -> string c)    
 
-let (|Skip|_|) (skipStrs: string list) (text: StringWindow) : (ExprTypes Option * StringWindow) Option =
+let (|Skip|_|) (skipStrs: string list) (text: StringWindow) : MatchReturn =
     skipStrs 
     |> List.tryFind (fun sstr -> text.StartsWith(sstr))
     |> Option.map (fun m -> None, text.Subwindow(m.Length))
 
-let (|MapSymbol|_|) (text: StringWindow) =
+let (|MapSymbol|_|) (text: StringWindow) : MatchReturn =
     let matches, str = 
         [
             for matchStrs, expr in allSimpleMappings do
@@ -213,7 +246,7 @@ let (|MapSymbol|_|) (text: StringWindow) =
     | [(matched, expr)] -> Some (Some(expr), text.Subwindow(matched.Length))
     | _ -> failwith (sprintf "Ambiguous symbol match: %A" matches)
 
-let (|NewExpression|_|) (typesStack: SubexpressionType list) (text: StringWindow) =
+let (|NewExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringWindow) =
     let matches, str = 
         [ 
             for ct in allExpressionTypes do 
@@ -227,18 +260,19 @@ let (|NewExpression|_|) (typesStack: SubexpressionType list) (text: StringWindow
     | [(mtext, subexprtype)] -> Some (subexprtype, text.Subwindow(mtext.Length))
     | _ -> failwith (sprintf "Ambiguous expression match: %A" matches)
 
-let (|OngoingExpression|_|) (typesStack: SubexpressionType list) (text: StringWindow) =
+let (|OngoingExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringWindow) =
         match typesStack with
-        | current :: parents -> 
+        | (current, offset) :: parents -> 
             match current.Pattern with
-            | (SCap h) :: rest when text.StartsWith(h) -> Some (h, { current with Pattern = rest } :: parents)
-            | (RCap h) :: rest when text.StartsWith(h) -> Some (h, current :: parents)
-            | (RCap _) :: (SCap h) :: rest when text.StartsWith(h) -> Some (h, { current with Pattern = rest } :: parents)
+            | (SCap h) :: rest when text.StartsWith(h) -> Some (h, { current with Pattern = rest })
+            | (RCap h) :: rest when text.StartsWith(h) -> Some (h, current)
+            | (RCap _) :: (SCap h) :: rest when text.StartsWith(h) -> Some (h, { current with Pattern = rest })
             | _ -> None
-            |> Option.map (fun (mtext, subexp) -> subexp, text.Subwindow(mtext.Length))
+            |> Option.map (fun (mtext, expr) -> mtext, (expr, offset) :: parents)       // Add Expression Offset and Parent Subexpressions Back On
+            |> Option.map (fun (mtext, subexp) -> subexp, text.Subwindow(mtext.Length)) // Correct Window Offset
         | _ -> None
 
-let (|RefineOpenExpression|_|) (typesStack: SubexpressionType list) (text: StringWindow) =
+let (|RefineOpenExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringWindow) =
     let matches, str = 
         [ 
             for ct in allExpressionTypes do 
@@ -252,58 +286,74 @@ let (|RefineOpenExpression|_|) (typesStack: SubexpressionType list) (text: Strin
     | [(mtext, subexprtype)] -> Some (subexprtype, text.Subwindow(mtext.Length))
     | _ -> failwith (sprintf "Ambiguous open expression match: %A" matches)    
 
-let rec findClosed (typesStack: SubexpressionType list) = 
+let rec findClosed (typesStack: SubexpressionAndOffset list) = 
     match typesStack with
     | [] -> None
-    | {Pattern = (Open :: _); Func = _} :: rest -> findClosed rest
+    | ({Pattern = (Open :: _); Func = _}, _) :: rest -> findClosed rest
     | other :: rest -> Some other
 
 // Note, don't move the text pointer when finishing an open expression, so that the parent expression is closed.
-let (|FinishOpenExpression|_|) (typesStack: SubexpressionType list) (text: StringWindow) =
+let (|FinishOpenExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringWindow) =
         match typesStack with
-        | current :: rest -> 
+        | (current, offset) :: rest -> 
             match current.Pattern with
             | (Open) :: [] 
             | (RCap _) :: Open :: [] -> 
                 match findClosed rest with
-                | Some (ancestor) -> 
+                | Some (ancestor, ancestorOffset) -> 
                     match ancestor.Pattern with
                     | ((SCap h) :: rest) 
-                    | ((RCap h) :: rest) when text.StartsWith(h) -> Some (current, text)
+                    | ((RCap h) :: rest) when text.StartsWith(h) -> Some (current, offset, text)
                     | _ -> None
-                | None when text.Length = 0 -> Some (current, text)
+                | None when text.Length = 0 -> Some (current, offset, text)
                 | None -> None
             | _ -> None
         | _ -> None
 
 let parseProgram (startText: string) = 
-    let rec parseProgramInner (str: StringWindow) (result: ExprTypes list) (currentCaptures: SubexpressionType list) : (StringWindow * ExprTypes) =
+    let rec parseProgramInner (str: StringWindow) (result: ExprRep list) (currentCaptures: (SubexpressionType * int) list) : (StringWindow * ExprRep) =
         try
             match result with
-            | SubExpression cSubExpr :: rSubExprs -> 
+            | { Offset = cSubExprOffset; Expr = SubExpression cSubExpr } :: rSubExprs -> 
                 match str with
-                | FinishOpenExpression currentCaptures (subtype, crem) ->
-                    let innerResult = SubExpression (cSubExpr |> List.rev) :: rSubExprs  
+                | FinishOpenExpression currentCaptures (subtype, expressionStartOffset, crem) ->
+                    let length = str.Offset - expressionStartOffset
+                    let innerResult = { Offset = expressionStartOffset; Length = length; Expr = SubExpression (cSubExpr |> List.rev) } :: rSubExprs  
                     let value = innerResult |> List.rev |> subtype.Func in 
-                        crem, value         
-                | _ when str.Length = 0 -> str, SubExpression (SubExpression (cSubExpr |> List.rev) :: rSubExprs)            
+                        crem, value
+                | _ when str.Length = 0 -> 
+                    // End of the road, wrap unclosed expressions in a subexpression
+                    let cSubExprRev = cSubExpr |> List.rev
+                    let newSubExpr = { Offset = str.Offset; Length = str.Offset - cSubExprRev.Head.Offset; Expr = SubExpression cSubExprRev } 
+                    str, listToSubExpression (newSubExpr :: rSubExprs)            
                 | OngoingExpression currentCaptures (captures, crem) ->
                     match captures with
                     // Expression is Finished
-                    | { Pattern = []; Func = func } :: parents -> 
-                        let innerResult = SubExpression (cSubExpr |> List.rev) :: rSubExprs  
+                    | ({ Pattern = []; Func = func }, offset) :: parents -> 
+                        let subExprRep = { Offset = offset; Length = crem.Offset - cSubExprOffset; Expr = SubExpression (cSubExpr |> List.rev) }
+                        let innerResult = subExprRep :: rSubExprs  
                         let value = innerResult |> List.rev |> func in 
                             crem, value   
                     // Expression Continues
-                    | { Pattern = h :: rest; Func = _ } :: parents -> parseProgramInner crem (SubExpression [] :: SubExpression (cSubExpr |> List.rev) :: rSubExprs) captures
+                    | ({ Pattern = h :: rest; Func = _ }, prevOffset) :: parents -> 
+                        let fresh = { Offset = str.Offset; Length = Int32.MinValue; Expr = SubExpression [] }
+                        let stale = { Offset = prevOffset; Length = str.Offset - prevOffset; Expr = SubExpression (cSubExpr |> List.rev) }
+                        parseProgramInner crem (fresh :: stale :: rSubExprs) captures
                     | [] -> failwith "Unexpected output from OngoingExpression"
                 | RefineOpenExpression currentCaptures (subtype, crem) ->
-                    // Mid-Expression we've realized we're actually in a different kind.
-                    let rem, value = parseProgramInner crem (SubExpression [] :: SubExpression (cSubExpr |> List.rev) :: []) (subtype :: currentCaptures)               
-                    parseProgramInner rem (SubExpression ([value]) :: rSubExprs) currentCaptures    
+                    // Mid-Expression we find evidence that further restricts the kind of expression it is
+                    let fresh = { Offset = str.Offset; Length = Int32.MinValue; Expr = SubExpression [] }
+                    let stale = { Offset = cSubExprOffset; Length = crem.Offset - cSubExprOffset; Expr = SubExpression (cSubExpr |> List.rev) }
+                    let rem, value = parseProgramInner crem (fresh :: stale :: []) ((subtype, str.Offset) :: currentCaptures) 
+                    let finalExpr = {value with Expr = SubExpression [value]}
+                    //parseProgramInner rem (SubExpression ([value]) :: rSubExprs) currentCaptures
+                    parseProgramInner rem (finalExpr :: rSubExprs) currentCaptures    
                 | NewExpression currentCaptures (subtype, crem) ->
-                    let rem, value = parseProgramInner crem [SubExpression []] (subtype :: currentCaptures)               
-                    parseProgramInner rem (SubExpression (value :: cSubExpr) :: rSubExprs) currentCaptures
+                    let newExpr = { Offset = str.Offset; Length = Int32.MinValue; Expr = SubExpression [] }   
+                    let rem, value = parseProgramInner crem [newExpr] ((subtype, str.Offset) :: currentCaptures)  
+                    let finalExpr = { Offset = crem.Offset; Length = rem.Offset - str.Offset; Expr = SubExpression (value :: cSubExpr)}   
+                    //parseProgramInner rem (SubExpression (value :: cSubExpr) :: rSubExprs) currentCaptures
+                    parseProgramInner rem (finalExpr :: rSubExprs) currentCaptures
                 | Skip whitespaceVocabulary res
                 | Num res
                 | MapSymbol res
@@ -312,9 +362,12 @@ let parseProgram (startText: string) =
                 | CaptureUnknown endUnknownChars res ->
                     let v, rem = res 
                     match v with
-                    | Some value -> parseProgramInner rem (SubExpression (value :: cSubExpr) :: rSubExprs) currentCaptures
+                    | Some value -> 
+                        let newExpr = { Offset = str.Offset; Length = rem.Offset - str.Offset; Expr = value }
+                        let newExprs = { Offset = cSubExprOffset; Length = rem.Offset - cSubExprOffset; Expr = SubExpression (newExpr :: cSubExpr) }
+                        parseProgramInner rem (newExprs :: rSubExprs) currentCaptures
                     | None -> parseProgramInner rem result currentCaptures
                 | str -> parseProgramInner (str.Subwindow(1)) result currentCaptures
             | _ -> failwith "Expected a SubExpression"
         with ex -> raise <| new BarbParsingException(ex.Message, str.Length)
-    let _, res = parseProgramInner (StringWindow(startText, 0)) [SubExpression []] [] in res
+    let _, res = parseProgramInner (StringWindow(startText, 0)) [{ Offset = 0; Length = 0; Expr = SubExpression [] }] [] in res
