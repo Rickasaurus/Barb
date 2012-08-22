@@ -3,6 +3,11 @@
 open System
 open System.Collections.Generic
 
+type BarbException (message, offset: uint32, length: uint32) = 
+    inherit Exception (message)
+    member t.Offset = offset
+    member t.Length = length
+
 type BarbSettings = 
     {
         BindGlobalsWhenReducing: bool

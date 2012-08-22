@@ -21,9 +21,8 @@ open Barb.Representation
 open Checked
 #endif
 
-type BarbParsingException (message, index) = 
-    inherit Exception (message)
-    member t.Index = index
+type BarbParsingException (message, offset, length) =
+    inherit BarbException (message, offset, length)
 
 type StringWindow =
     struct
@@ -249,7 +248,9 @@ let (|MapSymbol|_|) (text: StringWindow) : MatchReturn =
     match matches with
     | [] -> None
     | [(matched, expr)] -> Some (Some(expr), text.Subwindow(uint32 matched.Length))
-    | _ -> failwith (sprintf "Ambiguous symbol match: %A" matches)
+    | _ -> 
+        let errorText = sprintf "Ambiguous symbol match: %A" matches
+        raise (new BarbParsingException(errorText, text.Offset, matches |> List.map (fun (s,e) -> s.Length) |> List.max |> uint32))
 
 let (|NewExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringWindow) =
     let matches, str = 
@@ -263,7 +264,8 @@ let (|NewExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringW
     match matches with
     | [] -> None
     | [(mtext, subexprtype)] -> Some (subexprtype, text.Subwindow(uint32 mtext.Length))
-    | _ -> failwith (sprintf "Ambiguous expression match: %A" matches)
+    | _ -> let errorText = sprintf "Ambiguous expression match: %A" matches
+           raise (new BarbParsingException(errorText, text.Offset, matches |> List.map (fun (s,e) -> s.Length) |> List.max |> uint32))
 
 let (|OngoingExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringWindow) =
         match typesStack with
@@ -289,7 +291,8 @@ let (|RefineOpenExpression|_|) (typesStack: SubexpressionAndOffset list) (text: 
     match matches with
     | []-> None
     | [(mtext, subexprtype)] -> Some (subexprtype, text.Subwindow(uint32 mtext.Length))
-    | _ -> failwith (sprintf "Ambiguous open expression match: %A" matches)    
+    | _ -> let errorText = sprintf "Ambiguous open expression match: %A" matches
+           raise (new BarbParsingException(errorText, text.Offset, matches |> List.map (fun (s,e) -> s.Length) |> List.max |> uint32))
 
 let rec findClosed (typesStack: SubexpressionAndOffset list) = 
     match typesStack with
@@ -374,5 +377,6 @@ let parseProgram (startText: string) =
                     | None -> parseProgramInner rem result currentCaptures
                 | str -> parseProgramInner (str.Subwindow(1u)) result currentCaptures
             | _ -> failwith "Expected a SubExpression"
-        with ex -> raise <| new BarbParsingException(ex.Message, str.Length)
+        with | :? BarbParsingException as ex -> raise ex
+             | ex -> raise <| new BarbParsingException(ex.Message, str.Offset, str.Length)
     let _, res = parseProgramInner (StringWindow(startText, 0u)) [{ Offset = 0u; Length = 0u; Expr = SubExpression [] }] [] in res

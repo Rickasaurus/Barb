@@ -164,7 +164,7 @@ let ``should allow simple variable binding with var`` () =
 [<Fact>]
 let ``should follow scoping rules for bound variables`` () = 
     let testRecord = { HasHat = true; Name = "Don" }
-    Assert.Throws(typeof<System.Exception>, new Assert.ThrowsDelegate(fun () -> 
+    Assert.Throws(typeof<Barb.Reduce.BarbExecutionException>, new Assert.ThrowsDelegate(fun () -> 
         let func = buildExpr<BoolRec,bool> "(let x = true in x = HasHat) && x = true"
         let res = func(testRecord)
         res |> ignore))

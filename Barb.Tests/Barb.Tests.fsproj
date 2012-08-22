@@ -52,6 +52,7 @@
     <Compile Include="TextTests.fs" />
     <Compile Include="OOOTests.fs" />
     <Compile Include="LibTests.fs" />
+    <Compile Include="ErrorReportingTests.fs" />
     <None Include="TSVTableTestFile.tsv">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
