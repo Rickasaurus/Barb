@@ -18,6 +18,7 @@ type BarbSettings =
 
 type MethodSig = ((obj array -> obj) * Type array) list
 
+
 type ExprTypes = 
     | Unit
     | Invoke
@@ -35,8 +36,8 @@ type ExprTypes =
     | AppliedInvoke of string
     | Unknown of string
     | Binding of string * ExprRep
-    // Lambda: Parameters, Args, Contents
-    | Lambda of string list * ExprTypes list * ExprRep
+    // Lambda: Parameters, Bindings, Contents
+    | Lambda of string list * Bindings * ExprRep
     | IfThenElse of ExprRep list * ExprRep list * ExprRep list
     | Generator of ExprRep * ExprRep * ExprRep
     // Has no Unknowns
@@ -50,6 +51,8 @@ and ExprRep =
         Length: int
         Expr: ExprTypes
     }
+
+and Bindings = (String, ExprTypes Lazy) Map 
 
 type BarbData = 
     {
@@ -91,3 +94,6 @@ and exprExists (pred: ExprTypes -> bool) (expr: ExprTypes) =
     | Unresolved (expr) -> exprExists pred expr
     // Nothing found
     | _ -> false
+
+let wrapResolved (rep: ExprRep) = { rep with Expr = Resolved rep }
+let wrapUnresolved (rep: ExprRep) = { rep with Expr = Unresolved rep.Expr }

@@ -22,23 +22,16 @@ let resolveExpressionResult (input: ExprRep list) =
     | { Expr = Tuple (items) } :: [] -> tupleToObj items |> box
     | otherTokens -> failwith (otherTokens |> List.fold (fun s t -> s + (sprintf "Unexpected result: %A" t.Expr)) "")
 
+let applyArgToLambda (prms, bindings, expr) (arg: obj) =
+    match prms with
+    | [] -> failwith (sprintf "Unexpected Lambda Argument %A" arg)
+    | bindname :: restprms ->
+        let bindings = bindings |> Map.add bindname (Obj arg |> Lazy.CreateFromValue)
+        Lambda(restprms, bindings, expr)
+
 let resolveExpression exprs initialBindings settings (finalReduction: bool) = 
 
-    let rec applyArgToLambda bindings (prms, eargs: ExprTypes list, expr) (arg: obj) =
-        let args = Obj arg :: eargs
-        if List.length prms = List.length args then
-            let newbindings = 
-                args 
-                |> List.map Lazy.CreateFromValue 
-                |> List.rev
-                |> List.zip prms 
-                |> Seq.append (Map.toSeq bindings) 
-                |> Map.ofSeq 
-            SubExpression (reduceExpressions [] [expr] newbindings)
-        else
-            Lambda(prms, args, expr)
-
-    and (|ResolveSingle|_|) bindings =
+    let rec (|ResolveSingle|_|) bindings =
         function 
         | left, ({ Expr = rExpr } & r) :: rt ->
             let wrapit e = { r with Expr = e }
@@ -92,6 +85,10 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                     let rthen = reduceExpressions [] thenexpr bindings |> List.rev
                     let relse = reduceExpressions [] elseexpr bindings |> List.rev
                     IfThenElse (rif |> List.rev, rthen, relse) |> Unresolved |> wrapit |> Some
+            // Execute Lambda when fully applied, but only on final reduction to preserve semantics
+            | Lambda ([],lambdaBindings,lamdbaExpr) when finalReduction -> 
+                let totalBindings = Seq.concat [(Map.toSeq initialBindings); (Map.toSeq lambdaBindings)] |> Map.ofSeq
+                SubExpression (reduceExpressions [] [lamdbaExpr] totalBindings)  |> wrapit |> Some
             | _ -> None
             |> Option.map (fun res -> res, left, rt)
         | _ -> None
@@ -112,7 +109,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
             | Obj l, AppliedInvoke r when finalReduction -> resolveInvoke l r
             | IndexedProperty l, IndexArgs ({ Expr = Obj r }) -> executeIndexer l r
             | Obj l, IndexArgs ({ Expr = Obj r }) -> callIndexedProperty l r
-            | Lambda (p,a,e), Obj r -> applyArgToLambda bindings (p,a,e) r |> Some            
+            | Lambda (p,b,e), Obj r -> applyArgToLambda (p,b,e) r |> Some          
             | _ -> None
             |> Option.map (fun res -> {Offset = lOffset; Length = (rOffset + rLength) - lOffset; Expr = res}, lt, rt)
         | _ -> None
@@ -139,24 +136,28 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
         | left, (({Expr = Binding (bindName, bindInnerExpr)} & bindExpr) :: rt)  ->
             match reduceExpressions [] [bindInnerExpr] bindings with
             // Recursive Lambda Binding
-            | lmbExpr :: [] & {Expr = Lambda(p,a,lexpr)} :: [] 
+            | lmbExpr :: [] & {Expr = Lambda(lprms,lbinds,lexpr)} :: [] 
                 when not finalReduction
                 && lexpr |> exprExistsInRep (function | Unknown name when name = bindName -> true | _ -> false) ->
-                    let cleanBinds = p |> List.fold (fun bnds pn -> if bnds |> Map.containsKey pn then bnds |> Map.remove pn else bnds) bindings         
+                    // Bindings with the same name as lambda arguments must be removed so that names are not incorrectly bound to same-name variables in scope
+                    let cleanBinds = lprms |> List.fold (fun bnds pn -> if bnds |> Map.containsKey pn then bnds |> Map.remove pn else bnds) bindings         
                     let reducedExpr = reduceExpressions [] [lexpr] cleanBinds
                     let recLambda = 
-//                        let reducedLambda = {lmbExpr with Expr = Lambda(p,a,{lexpr with Expr = SubExpression reducedExpr})} in
-//                        let newBind = {bindExpr with Expr = Binding(bindName, reducedLambda)} in
-//                        let newSubExpr = {lmbExpr with Expr = SubExpression (newBind::reducedExpr)} in
-//                        let newLambdaExpr = {lmbExpr with Expr = Lambda(p,a,newSubExpr) }
-//                        { bindExpr with Expr = Binding(bindName, newLambdaExpr) }
-                        { bindExpr with 
-                            Expr = Binding(bindName, { lmbExpr with Expr = SubExpression ({bindExpr with Expr = Binding(bindName, {lmbExpr with Expr = Lambda(p,a,{ lmbExpr with Expr = SubExpression reducedExpr })})} :: reducedExpr)})
-                        }
+                        // Unresolved Binding Lambda SubExpression
+                        //   Binding (Lambda ReducedExpr)
+                        //   ReducedExpr
+                        let innerLambda = {lmbExpr with Expr = Lambda(lprms,lbinds, { lmbExpr with Expr = SubExpression reducedExpr })}
+                        let innerBinding = {bindExpr with Expr = Binding(bindName, innerLambda)} 
+                        let innerSub = {lmbExpr with Expr = SubExpression (innerLambda :: reducedExpr)} 
+                        let outterLambda = {lmbExpr with Expr = Lambda(lprms,lbinds,innerSub) }
+                        let outterBind = {bindExpr with Expr = Binding(bindName, outterLambda) }
+                        outterBind |> wrapUnresolved
                     reduceExpressions left (recLambda :: rt) bindings
             // Non-Recursive Lambda Binding
-            | lmbExpr :: [] & {Expr = Lambda(p,a,lexpr)} :: []  when not finalReduction ->
-                let reducedLambda = Lambda(p,a, { lexpr with Expr = SubExpression <| reduceExpressions [] [lexpr] bindings })
+            | lmbExpr :: [] & {Expr = Lambda(lprms,lbinds,lexpr)} :: []  when not finalReduction ->
+                // Bindings with the same name as lambda arguments must be removed so that names are not incorrectly bound to same-name variables in scope
+                let cleanBinds = lprms |> List.fold (fun bnds pn -> if bnds |> Map.containsKey pn then bnds |> Map.remove pn else bnds) bindings         
+                let reducedLambda = Lambda(lprms, lbinds, { lexpr with Expr = SubExpression <| reduceExpressions [] [lexpr] cleanBinds }) |> Unresolved
                 let newbindings = bindings |> Map.add bindName (lazy reducedLambda) in
                     reduceExpressions left rt newbindings
             // Normal Value Binding
