@@ -11,12 +11,14 @@ type BarbException (message, offset: uint32, length: uint32) =
 type BarbSettings = 
     {
         BindGlobalsWhenReducing: bool
+        FailOnCatchAll: bool
         Namespaces: string Set
         AdditionalBindings: IDictionary<string,obj>
     }
     with static member Default = 
             { 
                 BindGlobalsWhenReducing = true
+                FailOnCatchAll = true
                 AdditionalBindings = [] |> dict
                 Namespaces = [null; ""; "System"; "Microsoft.FSharp"; "Microsoft.FSharp.Collections"; "Barb.Lib"] |> Set.ofList
             }
@@ -63,7 +65,7 @@ and Bindings = (String, ExprTypes Lazy) Map
 
 type BarbData = 
     {
-        InputType: Type
+        InputType: Type 
         OutputType: Type
         Contents: ExprRep list
         Settings: BarbSettings

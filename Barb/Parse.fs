@@ -56,7 +56,7 @@ type DelimType =
     | Open
     | SCap of string
     | RCap of string
-
+    | MCap of DelimType
 
 type SubexpressionType = 
     {
@@ -182,7 +182,9 @@ let allExpressionTypes =
         { Pattern = [SCap "("; SCap ")"];                           Func = generateUnitOrSubExpression }
         { Pattern = [SCap "{"; RCap ".."; SCap "}"];                Func = generateNumIterator }
         { Pattern = [SCap "["; SCap "]"];                           Func = generateIndexArgs }
+//        { Pattern = [SCap "let"; SCap "="; Open];                   Func = generateBind }
         { Pattern = [SCap "let"; SCap "="; SCap "in"];              Func = generateBind }
+//        { Pattern = [SCap "var"; SCap "="; Open];                   Func = generateBind }
         { Pattern = [SCap "var"; SCap "="; SCap "in"];              Func = generateBind }
     ]
 

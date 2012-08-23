@@ -33,7 +33,7 @@ module Compiler =
             parsed.Settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, lazy (Obj kv.Value))
 
         let reducedExpression = 
-            resolveExpression parsed.Contents Map.empty parsed.Settings false |> List.rev
+            resolveExpression parsed.Contents Map.empty parsed.Settings false |> fst |> List.rev
 
         #if DEBUG
         let reOutput = Environment.NewLine + (sprintf "RE: %A" reducedExpression) + Environment.NewLine in
@@ -41,6 +41,9 @@ module Compiler =
         #endif
            
         { parsed with Contents = reducedExpression }
+
+    let reduceFinal (context: Bindings) (parsed: BarbData) : ExprRep list * Bindings =
+        resolveExpression parsed.Contents context parsed.Settings true
 
     let setInput (inputType: Type) (data: BarbData) : BarbData =
         { data with InputType = inputType }
@@ -68,7 +71,7 @@ module Compiler =
             #endif
 
             resolveExpression data.Contents inputBindings data.Settings true
-            |> resolveExpressionResult
+            |> fst |> resolveExpressionResult
 
         fun input -> 
             let naiveResult = calculateResult input

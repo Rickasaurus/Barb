@@ -42,19 +42,22 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                     match rExpr with
                     | Returned o -> resolveResultType o |> wrapit |> Some
                     | SubExpression exp ->
-                        match reduceExpressions [] exp bindings |> List.rev with
+                        match reduceExpressions [] exp bindings |> fst |> List.rev with
                         | single :: [] -> single
                         | many -> SubExpression many |> Unresolved |> wrapit
                         |> Some
                     | IndexArgs ({ Expr = SubExpression exp }) when finalReduction ->
-                        match reduceExpressions [] exp bindings |> List.rev with
+                        match reduceExpressions [] exp bindings |> fst |> List.rev with
                         | [] -> failwith (sprintf "No indexer found in [ ]")
                         | single :: [] -> IndexArgs single |> wrapit
                         | other -> failwith (sprintf "Indexer could not be fully reduced.")
                         |> Some
                     | Tuple tc -> 
-                        let reducedTuples = tc |> Array.map (fun t -> match reduceExpressions [] [t] bindings with | ({ Expr = Obj o } & oobj) :: [] -> oobj 
-                                                                                                                   | res -> SubExpression res |> wrapit)
+                        let reducedTuples = 
+                            tc |> Array.map (fun t -> 
+                                    match reduceExpressions [] [t] bindings |> fst  with 
+                                    | ({ Expr = Obj o } & oobj) :: [] -> oobj 
+                                    | res -> SubExpression res |> wrapit)
                         match reducedTuples |> Array.forall (function | {Expr = Obj o} -> true | _ -> false) with
                         | true -> reducedTuples |> (fun tc -> Obj (tupleToObj tc |> box))
                         | false -> reducedTuples |> Tuple |> Unresolved
@@ -66,9 +69,9 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         | (:? float as s), (:? float as i), (:? float as e) -> Obj (seq {s .. i .. e }) |> wrapit |> Some
                         | _ -> failwith (sprintf "Unexpected Generator Parameters: %A, %A, %A" s i e)
                     | Generator (sexpr, iexpr, eexpr) ->
-                        let rs = reduceExpressions [] [sexpr] bindings
-                        let ri = reduceExpressions [] [iexpr] bindings
-                        let re = reduceExpressions [] [eexpr] bindings
+                        let rs, _ = reduceExpressions [] [sexpr] bindings
+                        let ri, _ = reduceExpressions [] [iexpr] bindings
+                        let re, _ = reduceExpressions [] [eexpr] bindings
                         match rs, ri, re with
                         | (({Expr = Obj(s)} :: []), ({Expr = Obj(i)} :: []), ({Expr = Obj(e)} :: [])) -> 
                             Generator ({sexpr with Expr = Obj(s)}, {iexpr with Expr = Obj(i)}, {eexpr with Expr = Obj(e)}) |> wrapit |> Some
@@ -77,22 +80,22 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                             Generator gen |> Unresolved |> wrapit |> Some
                         | _ -> failwith (sprintf "One or more generator expressions could not be resolved: %A, %A, %A" rs ri re)
                     | IfThenElse (ifexpr, thenexpr, elseexpr) ->
-                        match reduceExpressions [] ifexpr bindings with
+                        match reduceExpressions [] ifexpr bindings |> fst with
                         // If fully resolved in initial reduction, resolve and return the result clause
                         | {Expr = Obj (:? bool as res)} :: [] -> 
                             if res then reduceExpressions [] thenexpr bindings
                             else reduceExpressions [] elseexpr bindings
-                            |> (fun resExpr -> Some (SubExpression(resExpr) |> wrapit))
+                            |> (fun resExpr -> Some (SubExpression(resExpr |> fst) |> wrapit))
                         // If not fully resolved in initial reduction, reduce both clauses and return the result
                         // Note: If in the future globally scoped Variables are added, resolving them here will cause problems with inner non-pure calls
                         | rif -> 
-                            let rthen = reduceExpressions [] thenexpr bindings |> List.rev
-                            let relse = reduceExpressions [] elseexpr bindings |> List.rev
+                            let rthen = reduceExpressions [] thenexpr bindings |> fst |> List.rev
+                            let relse = reduceExpressions [] elseexpr bindings |> fst |> List.rev
                             IfThenElse (rif |> List.rev, rthen, relse) |> Unresolved |> wrapit |> Some
                     // Execute Lambda when fully applied, but only on final reduction to preserve semantics
                     | Lambda ({Params = []} & l) when finalReduction -> 
                         let totalBindings = Seq.concat [(Map.toSeq initialBindings); (Map.toSeq l.Bindings)] |> Map.ofSeq
-                        SubExpression (reduceExpressions [] [l.Contents] totalBindings)  |> wrapit |> Some
+                        SubExpression (reduceExpressions [] [l.Contents] totalBindings |> fst)  |> wrapit |> Some
                     | _ -> None
                     |> Option.map (fun res -> res, left, rt)
                 with ex -> raise <| new BarbExecutionException(ex.Message, exprOffset, exprLength)
@@ -138,18 +141,18 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
         | _ -> None
 
     // Tries to merge/convert local tokens, if it can't it moves to the right
-    and reduceExpressions (lleft: ExprRep list) (lright: ExprRep list) (bindings: (string, ExprTypes Lazy) Map) =
+    and reduceExpressions (lleft: ExprRep list) (lright: ExprRep list) (bindings: Bindings) : ExprRep list * Bindings=
         match lleft, lright with
         | left, (rExpr & {Expr = Unresolved(expr)}) :: rt -> reduceExpressions ({rExpr with Expr = expr} :: left) rt bindings
         // Binding
         | left, (({Expr = Binding (bindName, bindInnerExpr)} & bindExpr) :: rt)  ->
-            match reduceExpressions [] [bindInnerExpr] bindings with
+            match reduceExpressions [] [bindInnerExpr] bindings |> fst with
             // Recursive Lambda Binding
             | lmbExpr :: [] & {Expr = Lambda(lambda)} :: [] 
                 when not finalReduction ->
                     // Bindings with the same name as lambda arguments must be removed so that names are not incorrectly bound to same-name variables in scope
                     let cleanBinds = lambda.Params |> List.fold (fun bnds pn -> if bnds |> Map.containsKey pn then bnds |> Map.remove pn else bnds) bindings         
-                    let reducedExpr = reduceExpressions [] [lambda.Contents] cleanBinds
+                    let reducedExpr, _ = reduceExpressions [] [lambda.Contents] cleanBinds
                     let recLambda = 
                         let newLambda = {lambda with Contents = { lambda.Contents with Expr = SubExpression reducedExpr }}
                         do newLambda.Bindings <- newLambda.Bindings |> Map.add bindName (Lambda newLambda |> Lazy.CreateFromValue)
@@ -166,7 +169,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
         // Continue
         | l,  r :: rt -> reduceExpressions (r :: l) rt bindings
         // Single Element, Done Reducing
-        | l :: [], [] -> [l]
+        | l :: [], [] -> [l], bindings
         | catchall when finalReduction -> 
             let offset, length = 
                 match catchall with
@@ -176,7 +179,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 | _ -> 0u, 0u
             raise <| new BarbExecutionException (sprintf "Unexpected case: %A" catchall, offset, length)
         // Multiple Elements, Done Reducing
-        | left, [] -> left
+        | left, [] -> left, bindings
 
     reduceExpressions [] exprs initialBindings
 

@@ -1,9 +1,11 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 2012
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Barb", "Barb\Barb.fsproj", "{8909D27B-857D-4273-BA1A-C01236906FCA}"
 EndProject
 Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "Barb.Tests", "Barb.Tests\Barb.Tests.fsproj", "{482B4B14-7FDA-4857-8021-BA599ABEC8EB}"
+EndProject
+Project("{F2A71F9B-5D33-465A-A702-920D77279786}") = "BarbRepl", "BarbRepl\BarbRepl.fsproj", "{41A027B6-813D-4AFC-B00C-E7E5D2984AC3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -19,6 +21,10 @@ Global
 		{482B4B14-7FDA-4857-8021-BA599ABEC8EB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{482B4B14-7FDA-4857-8021-BA599ABEC8EB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{482B4B14-7FDA-4857-8021-BA599ABEC8EB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{41A027B6-813D-4AFC-B00C-E7E5D2984AC3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{41A027B6-813D-4AFC-B00C-E7E5D2984AC3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{41A027B6-813D-4AFC-B00C-E7E5D2984AC3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{41A027B6-813D-4AFC-B00C-E7E5D2984AC3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
