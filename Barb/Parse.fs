@@ -37,7 +37,7 @@ type StringWindow =
             let offset = t.Offset
             let textLen = t.Length
             let rec matches (i: uint32) res =
-                if i > textLen - 1u then false
+                if i >= textLen then false
                 else
                     let newres = res && (text.[int <| offset + i] = str.[int i])
                     match i, newres with | 0u, _ -> newres | _, false -> newres | _ -> matches (i - 1u) newres

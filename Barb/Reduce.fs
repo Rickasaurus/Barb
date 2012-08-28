@@ -98,7 +98,9 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         SubExpression (reduceExpressions [] [l.Contents] totalBindings |> fst)  |> wrapit |> Some
                     | _ -> None
                     |> Option.map (fun res -> res, left, rt)
-                with ex -> raise <| new BarbExecutionException(ex.Message, exprOffset, exprLength)
+                with
+                | :? BarbException as ex -> raise ex 
+                | ex -> raise <| new BarbExecutionException(ex.Message, exprOffset, exprLength)
             | _ -> None
 
     and (|ResolveTuple|_|) bindings =
@@ -121,7 +123,9 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 | Lambda (lambda), Obj r -> applyArgToLambda lambda r |> Some          
                 | _ -> None
                 |> Option.map (fun res -> {Offset = lOffset; Length = (rOffset + rLength) - lOffset; Expr = res}, lt, rt)
-            with ex ->
+            with
+            | :? BarbException as ex -> raise ex  
+            | ex ->
                 let totalLength = (rOffset - lOffset) + rLength 
                 raise <| new BarbExecutionException (ex.Message, lOffset, totalLength)
         | _ -> None

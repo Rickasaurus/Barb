@@ -1,6 +1,15 @@
-﻿open Barb.Representation
+﻿open System
+open Barb.Representation
 open Barb.Compiler
 
+let printHighlightedError (input: string) (ex: BarbException) =
+    let initialColor = System.Console.ForegroundColor
+    do System.Console.Write(" ")
+       System.Console.Write (input.Substring(0, int ex.Offset))
+       System.Console.ForegroundColor <- ConsoleColor.Red
+       System.Console.Write (input.Substring(int ex.Offset, int ex.Length))
+       System.Console.ForegroundColor <- initialColor
+       System.Console.WriteLine (input.Substring(int <| ex.Offset + ex.Length))
 
 
 [<EntryPoint>]
@@ -47,11 +56,14 @@ let main argv =
     while not !exitRepl do
         printf "Barb> "
         lastCmd := System.Console.ReadLine()
+        let highlightedErrorFunc = printHighlightedError !lastCmd
         if parseCommands ((!lastCmd).ToLowerInvariant()) then ()
         else
             let parsed = 
                 try parse settings !lastCmd |> Some
-                with ex -> printfn "Error in Parse: %s" ex.Message; None
+                with :? BarbException as ex ->
+                           printfn "Error in Parse: %s" ex.Message
+                           highlightedErrorFunc ex; None
             if !showParsed then
                 parsed |> Option.iter (fun parsed -> 
                     printfn "---- Parsed Representation ----"
@@ -59,7 +71,9 @@ let main argv =
                     printfn "-------------------------------")
             let optimzied = 
                 try parsed |> Option.map (fun parsed -> reduce parsed)
-                with ex -> printfn "Error in Optimization: %s" ex.Message; None
+                with :? BarbException as ex ->
+                           printfn "Error in Optimization: %s" ex.Message; 
+                           highlightedErrorFunc ex; None
             if !showOptimized then
                 optimzied |> Option.iter (fun optimzied -> 
                     printfn "---- Optimized Representation ----"
@@ -67,7 +81,9 @@ let main argv =
                     printfn "----------------------------------")
             let final = 
                 try optimzied |> Option.map (fun optimized -> reduceFinal !context optimized) 
-                with ex -> printfn "Error in Execution: %s" ex.Message; None
+                with :? BarbException as ex -> 
+                           printfn "Error in Execution: %s" ex.Message
+                           highlightedErrorFunc ex; None
             match final with
             | Some (lr, lc) -> 
                 lastResult := lr; context := lc
