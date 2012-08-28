@@ -47,7 +47,7 @@ and ExprTypes =
     | Binding of string * ExprRep
     // Lambda: Parameters, Bindings, Contents
     | Lambda of LambdaRecord
-    | IfThenElse of ExprRep list * ExprRep list * ExprRep list
+    | IfThenElse of ExprRep * ExprRep * ExprRep
     | Generator of ExprRep * ExprRep * ExprRep
     // Has no Unknowns
     | Resolved of ExprRep
@@ -92,10 +92,10 @@ and exprExists (pred: ExprTypes -> bool) (expr: ExprTypes) =
     | IndexArgs (rep) -> exprExistsInRep pred rep
     | Binding (name, rep) -> exprExistsInRep pred rep
     | Lambda (lambda) -> exprExistsInRep pred (lambda.Contents)
-    | IfThenElse (ifexpr, thenexpr, elseexpr) ->
-        if ifexpr |> List.exists (exprExistsInRep pred) then true
-        elif thenexpr |> List.exists (exprExistsInRep pred) then true
-        elif elseexpr |> List.exists (exprExistsInRep pred) then true
+    | IfThenElse (ifRep, thenRep, elseRep) ->
+        if   ifRep   |> exprExistsInRep pred then true
+        elif thenRep |> exprExistsInRep pred then true
+        elif elseRep |> exprExistsInRep pred then true
         else false
     | Generator (fromRep, incRep, toRep) -> [fromRep; incRep; toRep] |> List.exists (exprExistsInRep pred) 
     // The two tagged cases

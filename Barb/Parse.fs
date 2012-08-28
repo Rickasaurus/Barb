@@ -135,9 +135,11 @@ let generateLambda (exprs: ExprRep list) : ExprRep =
 
 let generateIfThenElse (exprs: ExprRep list) : ExprRep = 
     match exprs with
-    | { Expr = SubExpression(ifexpr) } :: { Expr = SubExpression(thenexpr) } :: { Expr = SubExpression(elseexpr) } :: [] -> 
+    | ({ Expr = SubExpression(ifexpr)   } & ifRep)   :: 
+      ({ Expr = SubExpression(thenexpr) } & thenRep) ::
+      ({ Expr = SubExpression(elseexpr) } & elseRep) :: [] -> 
         let offset, length = exprRepListOffsetLength exprs
-        { Offset = offset; Length = length; Expr = IfThenElse (ifexpr, thenexpr, elseexpr) }
+        { Offset = offset; Length = length; Expr = IfThenElse (ifRep, thenRep, elseRep) }
     | list -> failwith (sprintf "Incorrect if-then-else syntax: %A" list)
 
 let generateUnitOrSubExpression: ExprRep list -> ExprRep =  
@@ -356,13 +358,11 @@ let parseProgram (startText: string) =
                     let stale = { Offset = cSubExprOffset; Length = crem.Offset - cSubExprOffset; Expr = SubExpression (cSubExpr |> List.rev) }
                     let rem, value = parseProgramInner crem (fresh :: stale :: []) ((subtype, str.Offset) :: currentCaptures) 
                     let finalExpr = {value with Expr = SubExpression [value]}
-                    //parseProgramInner rem (SubExpression ([value]) :: rSubExprs) currentCaptures
                     parseProgramInner rem (finalExpr :: rSubExprs) currentCaptures    
                 | NewExpression currentCaptures (subtype, crem) ->
                     let newExpr = { Offset = str.Offset; Length = UInt32.MaxValue; Expr = SubExpression [] }   
                     let rem, value = parseProgramInner crem [newExpr] ((subtype, str.Offset) :: currentCaptures)  
                     let finalExpr = { Offset = crem.Offset; Length = rem.Offset - str.Offset; Expr = SubExpression (value :: cSubExpr)}   
-                    //parseProgramInner rem (SubExpression (value :: cSubExpr) :: rSubExprs) currentCaptures
                     parseProgramInner rem (finalExpr :: rSubExprs) currentCaptures
                 | Skip whitespaceVocabulary res
                 | Num res

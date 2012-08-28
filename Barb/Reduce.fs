@@ -80,18 +80,19 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                             Generator gen |> Unresolved |> wrapit |> Some
                         | _ -> failwith (sprintf "One or more generator expressions could not be resolved: %A, %A, %A" rs ri re)
                     | IfThenElse (ifexpr, thenexpr, elseexpr) ->
-                        match reduceExpressions [] ifexpr bindings |> fst with
+                        match reduceExpressions [] [ifexpr] bindings |> fst with
                         // If fully resolved in initial reduction, resolve and return the result clause
                         | {Expr = Obj (:? bool as res)} :: [] -> 
-                            if res then reduceExpressions [] thenexpr bindings
-                            else reduceExpressions [] elseexpr bindings
+                            if res then reduceExpressions [] [thenexpr] bindings
+                            else reduceExpressions [] [elseexpr] bindings
                             |> (fun resExpr -> Some (SubExpression(resExpr |> fst) |> wrapit))
                         // If not fully resolved in initial reduction, reduce both clauses and return the result
                         // Note: If in the future globally scoped Variables are added, resolving them here will cause problems with inner non-pure calls
                         | rif -> 
-                            let rthen = reduceExpressions [] thenexpr bindings |> fst |> List.rev
-                            let relse = reduceExpressions [] elseexpr bindings |> fst |> List.rev
-                            IfThenElse (rif |> List.rev, rthen, relse) |> Unresolved |> wrapit |> Some
+                            let repIf = { ifexpr with Expr = rif |> List.rev |> SubExpression }
+                            let repThen = { thenexpr with Expr = reduceExpressions [] [thenexpr] bindings |> fst |> List.rev |> SubExpression }
+                            let repElse = { elseexpr with Expr = reduceExpressions [] [elseexpr] bindings |> fst |> List.rev |> SubExpression }
+                            IfThenElse (repIf, repThen, repElse) |> Unresolved |> wrapit |> Some
                     // Execute Lambda when fully applied, but only on final reduction to preserve semantics
                     | Lambda ({Params = []} & l) when finalReduction -> 
                         let totalBindings = Seq.concat [(Map.toSeq initialBindings); (Map.toSeq l.Bindings)] |> Map.ofSeq
