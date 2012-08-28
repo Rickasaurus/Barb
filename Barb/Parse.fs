@@ -171,8 +171,8 @@ let generateIndexArgs (exprs: ExprRep list) : ExprRep =
 
 let generateBind : ExprRep list -> ExprRep = 
     function
-    | exprs & { Offset = offset; Length = length; Expr = SubExpression([{ Expr = Unknown(name) }]) } :: expr :: [] -> 
-        { Offset = offset; Length = length; Expr = Binding (name, expr) }
+    | exprs & { Offset = offset; Length = length; Expr = SubExpression([{ Expr = Unknown(name) }]) } :: bindExpr :: scopeExpr :: [] -> 
+        { Offset = offset; Length = length; Expr = Binding (name, bindExpr, scopeExpr) }
     | list -> failwith (sprintf "Incorrect binding syntax: %A" list)
 
 let allExpressionTypes = 
@@ -185,9 +185,9 @@ let allExpressionTypes =
         { Pattern = [SCap "{"; RCap ".."; SCap "}"];                Func = generateNumIterator }
         { Pattern = [SCap "["; SCap "]"];                           Func = generateIndexArgs }
 //        { Pattern = [SCap "let"; SCap "="; Open];                   Func = generateBind }
-        { Pattern = [SCap "let"; SCap "="; SCap "in"];              Func = generateBind }
+        { Pattern = [SCap "let"; SCap "="; SCap "in"; Open];              Func = generateBind }
 //        { Pattern = [SCap "var"; SCap "="; Open];                   Func = generateBind }
-        { Pattern = [SCap "var"; SCap "="; SCap "in"];              Func = generateBind }
+        { Pattern = [SCap "var"; SCap "="; SCap "in"; Open];              Func = generateBind }
     ]
 
 let allSimpleMappings = 

@@ -29,6 +29,7 @@ type MethodSig = ((obj array -> obj) * Type array) list
 type LambdaRecord = { Params: string list; mutable Bindings: Bindings; Contents: ExprRep }
 
 and ExprTypes = 
+    (* Units *)
     | Unit
     | Invoke
     | New
@@ -39,16 +40,18 @@ and ExprTypes =
     | Prefix of (obj -> obj)    
     | Postfix of (obj -> obj)
     | Infix of int * (obj -> obj -> obj) 
-    | SubExpression of ExprRep list
-    | Tuple of ExprRep array
     | IndexArgs of ExprRep
     | AppliedInvoke of string
     | Unknown of string
-    | Binding of string * ExprRep
-    // Lambda: Parameters, Bindings, Contents
+    (* Containers *)
+    | SubExpression of ExprRep list
+    | Tuple of ExprRep array
+    // Binding: Name, Bound Expression, Scope
+    | Binding of string * ExprRep * ExprRep
     | Lambda of LambdaRecord
     | IfThenElse of ExprRep * ExprRep * ExprRep
     | Generator of ExprRep * ExprRep * ExprRep
+    (* Tags *)
     // Has no Unknowns
     | Resolved of ExprTypes
     // Has Unknowns
@@ -90,13 +93,11 @@ and exprExists (pred: ExprTypes -> bool) (expr: ExprTypes) =
     | SubExpression (repList) -> repList |> List.exists (exprExistsInRep pred)
     | Tuple (repArray) -> repArray |> Array.exists (exprExistsInRep pred)
     | IndexArgs (rep) -> exprExistsInRep pred rep
-    | Binding (name, rep) -> exprExistsInRep pred rep
+    | Binding (name, rep, scopeRep) -> 
+        exprExistsInRep pred rep || exprExistsInRep pred scopeRep
     | Lambda (lambda) -> exprExistsInRep pred (lambda.Contents)
     | IfThenElse (ifRep, thenRep, elseRep) ->
-        if   ifRep   |> exprExistsInRep pred then true
-        elif thenRep |> exprExistsInRep pred then true
-        elif elseRep |> exprExistsInRep pred then true
-        else false
+        ifRep |> exprExistsInRep pred || thenRep |> exprExistsInRep pred || elseRep |> exprExistsInRep pred
     | Generator (fromRep, incRep, toRep) -> [fromRep; incRep; toRep] |> List.exists (exprExistsInRep pred) 
     // The two tagged cases
     | Resolved (rep) -> exprExists pred rep

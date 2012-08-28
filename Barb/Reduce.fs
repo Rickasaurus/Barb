@@ -150,7 +150,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
         match lleft, lright with
         | left, (rExpr & {Expr = Unresolved(expr)}) :: rt -> reduceExpressions ({rExpr with Expr = expr} :: left) rt bindings
         // Binding
-        | left, (({Expr = Binding (bindName, bindInnerExpr)} & bindExpr) :: rt)  ->
+        | left, (({Expr = Binding (bindName, bindInnerExpr, boundScope)} & bindExpr) :: rt)  ->
             match reduceExpressions [] [bindInnerExpr] bindings |> fst with
             // Recursive Lambda Binding
             | lmbExpr :: [] & {Expr = Lambda(lambda)} :: [] 
@@ -163,11 +163,13 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         do newLambda.Bindings <- newLambda.Bindings |> Map.add bindName (Lambda newLambda |> Lazy.CreateFromValue)
                         { lmbExpr with Expr = Lambda newLambda }
                     let newbindings = bindings |> Map.add bindName (lazy recLambda.Expr)
-                    reduceExpressions left rt newbindings
+                    let res = { bindExpr with Expr = reduceExpressions [] [boundScope] newbindings |> fst |> SubExpression }
+                    reduceExpressions left (res :: rt) newbindings
             // Normal Value Binding
             | rexpr -> 
                 let newbindings = bindings |> Map.add bindName (lazy SubExpression rexpr) in
-                    reduceExpressions left rt newbindings
+                    let res = { bindExpr with Expr = reduceExpressions [] [boundScope] newbindings |> fst |> SubExpression }
+                    reduceExpressions left (res :: rt) bindings
         | ResolveSingle bindings (res, lt, rt)
         | ResolveTuple bindings (res, lt, rt) 
         | ResolveTriple (res, lt, rt) -> reduceExpressions lt (res :: rt) bindings
