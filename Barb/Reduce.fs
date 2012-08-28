@@ -109,20 +109,34 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
         | {Offset = lOffset; Length = lLength; Expr = l} :: lt, {Offset = rOffset; Length = rLength; Expr = r } :: rt ->
             try 
                 match l, r with
+                // Apply a postfix function and return the result
                 | Obj l, Postfix r -> Returned (r l) |> Some
+                // Apply a prefix function and return the result
                 | Prefix l, Obj r -> Returned (l r) |> Some
+                // Execute a parameterless method
                 | Method l, Unit -> executeUnitMethod l
+                // Execute some method given parameters r
                 | Method l, Obj r -> executeParameterizedMethod l r 
+                // Perform a .NET-Application wide scope invocation
                 | Unknown l, AppliedInvoke r when finalReduction || settings.BindGlobalsWhenReducing -> cachedResolveStatic (settings.Namespaces, l, r)
+                // New is allowed so C# users feel at home, it really does nothing though
                 | New, Unknown r -> Unknown r |> Some
+                // Provides F#-like construction without new
                 | Unknown l, Obj r -> executeConstructor settings.Namespaces l r
+                // Simplify to a single invocation ExprType
                 | Invoke, Unknown r -> AppliedInvoke r |> Some
-                | Invoke, IndexArgs r -> IndexArgs r |> Some // Here for F#-like indexing (if you want it)            
+                // Here for F#-like indexing, the invoking '.' is simply removed 
+                | Invoke, IndexArgs r -> IndexArgs r |> Some
+                // Finds and returns a particular memeber of the given object
                 | Obj l, AppliedInvoke r when finalReduction -> resolveInvoke l r
+                // Index the given indexed property representation via IndexArgs
                 | IndexedProperty l, IndexArgs ({ Expr = Obj r }) -> executeIndexer l r
+                // Index the given object it via IndexArgs
                 | Obj l, IndexArgs ({ Expr = Obj r }) -> callIndexedProperty l r
+                // Partially apply the given object to the lambda.  Will execute the a lambda if it's the final argument.
                 | Lambda (lambda), Obj r -> applyArgToLambda lambda r |> Some          
                 | _ -> None
+                // Maps the text representation of the two input expressions to the single result expression
                 |> Option.map (fun res -> {Offset = lOffset; Length = (rOffset + rLength) - lOffset; Expr = res}, lt, rt)
             with
             | :? BarbException as ex -> raise ex  
