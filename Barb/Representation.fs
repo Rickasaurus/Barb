@@ -50,7 +50,7 @@ and ExprTypes =
     | IfThenElse of ExprRep * ExprRep * ExprRep
     | Generator of ExprRep * ExprRep * ExprRep
     // Has no Unknowns
-    | Resolved of ExprRep
+    | Resolved of ExprTypes
     // Has Unknowns
     | Unresolved of ExprTypes
 
@@ -99,10 +99,10 @@ and exprExists (pred: ExprTypes -> bool) (expr: ExprTypes) =
         else false
     | Generator (fromRep, incRep, toRep) -> [fromRep; incRep; toRep] |> List.exists (exprExistsInRep pred) 
     // The two tagged cases
-    | Resolved (rep) -> exprExistsInRep pred rep
+    | Resolved (rep) -> exprExists pred rep
     | Unresolved (expr) -> exprExists pred expr
     // Nothing found
     | _ -> false
 
-let wrapResolved (rep: ExprRep) = { rep with Expr = Resolved rep }
+let wrapResolved (rep: ExprRep) = { rep with Expr = Resolved rep.Expr }
 let wrapUnresolved (rep: ExprRep) = { rep with Expr = Unresolved rep.Expr }
