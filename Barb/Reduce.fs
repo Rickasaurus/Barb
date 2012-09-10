@@ -146,18 +146,22 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
         | _ -> None
     
     and (|ResolveTriple|_|) =
-        function
-        // Order of Operations case 1: Obj_L InfixOp_R1 Obj_R InfixOp_R2
-        // If InfixOp_R1 <= InfixOp_R2 then we can safely apply InfixOp_R1
-        | ((lInfix & {Expr = (Infix (lp, lfun))}) :: {Expr = Obj l} :: lt), ({Expr = Obj r} :: (rInfix & {Expr = (Infix (rp, rfrun))}) :: rt) when finalReduction ->
-            if lp <= rp then 
-                Some ({lInfix with Expr = Obj (lfun l r)}, lt, ({rInfix with Expr = Infix (rp, rfrun)}) :: rt)
-            else None
-        // Order of Operations case 2: Obj InfixOp Obj END 
-        // We've reached the end of our list, it's safe to use InfixOp
-        | ((lInfix & {Expr = (Infix (lp, lfun))}) :: {Expr = Obj l} :: lt), ({Expr = Obj r} :: []) when finalReduction ->
-            Some ({lInfix with Expr = Obj (lfun l r)}, lt, [])
-        | _ -> None
+            function
+            // Order of Operations case 1: Obj_L InfixOp_R1 Obj_R InfixOp_R2
+            // If InfixOp_R1 <= InfixOp_R2 then we can safely apply InfixOp_R1
+            | ((lInfix & {Offset = oOffset; Length = oLength; Expr = (Infix (lp, lfun))}) :: {Expr = Obj l} :: lt), 
+              ({Expr = Obj r} :: (rInfix & {Expr = (Infix (rp, rfrun))}) :: rt) when finalReduction ->
+                try 
+                    if lp <= rp then Some ({lInfix with Expr = Obj (lfun l r)}, lt, ({rInfix with Expr = Infix (rp, rfrun)}) :: rt)
+                    else None
+                with | ex -> raise <| new BarbExecutionException (ex.Message, oOffset, oLength)
+            // Order of Operations case 2: Obj InfixOp Obj END 
+            // We've reached the end of our list, it's safe to use InfixOp
+            | ((lInfix & {Offset = oOffset; Length = oLength; Expr = (Infix (lp, lfun))}) :: {Expr = Obj l} :: lt), ({Expr = Obj r} :: []) when finalReduction ->
+                try 
+                    Some ({lInfix with Expr = Obj (lfun l r)}, lt, [])
+                with | ex -> raise <| new BarbExecutionException (ex.Message, oOffset, oLength)
+            | _ -> None
 
     // Tries to merge/convert local tokens, if it can't it moves to the right
     and reduceExpressions (lleft: ExprRep list) (lright: ExprRep list) (bindings: Bindings) : ExprRep list * Bindings=
