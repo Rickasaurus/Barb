@@ -16,41 +16,57 @@ open System.Numerics
 open Barb.Helpers
 open Barb.Representation
 
+module OperatorFactory = 
+    // Left is higher precedence
+    // TODO/IDEA: Use ranges of values ot determine overlap and generate correct unifications for all pairs
+    let private orderOfNumericConversions = 
+        [| TypeCode.Double; TypeCode.Single;
+           TypeCode.Int64; TypeCode.Int32; TypeCode.Int16; TypeCode.SByte;
+           TypeCode.UInt64; TypeCode.UInt32; TypeCode.UInt16; TypeCode.Char; TypeCode.Byte |]
 
-// Left is higher precedence
-// TODO/IDEA: Use ranges of values ot determine overlap and generate correct unifications for all pairs
-let orderOfNumericConversions = 
-    [| TypeCode.Double; TypeCode.Single;
-       TypeCode.Int64; TypeCode.Int32; TypeCode.Int16; TypeCode.SByte;
-       TypeCode.UInt64; TypeCode.UInt32; TypeCode.UInt16; TypeCode.Char; TypeCode.Byte |]
+    let private expConv prm typ = Expression.Convert(prm, typ)
+    type private BinaryExprFunc = Expression -> Expression -> BinaryExpression
+    type private BinaryExprSpecialCases = (Type * Type * (obj -> obj -> obj)) []
+    let private genDynamicOperatorFunc (binExpr: BinaryExprFunc) (specialCases:BinaryExprSpecialCases) (typ1: Type) (typ2: Type) : obj -> obj -> obj =
+        match specialCases |> Array.tryFind (fun (sct1, sct2, scfun) -> sct1 = typ1 && sct2 = typ2) with
+        | Some (_,_,func) -> func
+        | None -> 
+            let inline isPrimitiveNumeric (tc: TypeCode) = orderOfNumericConversions |> Array.exists ((=) tc)
+            let tc1, tc2 = Type.GetTypeCode(typ1), Type.GetTypeCode(typ2)    
+            let prms = [|Expression.Parameter(typeof<obj>); Expression.Parameter(typeof<obj>)|]
+            let inline wrappedExpr p1 p2 = Expression.Convert(binExpr p1 p2, typeof<obj>)
+            let typed1, typed2 = Expression.Convert(prms.[0], typ1), Expression.Convert(prms.[1], typ2)
+            let contents = 
+                // Case: Both the Primitive Number Types
+                if isPrimitiveNumeric tc1 && isPrimitiveNumeric tc2 then
+                    // Same Type Code
+                    if tc1 = tc2 then wrappedExpr typed1 typed2
+                    // Convert to Right to Left Type Code
+                    elif orderOfNumericConversions |> Array.find (fun e -> e = tc1 || e = tc2) = tc1 then
+                            wrappedExpr typed1 (Expression.Convert(typed2, typ1))
+                    // Covert to Left to Right Type Code
+                    else wrappedExpr (Expression.Convert(typed1, typ2)) typed2
+                else wrappedExpr typed1 typed2 // Case: Last Ditch, Try Adding
+            let lambda = Expression.Lambda<Func<obj, obj, obj>>(contents, prms)
+            let func : Func<obj,obj,obj> = lambda.Compile()
+            fun (o1: obj) (o2: obj) -> func.Invoke(o1, o2)
 
-let expConv prm typ = Expression.Convert(prm, typ)
+    let generateCachedNumericOperator opExpr specialCases : (unit -> (obj -> obj -> obj)) = 
+        let innerFunc () = 
+            let genFunc = genDynamicOperatorFunc opExpr specialCases
+            let cache: (obj -> obj -> obj) Option ref = ref None
+            fun (obj1: obj) (obj2: obj) -> 
+                if obj1 = null || obj2 = null then null
+                else
+                    let result = try !cache |> Option.bind (fun func -> func obj1 obj2 |> Some) with ex -> None
+                    match result with
+                    | Some(res) -> res
+                    | None -> let newFunc = genFunc (obj1.GetType()) (obj2.GetType()) 
+                              do cache := newFunc |> Some
+                              newFunc obj1 obj2 
+        innerFunc
 
-type BinaryExprFunc = Expression -> Expression -> BinaryExpression
-type BinaryExprSpecialCases = (Type * Type * (obj -> obj -> obj)) []
-let genDynamicOperatorFunc (binExpr: BinaryExprFunc) (specialCases:BinaryExprSpecialCases) (typ1: Type) (typ2: Type) : obj -> obj -> obj =
-    match specialCases |> Array.tryFind (fun (sct1, sct2, scfun) -> sct1 = typ1 && sct2 = typ2) with
-    | Some (_,_,func) -> func
-    | None -> 
-        let inline isPrimitiveNumeric (tc: TypeCode) = orderOfNumericConversions |> Array.exists ((=) tc)
-        let tc1, tc2 = Type.GetTypeCode(typ1), Type.GetTypeCode(typ2)    
-        let prms = [|Expression.Parameter(typeof<obj>); Expression.Parameter(typeof<obj>)|]
-        let inline wrappedExpr p1 p2 = Expression.Convert(binExpr p1 p2, typeof<obj>)
-        let typed1, typed2 = Expression.Convert(prms.[0], typ1), Expression.Convert(prms.[1], typ2)
-        let contents = 
-            // Case: Both the Primitive Number Types
-            if isPrimitiveNumeric tc1 && isPrimitiveNumeric tc2 then
-                // Same Type Code
-                if tc1 = tc2 then wrappedExpr typed1 typed2
-                // Convert to Right to Left Type Code
-                elif orderOfNumericConversions |> Array.find (fun e -> e = tc1 || e = tc2) = tc1 then
-                        wrappedExpr typed1 (Expression.Convert(typed2, typ1))
-                // Covert to Left to Right Type Code
-                else wrappedExpr (Expression.Convert(typed1, typ2)) typed2
-            else wrappedExpr typed1 typed2 // Case: Last Ditch, Try Adding
-        let lambda = Expression.Lambda<Func<obj, obj, obj>>(contents, prms)
-        let func : Func<obj,obj,obj> = lambda.Compile()
-        fun (o1: obj) (o2: obj) -> func.Invoke(o1, o2)
+open OperatorFactory
 
 let nullableToOption res =
     match res with
@@ -345,46 +361,25 @@ let orOp (obj1: obj) (obj2: obj) =
     | w1, w2 -> failwith (sprintf "Unexcepted arguments for 'or' operation: %A or %A" w1 w2)  
 
 
-let addObjects () = 
-    let addExpr = (fun exp1 exp2 -> Expression.Add(exp1, exp2))
+let addObjects : (unit -> (obj -> obj -> obj)) = 
+    let addExpr = (fun exp1 exp2 -> Expression.AddChecked(exp1, exp2))
     let specialCases = [| typeof<string>, typeof<string>, fun (o1: obj) (o2: obj) -> (o1 :?> string) + (o2 :?> string) |> box |]
-    let genFunc = genDynamicOperatorFunc addExpr specialCases
-    let cache: (obj -> obj -> obj) Option ref = ref None
-    //TODO: Hidden cache goes here. Should assume the same each time.
-    fun obj1 obj2 -> 
-        let result = try !cache |> Option.bind (fun func -> func obj1 obj2 |> Some) with ex -> None
-        match result with
-        | Some(res) -> res
-        | None -> let newFunc = genFunc (obj1.GetType()) (obj2.GetType()) 
-                  do cache := newFunc |> Some
-                  newFunc obj1 obj2 
+    generateCachedNumericOperator addExpr specialCases
 
-let subObjects (obj1: obj) (obj2: obj) =
-    if obj1 = null || obj2 = null then failwith "Unexpected null in subtraction"
-    match obj1, obj2 with
-    | (:? float as d1), (:? float as d2) -> (d1 - d2) :> obj
-    | (:? int64 as b1), (:? int64 as b2) -> (b1 - b2) :> obj
-    | (:? float as d1), (:? int64 as b2) -> (d1 - float b2) :> obj
-    | (:? int64 as b1), (:? float as d2) -> (float b1 - d2) :> obj
-    | _ -> failwith (sprintf "Cannot subtract %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))
+let subObjects : (unit -> (obj -> obj -> obj)) = 
+    let subExpr = (fun exp1 exp2 -> Expression.SubtractChecked(exp1, exp2))
+    let specialCases = [| |]
+    generateCachedNumericOperator subExpr specialCases
 
-let divideObjects (obj1: obj) (obj2: obj) =
-    if obj1 = null || obj2 = null then failwith "Unexpected null in division"
-    match obj1, obj2 with
-    | (:? float as d1), (:? float as d2) -> (d1 / d2) :> obj
-    | (:? int64 as b1), (:? int64 as b2) -> (b1 / b2) :> obj
-    | (:? float as d1), (:? int64 as b2) -> (d1 / float b2) :> obj
-    | (:? int64 as b1), (:? float as d2) -> (float b1 / d2) :> obj
-    | _ -> failwith (sprintf "Cannot divide %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))
+let divideObjects : (unit -> (obj -> obj -> obj)) = 
+    let divExpr = (fun exp1 exp2 -> Expression.Divide(exp1, exp2))
+    let specialCases = [| |]
+    generateCachedNumericOperator divExpr specialCases
 
-let multObjects (obj1: obj) (obj2: obj) =
-    if obj1 = null || obj2 = null then failwith "Unexpected null in multiplication"
-    match obj1, obj2 with
-    | (:? float as d1), (:? float as d2) -> (d1 * d2) :> obj
-    | (:? int64 as b1), (:? int64 as b2) -> (b1 * b2) :> obj
-    | (:? float as d1), (:? int64 as b2) -> (d1 * float b2) :> obj
-    | (:? int64 as b1), (:? float as d2) -> (float b1 * d2) :> obj
-    | _ -> failwith (sprintf "Cannot multiply %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))
+let multObjects : (unit -> (obj -> obj -> obj)) = 
+    let mulExpr = (fun exp1 exp2 -> Expression.MultiplyChecked(exp1, exp2))
+    let specialCases = [| |]
+    generateCachedNumericOperator mulExpr specialCases
 
 let objToEnumerable (obj: obj) =
     match obj with

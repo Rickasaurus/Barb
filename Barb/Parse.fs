@@ -210,10 +210,10 @@ let allSimpleMappings =
         ["\\/"], fun () -> Infix (2, unionObjects)
         ["/\\"], fun () -> Infix (2, intersectObjects)
         ["/?\\"], fun () -> Infix (2, doObjectsIntersect)
-        ["/"], fun () -> Infix (1, divideObjects)
-        ["*"], fun () -> Infix (1, multObjects)
+        ["/"], fun () -> Infix (1, divideObjects ())
+        ["*"], fun () -> Infix (1, multObjects ())
         ["+"], fun () -> Infix (2, addObjects ())
-        ["-"], fun () -> Infix (2, subObjects)
+        ["-"], fun () -> Infix (2, subObjects ())
     ]
 
 let whitespaceVocabulary = [" "; "\t"; "\r"; "\n"] 

@@ -116,6 +116,13 @@ let ``should support comparing null values`` () =
     Assert.True(result)
 
 [<Fact>]
+let ``basic operators on null should return null`` () =
+    let opers = [|"+"; "-"; "/"; "*"|]
+    for op in opers do
+        let predicate = buildExpr<unit,bool> ("10 " + op + " null = null")
+        Assert.True(predicate(), "failed on: " + op)    
+
+[<Fact>]
 let ``should support object indexers`` () =
     let testRecord = { Name = "Dude Duderson"; Age = 20 }
     let predicate = buildExpr<DudeRecordWithInt,bool> "Name[0] = 'D'"
