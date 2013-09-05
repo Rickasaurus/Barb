@@ -205,8 +205,10 @@ let allSimpleMappings =
         [">"], fun () -> Infix (3, compareObjects (>))
         ["<"], fun () -> Infix (3, compareObjects (<))
         ["!"; "not"], fun () -> Prefix notOp
-        ["&"; "&&"; "and"], fun () -> Infix (4, andOp)
-        ["|"; "||"; "or"], fun () -> Infix (4, orOp)
+        ["&&"; "and"], fun () -> Infix (4, andOp)
+        ["||"; "or"], fun () -> Infix (4, orOp)
+        ["|"; "|||"], fun () -> Infix (2, bitwiseOrObjects ())
+        ["&"; "&&&"], fun () -> Infix (2, bitwiseAndObjects ())
         ["\\/"], fun () -> Infix (2, unionObjects)
         ["/\\"], fun () -> Infix (2, intersectObjects)
         ["/?\\"], fun () -> Infix (2, doObjectsIntersect)

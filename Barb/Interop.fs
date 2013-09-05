@@ -347,16 +347,19 @@ let compareObjects op (obj1: obj) (obj2: obj) =
 
 let notOp (obj1: obj) =
     match obj1 with
+    | null -> null
     | (:? bool as b) -> box (not b)
     | w1 -> failwith (sprintf "Unexcepted argument for 'not' operation: %A" w1) 
 
 let andOp (obj1: obj) (obj2: obj) =
     match obj1, obj2 with 
+    | null, _ | _, null -> null
     | (:? bool as b1), (:? bool as b2) -> box (b1 && b2)
     | w1, w2 -> failwith (sprintf "Unexcepted arguments for 'and' operation: %A and %A" w1 w2)  
 
 let orOp (obj1: obj) (obj2: obj) =
     match obj1, obj2 with 
+    | null, _ | _, null -> null
     | (:? bool as b1), (:? bool as b2) -> box (b1 || b2)
     | w1, w2 -> failwith (sprintf "Unexcepted arguments for 'or' operation: %A or %A" w1 w2)  
 
@@ -380,6 +383,16 @@ let multObjects : (unit -> (obj -> obj -> obj)) =
     let mulExpr = (fun exp1 exp2 -> Expression.MultiplyChecked(exp1, exp2))
     let specialCases = [| |]
     generateCachedNumericOperator mulExpr specialCases
+
+let bitwiseOrObjects : (unit -> (obj -> obj -> obj)) = 
+    let orExpr = (fun exp1 exp2 -> Expression.Or(exp1, exp2))
+    let specialCases = [| |]
+    generateCachedNumericOperator orExpr specialCases
+
+let bitwiseAndObjects : (unit -> (obj -> obj -> obj)) = 
+    let andExpr = (fun exp1 exp2 -> Expression.And(exp1, exp2))
+    let specialCases = [| |]
+    generateCachedNumericOperator andExpr specialCases
 
 let objToEnumerable (obj: obj) =
     match obj with

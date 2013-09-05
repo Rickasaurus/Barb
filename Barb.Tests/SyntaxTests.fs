@@ -116,11 +116,29 @@ let ``should support comparing null values`` () =
     Assert.True(result)
 
 [<Fact>]
-let ``basic operators on null should return null`` () =
-    let opers = [|"+"; "-"; "/"; "*"|]
+let ``most binary operators on null should return null`` () =
+    let opers = [|"+"; "-"; "/"; "*"; "&"; "|"; "|||"; "&&&"; "&&"; "and"; "||"; "or"|]
     for op in opers do
-        let predicate = buildExpr<unit,bool> ("10 " + op + " null = null")
-        Assert.True(predicate(), "failed on: " + op)    
+        let predicate = buildExpr<unit,bool> ("(10 " + op + " null) = null")
+        let res = predicate()
+        Assert.True(res, "failed on: " + op + " with " + res.ToString())    
+
+[<Fact>]
+let ``set operators should have correct behavior with nulls`` () =
+    let opsAns = [| "\\/", false; "/\\", true; "/?\\", false|]
+    for op, ans in opsAns do
+        let predicate = buildExpr<unit,bool> ("(10 " + op + " null) = null")
+        let res = predicate()
+        Assert.True((ans = res), "failed on: " + op + " with " + res.ToString())    
+
+[<Fact>]
+let ``equality and comparison operators should return true or false for nulls`` () =
+    let opsAns = [|"=", false; "==", false; "<>", true; "!=", true; ">=", false; "<=", false; ">", false; "<", false|]
+    for op, ans in opsAns do
+        let predicate = buildExpr<unit,bool> ("10 " + op + " null")
+        let res = predicate()
+        Assert.Equal(ans, res)    
+
 
 [<Fact>]
 let ``should support object indexers`` () =
