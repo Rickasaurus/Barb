@@ -221,6 +221,26 @@ let ``plus should concatinate strings`` () =
     Assert.True(func())
 
 [<Fact>]
+let ``plus should work well with lossy on the right`` () =
+    let func = buildExpr<unit,bool> "5.1 + 5 = 10.1"
+    Assert.True(func())
+
+[<Fact>]
+let ``plus should work well with lossy on the left`` () =
+    let func = buildExpr<unit,bool> "5 + 5.1 = 10.1"
+    Assert.True(func())
+
+type Nums = { x: obj; y: obj }
+
+[<Fact>]
+let ``plus should work with different types but may be slow`` () =
+    let func = buildExpr<Nums,bool> "x + y = y + x"
+    Assert.True(func({ x = 1; y = 2 }))
+    Assert.True(func({ x = 1.0; y = 2.0 }))
+    Assert.True(func({ x = 1u; y = 2u }))
+    Assert.True(func({ x = "helleh"; y = "helleh" }))
+
+[<Fact>]
 let ``tuple implementation should support Length property`` () =
     let func = buildExpr<unit,bool> "let tpl = (1,2,3) in tpl.Length = 3"
     Assert.True(func())

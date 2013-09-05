@@ -192,28 +192,28 @@ let allExpressionTypes =
 
 let allSimpleMappings = 
     [
-        ["."], Invoke
-        ["()"], Unit
-        ["new"], New
-        ["null"], Obj null
-        ["true"], Obj true
-        ["false"], Obj false
-        ["=="; "="], Infix (3, objectsEqual)
-        ["<>"; "!="], Infix (3, objectsNotEqual)
-        [">="], Infix (3, compareObjects (>=))
-        ["<="], Infix (3, compareObjects (<=))
-        [">"], Infix (3, compareObjects (>))
-        ["<"], Infix (3, compareObjects (<))
-        ["!"; "not"], Prefix notOp
-        ["&"; "&&"; "and"], Infix (4, andOp)
-        ["|"; "||"; "or"], Infix (4, orOp)
-        ["\\/"], Infix (2, unionObjects)
-        ["/\\"], Infix (2, intersectObjects)
-        ["/?\\"], Infix (2, doObjectsIntersect)
-        ["/"], Infix (1, divideObjects)
-        ["*"], Infix (1, multObjects)
-        ["+"], Infix (2, addObjects)
-        ["-"], Infix (2, subObjects)
+        ["."], fun () -> Invoke
+        ["()"], fun () -> Unit
+        ["new"], fun () -> New
+        ["null"], fun () -> Obj null
+        ["true"], fun () -> Obj true
+        ["false"], fun () -> Obj false
+        ["=="; "="], fun () -> Infix (3, objectsEqual)
+        ["<>"; "!="], fun () -> Infix (3, objectsNotEqual)
+        [">="], fun () -> Infix (3, compareObjects (>=))
+        ["<="], fun () -> Infix (3, compareObjects (<=))
+        [">"], fun () -> Infix (3, compareObjects (>))
+        ["<"], fun () -> Infix (3, compareObjects (<))
+        ["!"; "not"], fun () -> Prefix notOp
+        ["&"; "&&"; "and"], fun () -> Infix (4, andOp)
+        ["|"; "||"; "or"], fun () -> Infix (4, orOp)
+        ["\\/"], fun () -> Infix (2, unionObjects)
+        ["/\\"], fun () -> Infix (2, intersectObjects)
+        ["/?\\"], fun () -> Infix (2, doObjectsIntersect)
+        ["/"], fun () -> Infix (1, divideObjects)
+        ["*"], fun () -> Infix (1, multObjects)
+        ["+"], fun () -> Infix (2, addObjects ())
+        ["-"], fun () -> Infix (2, subObjects)
     ]
 
 let whitespaceVocabulary = [" "; "\t"; "\r"; "\n"] 
@@ -251,7 +251,7 @@ let (|MapSymbol|_|) (text: StringWindow) : MatchReturn =
         ] |> List.allMaxBy (fun (m, expr) -> m.Length)
     match matches with
     | [] -> None
-    | [(matched, expr)] -> Some (Some(expr), text.Subwindow(uint32 matched.Length))
+    | [(matched, expr)] -> Some (Some(expr()), text.Subwindow(uint32 matched.Length))
     | _ -> 
         let errorText = sprintf "Ambiguous symbol match: %A" matches
         raise (new BarbParsingException(errorText, text.Offset, matches |> List.map (fun (s,e) -> s.Length) |> List.max |> uint32))
