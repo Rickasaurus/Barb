@@ -127,6 +127,8 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 | Invoke, Unknown r -> AppliedInvoke r |> Some
                 // Here for F#-like indexing, the invoking '.' is simply removed 
                 | Invoke, IndexArgs r -> IndexArgs r |> Some
+                // Invoke on null should always be null
+                | Obj null, AppliedInvoke _ -> Obj null |> Some
                 // Finds and returns a particular memeber of the given object
                 | Obj l, AppliedInvoke r when finalReduction -> resolveInvoke l r
                 // Index the given indexed property representation via IndexArgs
