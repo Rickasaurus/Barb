@@ -284,3 +284,8 @@ let ``should be able to create new objects without new`` () =
 let ``should support exporting nested tuples`` () =
     let predicate = buildExpr<unit,int array array> "((1,2), (3,4), (5,6))"
     Assert.Equal<int array array>([|[|1; 2|]; [|3;4|]; [|5;6|]|], predicate())
+
+[<Fact>] 
+let ``invoke on null should return null`` () =
+    let predicate = buildExpr<unit, bool> "(null).Hello == null"
+    Assert.True(predicate())
