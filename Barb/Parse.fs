@@ -204,9 +204,9 @@ let allExpressionTypes =
 //        { Pattern = [SCap "var"; SCap "="; Open];                   Func = generateBind }
         { Pattern = [SCap "var"; SCap "="; SCap "in"; Open];        Func = generateBind }
         { Pattern = [Open; SCap "and"; Open];                       Func = generateAnd }
-        { Pattern = [Open; SCap "&&"; Open];                        Func = generateAnd }
+        { Pattern = [Open; SCap "&& "; Open];                        Func = generateAnd }
         { Pattern = [Open; SCap "or"; Open];                        Func = generateOr }
-        { Pattern = [Open; SCap "||"; Open];                        Func = generateOr }
+        { Pattern = [Open; SCap "|| "; Open];                        Func = generateOr }
     ]
 
 let allSimpleMappings = 
