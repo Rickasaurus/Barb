@@ -32,7 +32,7 @@ let applyArgToLambda (l: LambdaRecord) (arg: obj) =
         let bindings = l.Bindings |> Map.add bindname (Obj arg |> Lazy.CreateFromValue)
         Lambda({ l with Params = restprms; Bindings = bindings })
 
-let inline subexprIfNeeded (input: ExprRep list): ExprTypes =   
+let inline SubExpressionIfNeeded (input: ExprRep list): ExprTypes =   
     match input with
     | h :: [] -> h.Expr
     | list -> SubExpression list
@@ -62,7 +62,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                             tc |> Array.map (fun t -> 
                                     match reduceExpressions [] [t] bindings |> fst  with 
                                     | ({ Expr = Obj o } & oobj) :: [] -> oobj 
-                                    | res -> SubExpression res |> wrapit)
+                                    | res -> SubExpressionIfNeeded res |> wrapit)
                         match reducedTuples |> Array.forall (function | {Expr = Obj o} -> true | _ -> false) with
                         | true -> reducedTuples |> (fun tc -> Obj (tupleToObj tc |> box))
                         | false -> reducedTuples |> Tuple |> Unresolved
@@ -81,7 +81,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         | (({Expr = Obj(s)} :: []), ({Expr = Obj(i)} :: []), ({Expr = Obj(e)} :: [])) -> 
                             Generator ({sexpr with Expr = Obj(s)}, {iexpr with Expr = Obj(i)}, {eexpr with Expr = Obj(e)}) |> wrapit |> Some
                         | s, i, e when not finalReduction -> 
-                            let gen = {sexpr with Expr = SubExpression s}, {iexpr with Expr = SubExpression i}, {eexpr with Expr = SubExpression e}
+                            let gen = {sexpr with Expr = SubExpressionIfNeeded s}, {iexpr with Expr = SubExpressionIfNeeded i}, {eexpr with Expr = SubExpressionIfNeeded e}
                             Generator gen |> Unresolved |> wrapit |> Some
                         | _ -> failwith (sprintf "One or more generator expressions could not be resolved: %A, %A, %A" rs ri re)
                     | IfThenElse (ifexpr, thenexpr, elseexpr) ->
@@ -90,18 +90,18 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         | {Expr = Obj (:? bool as res)} :: [] -> 
                             if res then reduceExpressions [] [thenexpr] bindings
                             else reduceExpressions [] [elseexpr] bindings
-                            |> (fun resExpr -> Some (SubExpression(resExpr |> fst) |> wrapit))
+                            |> fun resExpr -> resExpr |> fst |> SubExpressionIfNeeded |> wrapit |> Some
                         // If not fully resolved in initial reduction, reduce both clauses and return the result
                         // Note: If in the future globally scoped Variables are added, resolving them here will cause problems with inner non-pure calls
                         | rif -> 
-                            let repIf = { ifexpr with Expr = rif |> List.rev |> SubExpression }
-                            let repThen = { thenexpr with Expr = reduceExpressions [] [thenexpr] bindings |> fst |> List.rev |> SubExpression }
-                            let repElse = { elseexpr with Expr = reduceExpressions [] [elseexpr] bindings |> fst |> List.rev |> SubExpression }
+                            let repIf = { ifexpr with Expr = rif |> List.rev |> SubExpressionIfNeeded }
+                            let repThen = { thenexpr with Expr = reduceExpressions [] [thenexpr] bindings |> fst |> List.rev |> SubExpressionIfNeeded }
+                            let repElse = { elseexpr with Expr = reduceExpressions [] [elseexpr] bindings |> fst |> List.rev |> SubExpressionIfNeeded }
                             IfThenElse (repIf, repThen, repElse) |> Unresolved |> wrapit |> Some
                     // Execute Lambda when fully applied, but only on final reduction to preserve semantics
                     | Lambda ({Params = []} & l) when finalReduction -> 
                         let totalBindings = Seq.concat [(Map.toSeq initialBindings); (Map.toSeq l.Bindings)] |> Map.ofSeq
-                        SubExpression (reduceExpressions [] [l.Contents] totalBindings |> fst)  |> wrapit |> Some
+                        reduceExpressions [] [l.Contents] totalBindings |> fst |> SubExpressionIfNeeded |> wrapit |> Some
                     | And (lExpr, rExpr) ->
                         // Left and side of the And 
                         match reduceExpressions [] [lExpr] bindings |> fst with
@@ -113,12 +113,12 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                             match reduceExpressions [] [rExpr] bindings |> fst with
                             | { Expr = Obj (null) } :: [] -> Obj null |> wrapit |> Some
                             | { Expr = Obj (:? bool as res)} :: [] -> Obj res |> wrapit |> Some
-                            | res when not finalReduction -> And ({lExpr with Expr = Obj true}, {rExpr with Expr = res |> List.rev |> subexprIfNeeded}) |> Unresolved |> wrapit |> Some
+                            | res when not finalReduction -> And ({lExpr with Expr = Obj true}, {rExpr with Expr = res |> List.rev |> SubExpressionIfNeeded}) |> Unresolved |> wrapit |> Some
                             | res -> failwith (sprintf "Right hand side of And did not evaluate properly: %A" rExpr)
                         // Left hand side did not evaluate fully, try to reduce both and return
                         | res when not finalReduction -> 
-                            let repL = { lExpr with Expr = res |> List.rev |> subexprIfNeeded }
-                            let repR = { rExpr with Expr = reduceExpressions [] [rExpr] bindings |> fst |> List.rev |> subexprIfNeeded }
+                            let repL = { lExpr with Expr = res |> List.rev |> SubExpressionIfNeeded }
+                            let repR = { rExpr with Expr = reduceExpressions [] [rExpr] bindings |> fst |> List.rev |> SubExpressionIfNeeded }
                             And (repL, repR) |> Unresolved |> wrapit |> Some
                         | res -> failwith (sprintf "Right hand side of And did not evaluate properly: %A" rExpr)
                     | Or (lExpr, rExpr) ->
@@ -133,13 +133,13 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                             | { Expr = Obj (null) } :: [] -> Obj null |> wrapit |> Some
                             | { Expr = Obj (:? bool as res)} :: [] -> Obj res |> wrapit |> Some
                             | res when not finalReduction -> 
-                                let orExpr = Or ({lExpr with Expr = Obj false}, {rExpr with Expr = res |> List.rev |> subexprIfNeeded}) 
+                                let orExpr = Or ({lExpr with Expr = Obj false}, {rExpr with Expr = res |> List.rev |> SubExpressionIfNeeded}) 
                                 orExpr |> Unresolved |> wrapit |> Some
                             | res -> failwith (sprintf "Right hand side of Or did not evaluate properly: %A" rExpr)
                         // Left hand side did not evaluate fully, try to reduce both and return
                         | res when not finalReduction -> 
-                            let repL = { lExpr with Expr = res |> List.rev |> subexprIfNeeded }
-                            let repR = { rExpr with Expr = reduceExpressions [] [rExpr] bindings |> fst |> List.rev |> subexprIfNeeded }
+                            let repL = { lExpr with Expr = res |> List.rev |> SubExpressionIfNeeded }
+                            let repR = { rExpr with Expr = reduceExpressions [] [rExpr] bindings |> fst |> List.rev |> SubExpressionIfNeeded }
                             Or (repL, repR) |> Unresolved |> wrapit |> Some
                         | res -> failwith (sprintf "Left hand side of Or did not evaluate properly: %A" lExpr)
                     | _ -> None
@@ -224,16 +224,16 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                     let cleanBinds = lambda.Params |> List.fold (fun bnds pn -> if bnds |> Map.containsKey pn then bnds |> Map.remove pn else bnds) bindings         
                     let reducedExpr, _ = reduceExpressions [] [lambda.Contents] cleanBinds
                     let recLambda = 
-                        let newLambda = {lambda with Contents = { lambda.Contents with Expr = SubExpression reducedExpr }}
+                        let newLambda = {lambda with Contents = { lambda.Contents with Expr = SubExpressionIfNeeded reducedExpr }}
                         do newLambda.Bindings <- newLambda.Bindings |> Map.add bindName (Lambda newLambda |> Lazy.CreateFromValue)
                         { lmbExpr with Expr = Lambda newLambda }
                     let newbindings = bindings |> Map.add bindName (lazy recLambda.Expr)
-                    let res = { bindExpr with Expr = reduceExpressions [] [boundScope] newbindings |> fst |> SubExpression }
+                    let res = { bindExpr with Expr = reduceExpressions [] [boundScope] newbindings |> fst |> SubExpressionIfNeeded }
                     reduceExpressions left (res :: rt) newbindings
             // Normal Value Binding
             | rexpr -> 
-                let newbindings = bindings |> Map.add bindName (lazy SubExpression rexpr) in
-                    let res = { bindExpr with Expr = reduceExpressions [] [boundScope] newbindings |> fst |> SubExpression }
+                let newbindings = bindings |> Map.add bindName (lazy SubExpressionIfNeeded rexpr) in
+                    let res = { bindExpr with Expr = reduceExpressions [] [boundScope] newbindings |> fst |> SubExpressionIfNeeded }
                     reduceExpressions left (res :: rt) bindings
         | ResolveSingle bindings (res, lt, rt)
         | ResolveTuple bindings (res, lt, rt) 
