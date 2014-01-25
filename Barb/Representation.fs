@@ -56,6 +56,8 @@ and ExprTypes =
     | Resolved of ExprTypes
     // Has Unknowns
     | Unresolved of ExprTypes
+    | And of ExprRep * ExprRep
+    | Or of ExprRep * ExprRep
 
 and ExprRep =
     {

@@ -32,6 +32,11 @@ let applyArgToLambda (l: LambdaRecord) (arg: obj) =
         let bindings = l.Bindings |> Map.add bindname (Obj arg |> Lazy.CreateFromValue)
         Lambda({ l with Params = restprms; Bindings = bindings })
 
+let inline subexprIfNeeded (input: ExprRep list): ExprTypes =   
+    match input with
+    | h :: [] -> h.Expr
+    | list -> SubExpression list
+
 let resolveExpression exprs initialBindings settings (finalReduction: bool) = 
 
     let rec (|ResolveSingle|_|) bindings =
@@ -97,6 +102,46 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                     | Lambda ({Params = []} & l) when finalReduction -> 
                         let totalBindings = Seq.concat [(Map.toSeq initialBindings); (Map.toSeq l.Bindings)] |> Map.ofSeq
                         SubExpression (reduceExpressions [] [l.Contents] totalBindings |> fst)  |> wrapit |> Some
+                    | And (lExpr, rExpr) ->
+                        // Left and side of the And 
+                        match reduceExpressions [] [lExpr] bindings |> fst with
+                        // False short curcuits 
+                        | { Expr = Obj (null) } :: [] -> Obj null |> wrapit |> Some
+                        | { Expr = Obj (:? bool as res)} :: [] when res = false -> Obj res |> wrapit |> Some
+                        | { Expr = Obj (:? bool as res)} :: [] when res = true ->
+                            // Evaluate right hand side of the And
+                            match reduceExpressions [] [rExpr] bindings |> fst with
+                            | { Expr = Obj (null) } :: [] -> Obj null |> wrapit |> Some
+                            | { Expr = Obj (:? bool as res)} :: [] -> Obj res |> wrapit |> Some
+                            | res when not finalReduction -> And ({lExpr with Expr = Obj true}, {rExpr with Expr = res |> List.rev |> subexprIfNeeded}) |> Unresolved |> wrapit |> Some
+                            | res -> failwith (sprintf "Right hand side of And did not evaluate properly: %A" rExpr)
+                        // Left hand side did not evaluate fully, try to reduce both and return
+                        | res when not finalReduction -> 
+                            let repL = { lExpr with Expr = res |> List.rev |> subexprIfNeeded }
+                            let repR = { rExpr with Expr = reduceExpressions [] [rExpr] bindings |> fst |> List.rev |> subexprIfNeeded }
+                            And (repL, repR) |> Unresolved |> wrapit |> Some
+                        | res -> failwith (sprintf "Right hand side of And did not evaluate properly: %A" rExpr)
+                    | Or (lExpr, rExpr) ->
+                        // Left and side of the Or 
+                        match reduceExpressions [] [lExpr] bindings |> fst with
+                        // True short curcuits 
+                        | { Expr = Obj (null)} :: [] -> Obj null |> wrapit |> Some
+                        | { Expr = Obj (:? bool as res)} :: [] when res = true -> Obj res |> wrapit |> Some
+                        | { Expr = Obj (:? bool as res)} :: [] when res = false ->
+                            // Evaluate right hand side of the Or
+                            match reduceExpressions [] [rExpr] bindings |> fst  with
+                            | { Expr = Obj (null) } :: [] -> Obj null |> wrapit |> Some
+                            | { Expr = Obj (:? bool as res)} :: [] -> Obj res |> wrapit |> Some
+                            | res when not finalReduction -> 
+                                let orExpr = Or ({lExpr with Expr = Obj false}, {rExpr with Expr = res |> List.rev |> subexprIfNeeded}) 
+                                orExpr |> Unresolved |> wrapit |> Some
+                            | res -> failwith (sprintf "Right hand side of Or did not evaluate properly: %A" rExpr)
+                        // Left hand side did not evaluate fully, try to reduce both and return
+                        | res when not finalReduction -> 
+                            let repL = { lExpr with Expr = res |> List.rev |> subexprIfNeeded }
+                            let repR = { rExpr with Expr = reduceExpressions [] [rExpr] bindings |> fst |> List.rev |> subexprIfNeeded }
+                            Or (repL, repR) |> Unresolved |> wrapit |> Some
+                        | res -> failwith (sprintf "Left hand side of Or did not evaluate properly: %A" lExpr)
                     | _ -> None
                     |> Option.map (fun res -> res, left, rt)
                 with

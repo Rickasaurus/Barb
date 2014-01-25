@@ -68,7 +68,7 @@ type SubexpressionAndOffset = SubexpressionType * uint32
 
 open System.Numerics
 
-let whitespace = [| " "; "\r"; "\n"; "\t"; |]
+let whitespace = [| " "; "\r"; "\n"; "\t"; |]    
 
 let (|Num|_|) (text: StringWindow) : MatchReturn =
     let isnumchar c = c >= '0' && c <= '9' 
@@ -175,6 +175,21 @@ let generateBind : ExprRep list -> ExprRep =
         { Offset = offset; Length = length; Expr = Binding (name, bindExpr, scopeExpr) }
     | list -> failwith (sprintf "Incorrect binding syntax: %A" list)
 
+let generateAnd (exprs: ExprRep list) : ExprRep = 
+    match exprs with
+    | firstExpr :: secondExpr :: [] ->
+        let offset, length = exprRepListOffsetLength exprs
+        { Offset = offset; Length = length; Expr = And (firstExpr, secondExpr) }
+    | list -> failwith (sprintf "Incorrect and syntax: %A" list)
+
+let generateOr (exprs: ExprRep list) : ExprRep = 
+    match exprs with
+    | firstExpr :: secondExpr :: [] ->
+        let offset, length = exprRepListOffsetLength exprs
+        { Offset = offset; Length = length; Expr = Or (firstExpr, secondExpr) }
+    | list -> failwith (sprintf "Incorrect and syntax: %A" list)
+
+
 let allExpressionTypes = 
     [
         { Pattern = [Open; RCap ","; Open];                         Func = generateTuple }
@@ -187,7 +202,11 @@ let allExpressionTypes =
 //        { Pattern = [SCap "let"; SCap "="; Open];                   Func = generateBind }
         { Pattern = [SCap "let"; SCap "="; SCap "in"; Open];              Func = generateBind }
 //        { Pattern = [SCap "var"; SCap "="; Open];                   Func = generateBind }
-        { Pattern = [SCap "var"; SCap "="; SCap "in"; Open];              Func = generateBind }
+        { Pattern = [SCap "var"; SCap "="; SCap "in"; Open];        Func = generateBind }
+        { Pattern = [Open; SCap "and"; Open];                       Func = generateAnd }
+        { Pattern = [Open; SCap "&&"; Open];                        Func = generateAnd }
+        { Pattern = [Open; SCap "or"; Open];                        Func = generateOr }
+        { Pattern = [Open; SCap "||"; Open];                        Func = generateOr }
     ]
 
 let allSimpleMappings = 
@@ -205,8 +224,6 @@ let allSimpleMappings =
         [">"], fun () -> Infix (3, compareObjects (>))
         ["<"], fun () -> Infix (3, compareObjects (<))
         ["!"; "not"], fun () -> Prefix notOp
-        ["&&"; "and"], fun () -> Infix (4, andOp)
-        ["||"; "or"], fun () -> Infix (4, orOp)
         ["|"; "|||"], fun () -> Infix (2, bitwiseOrObjects ())
         ["&"; "&&&"], fun () -> Infix (2, bitwiseAndObjects ())
         ["\\/"], fun () -> Infix (2, unionObjects)

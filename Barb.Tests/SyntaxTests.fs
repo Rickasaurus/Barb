@@ -30,9 +30,58 @@ let ``should ignore whitespace, even at the end of a token`` () =
 [<Fact>] 
 let ``should support simple and usage`` () =
     let testRecord = { Name = "Dude"; Sex = 'f' }
-    let predicate = buildExpr<DudeRecord,bool> "true and true"
-    let result = predicate testRecord
-    Assert.True(result)
+    let cases = 
+        [ "true and true", true
+          "true and false", false
+          "false and true", false
+          "false and false", false ]
+    for expr, res in cases do        
+        let predicate = buildExpr<DudeRecord,bool> expr
+        let result = predicate testRecord
+        do Assert.Equal(result, res)
+
+[<Fact>] 
+let ``should support simple or usage`` () =
+    let testRecord = { Name = "Dude"; Sex = 'f' }
+    let cases = 
+        [ "true or true", true
+          "true or false", true
+          "false or true", true
+          "false or false", false 
+          ]
+    for expr, res in cases do        
+        let predicate = buildExpr<DudeRecord,bool> expr
+        let result = predicate testRecord
+        do Assert.Equal(result, res)
+
+type TFRec = { FTrue: bool; FFalse: bool }
+let TFRecInstance = { FTrue = true; FFalse = false }
+
+[<Fact>] 
+let ``should support record and usage`` () =
+    let cases = 
+        [ "FTrue and FTrue", true
+          "FTrue and FFalse", false
+          "FFalse and FTrue", false
+          "FFalse and FFalse", false ]
+    for expr, res in cases do        
+        let predicate = buildExpr<TFRec,bool> expr
+        let result = predicate TFRecInstance
+        do Assert.Equal(result, res)
+
+[<Fact>] 
+let ``should support record or usage`` () =
+    let cases = 
+        [ "FTrue or FTrue", true
+          "FTrue or FFalse", true
+          "FFalse or FTrue", true
+          "FFalse or FFalse", false 
+          ]
+    for expr, res in cases do        
+        let predicate = buildExpr<TFRec,bool> expr
+        let result = predicate TFRecInstance
+        do Assert.Equal(result, res)
+
 
 [<Fact>] 
 let ``should work with a compound predicate`` () =
@@ -100,14 +149,6 @@ let ``should support parens`` () =
     let result = predicate testRecord
     Assert.True(result)
 
-[<Fact>] 
-let ``should support parens over entire predicate`` () =
-    let testRecord = { Name = "Dude Duderson"; Age = 20 }
-    let predicate = buildExpr<DudeRecordWithInt,bool> "(Name = \"Dude Duderson\" (and) (Age <> 19))"
-    let result = predicate testRecord
-    Assert.True(result)
-
-
 [<Fact>]
 let ``should support comparing null values`` () =
     let testRecord = { Name = null; Age = 20 }
@@ -116,12 +157,37 @@ let ``should support comparing null values`` () =
     Assert.True(result)
 
 [<Fact>]
-let ``most binary operators on null should return null`` () =
-    let opers = [|"+"; "-"; "/"; "*"; "&"; "|"; "|||"; "&&&"; "&&"; "and"; "||"; "or"|]
+let ``most infix numeric operators on null should return null`` () =
+    let opers = [|"+"; "-"; "/"; "*"; "&"; "|"; "|||"; "&&&" |]
     for op in opers do
         let predicate = buildExpr<unit,bool> ("(10 " + op + " null) = null")
         let res = predicate()
-        Assert.True(res, "failed on: " + op + " with " + res.ToString())    
+        Assert.True(res, "null right failed on: " + op + " with " + res.ToString())    
+        let predicate = buildExpr<unit,bool> ("(null " + op + " 10) = null")
+        let res = predicate()
+        Assert.True(res, "null left failed on: " + op + " with " + res.ToString())    
+
+[<Fact>]
+let ``and operators on null should return null`` () =
+    let opers = [|"&&"; "and"|]
+    for op in opers do
+        let predicate = buildExpr<unit,bool> ("(true " + op + " null) = null")
+        let res = predicate()
+        Assert.True(res, "null right failed on: " + op + " with " + res.ToString())    
+        let predicate = buildExpr<unit,bool> ("(null " + op + " true) = null")
+        let res = predicate()
+        Assert.True(res, "null right failed on: " + op + " with " + res.ToString())    
+
+[<Fact>]
+let ``or operators on null should return null`` () =
+    let opers = [|"||"; "or"|]
+    for op in opers do
+        let predicate = buildExpr<unit,bool> ("(false " + op + " null) = null")
+        let res = predicate()
+        Assert.True(res, "null right failed on: " + op + " with " + res.ToString())    
+        let predicate = buildExpr<unit,bool> ("(null " + op + " false) = null")
+        let res = predicate()
+        Assert.True(res, "null right failed on: " + op + " with " + res.ToString())    
 
 [<Fact>]
 let ``set operators should have correct behavior with nulls`` () =
