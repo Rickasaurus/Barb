@@ -199,6 +199,15 @@ let resolveInvoke (o: obj) (memberName: string) =
          | Some (resolvedMember) -> resolvedMember o |> Some
          | None -> failwith (sprintf "Unable to lookup specified member %s in object %s" memberName (o.GetType().Name))
 
+let rec resolveInvokeAtDepth (depth: int) (o: obj) (memberName: string) =
+    match depth, box o with
+    | 0, _ -> failwith "Unexpected Error: resolveInvokeAtDepth was called with a depth of 0"
+    | 1, (:? IEnumerable as enum) -> 
+        [| for e in enum do match resolveInvoke e memberName with Some v -> yield v | None -> () |] 
+    | n, (:? IEnumerable as enum) -> 
+        [| for e in enum do yield! resolveInvokeAtDepth (n - 1) e memberName |]
+    | _, o -> failwith "Cannot invoke at depth with a non-enumerable object"
+
 let rec resolveMembers (rtype: System.Type) (bindingflags: BindingFlags) =
     let properties = rtype.GetProperties(bindingflags)
     let methodCollections = rtype.GetMethods(bindingflags) |> Seq.groupBy (fun mi -> mi.Name)

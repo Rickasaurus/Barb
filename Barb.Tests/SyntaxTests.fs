@@ -567,7 +567,15 @@ let ``Any out of bounds indexing should return null`` () =
 //
 // Wish List / Ideas
 //
+type Location = { City: string }
+type PersonOneLoc = { Locations: Location array  }
 
+[<Fact>]
+let ``should support mutli-calls over arrays 1 deep`` () = 
+    let p = { Locations = [| { City = "New York" }; { City = "Hoboken" } |] }
+    let predicate = buildExpr<PersonOneLoc,bool> "Locations..City /?\ (\"Hoboken\")"
+    let result = predicate (p)
+    Assert.True(result)  
 
 //[<Fact>] // Experimental
 let ``should support safe while syntax`` () = 

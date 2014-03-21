@@ -41,7 +41,7 @@ and ExprTypes =
     | Postfix of (obj -> obj)
     | Infix of int * (obj -> obj -> obj) 
     | IndexArgs of ExprRep
-    | AppliedInvoke of string
+    | AppliedInvoke of int * string // where int is the collection depth to perform the invocation, 0 is top level
     | Unknown of string
     (* Containers *)
     | SubExpression of ExprRep list

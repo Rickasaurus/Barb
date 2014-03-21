@@ -39,11 +39,12 @@ let inline SubExpressionIfNeeded (input: ExprRep list): ExprTypes =
 
 let resolveExpression exprs initialBindings settings (finalReduction: bool) = 
 
-    let rec (|ResolveSingle|_|) bindings =
-            function 
-            | left, ({ Expr = rExpr; Offset = exprOffset; Length = exprLength } & r) :: rt ->
+    let rec (|ResolveSingle|_|) bindings lists =
+            printfn "%A" lists
+            match lists with 
+            | left, ({ Expr = rExpr; Offset = exprOffset; Length = exprLength } & erep) :: rt ->
                 try 
-                    let wrapit e = { r with Expr = e }
+                    let wrapit e = { erep with Expr = e }
                     match rExpr with
                     | Returned o -> resolveResultType o |> wrapit |> Some
                     | SubExpression exp ->
@@ -67,7 +68,9 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         | true -> reducedTuples |> (fun tc -> Obj (tupleToObj tc |> box))
                         | false -> reducedTuples |> Tuple |> Unresolved
                         |> wrapit |> Some           
-                    | Unknown unk -> bindings |> Map.tryFind unk |> Option.bind (fun res -> res.Force() |> wrapit |> Some)
+                    | Unknown unk -> 
+                        let res = bindings |> Map.tryFind unk |> Option.bind (fun res -> res.Force() |> wrapit |> Some)
+                        res
                     | Generator ({Expr = Obj(s)}, {Expr = Obj(i)}, {Expr = Obj(e)}) ->
                         match s, i, e with
                         | (:? int64 as s), (:? int64 as i), (:? int64 as e) -> Obj (seq {s .. i .. e }) |> wrapit |> Some
@@ -151,7 +154,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
 
     and (|ResolveTuple|_|) bindings =
         function 
-        | {Offset = lOffset; Length = lLength; Expr = l} :: lt, {Offset = rOffset; Length = rLength; Expr = r } :: rt ->
+        | ({Offset = lOffset; Length = lLength; Expr = l} & lrep) :: lt, ({Offset = rOffset; Length = rLength; Expr = r } & rrep) :: rt ->
             try 
                 match l, r with
                 // Apply a postfix function and return the result
@@ -163,19 +166,27 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 // Execute some method given parameters r
                 | Method l, Obj r -> executeParameterizedMethod l r 
                 // Perform a .NET-Application wide scope invocation
-                | Unknown l, AppliedInvoke r when finalReduction || settings.BindGlobalsWhenReducing -> cachedResolveStatic (settings.Namespaces, l, r)
+                | Unknown l, AppliedInvoke (depth, r) when depth = 0 && finalReduction || settings.BindGlobalsWhenReducing -> 
+                    cachedResolveStatic (settings.Namespaces, l, r)
+                // Perform a .NET-Application wide scope invocation
+                | Unknown l, AppliedInvoke (depth, r) when finalReduction || settings.BindGlobalsWhenReducing -> 
+                    failwith "Static invocations above depth 0 are not currently supported."
                 // New is allowed so C# users feel at home, it really does nothing though
                 | New, Unknown r -> Unknown r |> Some
                 // Provides F#-like construction without new
                 | Unknown l, Obj r -> executeConstructor settings.Namespaces l r
                 // Simplify to a single invocation ExprType
-                | Invoke, Unknown r -> AppliedInvoke r |> Some
+                | Invoke, Unknown r -> AppliedInvoke (0, r) |> Some
                 // Here for F#-like indexing, the invoking '.' is simply removed 
                 | Invoke, IndexArgs r -> IndexArgs r |> Some
                 // Invoke on null should always be null
                 | Obj null, AppliedInvoke _ -> Obj null |> Some
                 // Finds and returns a particular memeber of the given object
-                | Obj l, AppliedInvoke r when finalReduction -> resolveInvoke l r
+                | Obj l, AppliedInvoke (0, r) when finalReduction -> resolveInvoke l r
+                | Obj l, AppliedInvoke (depth, r) when finalReduction -> 
+                    Tuple [| for o in resolveInvokeAtDepth depth l r -> { lrep with Expr = o } |] |> Some
+                // Combine Invocations for Flattened Nested Invocation
+                | Invoke, AppliedInvoke (depth, r) -> AppliedInvoke (depth + 1, r) |> Some
                 // Index the given indexed property representation via IndexArgs
                 | IndexedProperty l, IndexArgs ({ Expr = Obj r }) -> executeIndexer l r
                 // Index the given object it via IndexArgs
@@ -213,7 +224,8 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
     // Tries to merge/convert local tokens, if it can't it moves to the right
     and reduceExpressions (lleft: ExprRep list) (lright: ExprRep list) (bindings: Bindings) : ExprRep list * Bindings=
         match lleft, lright with
-        | left, (rExpr & {Expr = Unresolved(expr)}) :: rt -> reduceExpressions ({rExpr with Expr = expr} :: left) rt bindings
+        | left, (rExpr & {Expr = Unresolved(expr)}) :: rt -> 
+            reduceExpressions ({rExpr with Expr = expr} :: left) rt bindings
         // Binding
         | left, (({Expr = Binding (bindName, bindInnerExpr, boundScope)} & bindExpr) :: rt)  ->
             match reduceExpressions [] [bindInnerExpr] bindings |> fst with
