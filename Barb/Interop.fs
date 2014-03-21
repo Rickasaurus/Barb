@@ -270,6 +270,8 @@ let executeParameterizedMethod (sigs: MethodSig) (args: obj) =
     |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = arrayArgs.Length)
     |> Option.tryResolve (fun () -> sigs |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = 1))
     |> Option.map (fun (exec, paramTypes) -> 
+        // If the it only takes one parameter but we have args, treat the args as a collection
+        let arrayArgs = if  paramTypes.Length = 1 && arrayArgs.Length > 1 then [|box arrayArgs|] else arrayArgs
         Array.zip paramTypes arrayArgs
         |> Array.map (fun (tType, param) -> convertToTargetType tType param)
         |> Array.map (function | Some rParam -> rParam | None -> failwith (sprintf "Unable to resolve method parameters: %A -> %A" arrayArgs paramTypes))

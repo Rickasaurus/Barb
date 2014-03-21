@@ -148,7 +148,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                     | _ -> None
                     |> Option.map (fun res -> res, left, rt)
                 with
-                | :? BarbException as ex -> raise ex 
+                | :? BarbException as ex -> reraise () 
                 | ex -> raise <| new BarbExecutionException(ex.Message, exprOffset, exprLength)
             | _ -> None
 
@@ -197,7 +197,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 // Maps the text representation of the two input expressions to the single result expression
                 |> Option.map (fun res -> {Offset = lOffset; Length = (rOffset + rLength) - lOffset; Expr = res}, lt, rt)
             with
-            | :? BarbException as ex -> raise ex  
+            | :? BarbException as ex -> reraise ()  
             | ex ->
                 let totalLength = (rOffset - lOffset) + rLength 
                 raise <| new BarbExecutionException (ex.Message, lOffset, totalLength)

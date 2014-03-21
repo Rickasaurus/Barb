@@ -55,6 +55,14 @@ module Lib =
         let t2obj = t2 |> Seq.cast<obj>
         t1obj |> Seq.exists (fun i1 -> t2obj |> Seq.exists (fun i2 -> Barb.Interop.objectsEqualInner i1 i2))
 
+    let flatten (t1: IEnumerable) =
+        [|
+            for set in t1 do
+                match set with
+                | (:? IEnumerable as enumset) -> for element in enumset do yield box element
+                | o -> yield o
+        |]
+
 module Table =
     let loadTSV (filename: string) : string [] [] = 
         File.ReadLines filename

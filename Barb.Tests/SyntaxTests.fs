@@ -564,9 +564,6 @@ let ``Any out of bounds indexing should return null`` () =
     let result = predicate ()
     Assert.True(result)    
 
-//
-// Wish List / Ideas
-//
 type Location = { City: string }
 type PersonOneLoc = { Locations: Location array  }
 
@@ -576,6 +573,37 @@ let ``should support mutli-calls over arrays 1 deep`` () =
     let predicate = buildExpr<PersonOneLoc,bool> "Locations..City /?\ (\"Hoboken\")"
     let result = predicate (p)
     Assert.True(result)  
+
+type TestCity = { Name: string; ZipCodes: string array }
+type TestLocation2 = { City: TestCity }
+type TestPerson2 = { Name: string; Locations: TestLocation2 array }
+
+[<Fact>]
+let ``should support multi-calls over two subtypes for a single value`` () = 
+    let l1 = { City = { Name = "Hoboken"; ZipCodes = [| "90210"; "12345"; "07030" |] } }
+    let l2 = { City = { Name = "New York"; ZipCodes = [| "54321"; "00000"; "44444" |] } }
+    let p = { Name = "Dude Duderson"; Locations = [| l1; l2 |] }
+    let predicate = buildExpr<TestPerson2,bool> "let n = Locations..City..Name in n = (\"Hoboken\", \"New York\")" in 
+        let result = predicate (p)
+        Assert.True(result)  
+
+    let predicate = buildExpr<TestPerson2,bool> "let n = Locations..City..Name in n /?\ (\"Hoboken\") and n /?\ (\"New York\")" in 
+        let result = predicate (p)
+        Assert.True(result)  
+
+[<Fact>]
+let ``should support multi-calls over two subtypes for a collection of values`` () = 
+    let l1 = { City = { Name = "Hoboken"; ZipCodes = [| "90210"; "12345"; "07030" |] } }
+    let l2 = { City = { Name = "New York"; ZipCodes = [| "54321"; "00000"; "44444" |] } }
+    let p = { Name = "Dude Duderson"; Locations = [| l1; l2 |] }
+
+    let predicate = buildExpr<TestPerson2,bool> "let z = (Lib.flatten (Locations..City..ZipCodes)) in z /?\ (\"00000\") and z /?\ (\"12345\")" in 
+        let result = predicate (p)
+        Assert.True(result) 
+//
+// Wish List / Ideas
+//
+
 
 //[<Fact>] // Experimental
 let ``should support safe while syntax`` () = 
