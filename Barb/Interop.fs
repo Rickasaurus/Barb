@@ -429,3 +429,11 @@ let intersectObjects (obj1: obj) (obj2: obj) =
 let doObjectsIntersect (obj1: obj) (obj2: obj) =
     (objToEnumerable obj1, objToEnumerable obj2)
     |> (fun (t1, t2) -> t1 |> Seq.exists (fun i1 -> t2 |> Seq.exists (fun i2 -> objectsEqualInner i1 i2))) |> box
+
+let isSubsetOf (obj1: obj) (obj2: obj) = 
+    (objToEnumerable obj1, objToEnumerable obj2)
+    |> (fun (t1, t2) -> t1 |> Seq.forall (fun i1 -> t2 |> Seq.exists (fun i2 -> objectsEqualInner i1 i2))) |> box
+
+let isSupersetOf (obj1: obj) (obj2: obj) = 
+    (objToEnumerable obj2, objToEnumerable obj1)
+    |> (fun (t1, t2) -> t1 |> Seq.forall (fun i1 -> t2 |> Seq.exists (fun i2 -> objectsEqualInner i1 i2))) |> box

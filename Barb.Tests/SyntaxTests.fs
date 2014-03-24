@@ -551,6 +551,70 @@ let ``hasintersection operator should consider null to be the empty set`` () =
     let result = predicate ()
     Assert.False(result)
 
+[<Fact>]
+let ``issubset operator should work correctly in true cases`` () =
+    let cases = [
+            @"(1,2,3) (= (1,2,3)"
+            @"(1,2) (= (1,2,3)"
+            @"(1) (= (1,2,3)"
+            @"null (= (1,2,3)"
+            @"null (= (1)"
+        ]
+    for predstr in cases do         
+        let predicate = buildExpr<unit, bool> predstr
+        let result = predicate ()
+        Assert.True(result, predstr)
+
+[<Fact>]
+let ``issubset operator should work correctly in false cases`` () =
+    let cases = [
+            @"(1,2,3,4) (= (1,2,3)"
+            @"(2,3,4) (= (1,2,3)"
+            @"(3,4) (= (1,2,3)"
+            @"(4) (= (1,2,3)"
+            @"(1,2,3,4) (= null"
+            @"(1) (= null"
+        ]
+    for predstr in cases do         
+        let predicate = buildExpr<unit, bool> predstr
+        let result = predicate ()
+        Assert.False(result, predstr)
+
+[<Fact>]
+let ``issuperset operator should work correctly in true cases`` () =
+    let cases = [
+            @"(1,2,3) =) (1,2,3)"
+            @"(1,2,3) =) (1,2) "
+            @"(1,2,3) =) (1)"
+            @"(1,2,3) =) null"
+            @"(1) =) null"
+        ]
+    for predstr in cases do         
+        let predicate = buildExpr<unit, bool> predstr
+        let result = predicate ()
+        Assert.True(result, predstr)
+
+[<Fact>]
+let ``issuperset operator should work correctly in false cases`` () =
+    let cases = [
+            @"(1,2,3) =) (1,2,3,4)"
+            @"(1,2,3) =) (2,3,4)"
+            @"(1,2,3) =) (3,4)"
+            @"(1,2,3) =) (4)"
+            @"null =) (1,2,3,4)"
+            @"null =) (1)"
+        ]
+    for predstr in cases do         
+        let predicate = buildExpr<unit, bool> predstr
+        let result = predicate ()
+        Assert.False(result, predstr)
+
+[<Fact>]
+let ``issuperset operator should work correctly in parens`` () =    
+    let predicate = buildExpr<unit, bool> @"((1,2,3) =) (1,2,3))"
+    let result = predicate ()
+    Assert.True(result)
+
 
 [<Fact>] 
 let ``Any indexing on null should return null`` () =

@@ -217,6 +217,8 @@ let allSimpleMappings =
         ["null"], fun () -> Obj null
         ["true"], fun () -> Obj true
         ["false"], fun () -> Obj false
+        ["(="], fun () -> Infix (2, isSubsetOf)
+        ["=)"], fun () -> Infix (2, isSupersetOf)
         ["=="; "="], fun () -> Infix (3, objectsEqual)
         ["<>"; "!="], fun () -> Infix (3, objectsNotEqual)
         [">="], fun () -> Infix (3, compareObjects (>=))
@@ -261,7 +263,7 @@ let (|Skip|_|) (skipStrs: string list) (text: StringWindow) : MatchReturn =
     |> List.tryFind (fun sstr -> text.StartsWith(sstr))
     |> Option.map (fun m -> None, text.Subwindow(uint32 m.Length))
 
-let (|MapSymbol|_|) (text: StringWindow) : MatchReturn =
+let getBestSimpleMappedSymbol (text: StringWindow) =
     let matches, str = 
         [
             for matchStrs, expr in allSimpleMappings do
@@ -270,23 +272,31 @@ let (|MapSymbol|_|) (text: StringWindow) : MatchReturn =
         ] |> List.allMaxBy (fun (m, expr) -> m.Length)
     match matches with
     | [] -> None
-    | [(matched, expr)] -> Some (Some(expr()), text.Subwindow(uint32 matched.Length))
+    | [(matched, expr)] -> Some (matched, expr, text.Subwindow(uint32 matched.Length))
     | _ -> 
         let errorText = sprintf "Ambiguous symbol match: %A" matches
-        raise (new BarbParsingException(errorText, text.Offset, matches |> List.map (fun (s,e) -> s.Length) |> List.max |> uint32))
+        raise (new BarbParsingException(errorText, text.Offset, matches |> List.map (fun (s,e) -> s.Length) |> List.max |> uint32))    
+
+let (|MapSymbol|_|) (text: StringWindow) : MatchReturn =
+    match getBestSimpleMappedSymbol text with
+    | None -> None
+    | Some (matched, expr, tw) -> Some (Some(expr()), text.Subwindow(uint32 matched.Length))
 
 let (|NewExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringWindow) =
-    let matches, str = 
+    let antimatch = getBestSimpleMappedSymbol text
+    let matches, strlen = 
         [ 
             for ct in allExpressionTypes do 
                 match ct.Pattern with
                 | (SCap h) :: rest when text.StartsWith(h) -> yield h, { ct with Pattern = rest }
                 | (RCap h) :: rest when text.StartsWith(h) -> yield h, ct
                 | _ -> ()    
-        ] |> List.allMaxBy (fun (m, rest) -> m.Length)
-    match matches with
-    | [] -> None
-    | [(mtext, subexprtype)] -> Some (subexprtype, text.Subwindow(uint32 mtext.Length))
+        ] 
+        |> List.allMaxBy (fun (m, rest) -> m.Length)           
+    match matches, antimatch with
+    | [], _ -> None
+    | [_], Some (sstr, _ , _) when sstr.Length > strlen -> None 
+    | [(mtext, subexprtype)], _ -> Some (subexprtype, text.Subwindow(uint32 mtext.Length))
     | _ -> let errorText = sprintf "Ambiguous expression match: %A" matches
            raise (new BarbParsingException(errorText, text.Offset, matches |> List.map (fun (s,e) -> s.Length) |> List.max |> uint32))
 
