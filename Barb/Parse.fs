@@ -204,9 +204,9 @@ let allExpressionTypes =
 //        { Pattern = [SCap "var"; SCap "="; Open];                   Func = generateBind }
         { Pattern = [SCap "var"; SCap "="; SCap "in"; Open];        Func = generateBind }
         { Pattern = [Open; SCap "and"; Open];                       Func = generateAnd }
-        { Pattern = [Open; SCap "&& "; Open];                        Func = generateAnd }
+        { Pattern = [Open; SCap "&&"; Open];                        Func = generateAnd }
         { Pattern = [Open; SCap "or"; Open];                        Func = generateOr }
-        { Pattern = [Open; SCap "|| "; Open];                        Func = generateOr }
+        { Pattern = [Open; SCap "||"; Open];                        Func = generateOr }
     ]
 
 let allSimpleMappings = 
@@ -313,7 +313,8 @@ let (|OngoingExpression|_|) (typesStack: SubexpressionAndOffset list) (text: Str
         | _ -> None
 
 let (|RefineOpenExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringWindow) =
-    let matches, str = 
+    let antimatch = getBestSimpleMappedSymbol text
+    let matches, strlen = 
         [ 
             for ct in allExpressionTypes do 
                 match ct.Pattern with
@@ -321,10 +322,11 @@ let (|RefineOpenExpression|_|) (typesStack: SubexpressionAndOffset list) (text: 
                 | Open :: (RCap h) :: rest when text.StartsWith(h) -> yield h, { ct with Pattern = (RCap h) :: rest }
                 | _ -> ()
         ] |> List.allMaxBy (fun (m, rest) -> m.Length)   
-    match matches with
-    | []-> None
-    | [(mtext, subexprtype)] -> Some (subexprtype, text.Subwindow(uint32 mtext.Length))
-    | _ -> let errorText = sprintf "Ambiguous open expression match: %A" matches
+    match matches, antimatch with
+    | [], _ -> None
+    | [_], Some (sstr, _ , _) when sstr.Length > strlen -> None 
+    | [(mtext, subexprtype)], _ -> Some (subexprtype, text.Subwindow(uint32 mtext.Length))
+    | _ -> let errorText = sprintf "Ambiguous refinement on open expression match: %A" matches
            raise (new BarbParsingException(errorText, text.Offset, matches |> List.map (fun (s,e) -> s.Length) |> List.max |> uint32))
 
 let rec findClosed (typesStack: SubexpressionAndOffset list) = 
