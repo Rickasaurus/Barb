@@ -49,6 +49,7 @@
     <Compile Include="ParseTests.fs" />
     <Compile Include="SyntaxTests.fs" />
     <Compile Include="InteropTests.fs" />
+    <Compile Include="InteropGenericsTests.fs" />
     <Compile Include="TextTests.fs" />
     <Compile Include="OOOTests.fs" />
     <Compile Include="LibTests.fs" />

@@ -4,6 +4,7 @@ open System
 open System.Text
 open System.Text.RegularExpressions
 open System.Reflection
+open System.Linq.Expressions
 open System.ComponentModel
 open System.Linq
 open System.Linq.Expressions
@@ -129,11 +130,29 @@ let rec resolveResultType (output: obj) =
 let fieldToExpr (fld: FieldInfo) =
     fun (obj: obj) ->
         fld.GetValue(obj, null) |> Returned
-    
-let propertyToExpr (prop: PropertyInfo) =
+
+let staticPropertyToExpr (rtype: System.Type) (prop: PropertyInfo) = 
     match prop.GetIndexParameters() with
-    | [||] -> (fun obj -> prop.GetValue(obj, null) |> Returned)
+    | [||] ->
+        let propexp = Expression.Property(null, prop)
+        let lambda = Expression.Lambda(propexp)
+        let compiledLambda = lambda.Compile()
+        (fun obj -> compiledLambda.DynamicInvoke() |> Returned)
+       // (fun obj -> prop.GetValue(obj, null) |> Returned)
     | prms ->
+        let typeArgs = prms |> Array.map (fun pi -> pi.ParameterType)
+        (fun (obj: obj) -> [(fun args -> prop.GetValue(obj, args)), typeArgs] |> IndexedProperty)
+
+let propertyToExpr (rtype: System.Type) (prop: PropertyInfo) = 
+    let objparam = Expression.Parameter(rtype, "objparam")  
+    match prop.GetIndexParameters() with
+    | [||] -> 
+        let propexp = Expression.Property(objparam, prop)
+        let funcType = typedefof<Func<_,_>>.MakeGenericType(rtype, prop.PropertyType);
+        let lambda = Expression.Lambda(funcType, propexp, objparam)
+        let compiledLambda = lambda.Compile()
+        (fun obj -> compiledLambda.DynamicInvoke([|obj|]) |> Returned)
+     | prms ->
         let typeArgs = prms |> Array.map (fun pi -> pi.ParameterType)
         (fun (obj: obj) -> [(fun args -> prop.GetValue(obj, args)), typeArgs] |> IndexedProperty)
 
@@ -151,7 +170,7 @@ let overloadedMethodToExpr (methods: MethodInfo seq) =
         Method methodOverloads
 
 let rec resolveMember (rtype: System.Type) (memberName: string) : (obj -> ExprTypes) option =
-    rtype.GetProperty(memberName) |> nullableToOption |> Option.map propertyToExpr
+    rtype.GetProperty(memberName) |> nullableToOption |> Option.map (propertyToExpr rtype)
     |> Option.tryResolve (fun () -> match rtype.GetMethods() |> Array.filter (fun mi -> mi.Name = memberName) with | [||] -> None | methods -> methods |> overloadedMethodToExpr |> Some)
     |> Option.tryResolve (fun () -> rtype.GetField(memberName) |> nullableToOption |> Option.map fieldToExpr)
     |> Option.tryResolve (fun () -> rtype.GetInterfaces() |> Seq.tryPick (fun i -> resolveMember i memberName))
@@ -172,7 +191,7 @@ let resolveStatic (namespaces: string Set) (rtypename: string) (memberName: stri
     match getTypeByName namespaces rtypename with
     | [] -> None
     | rtype :: [] ->        
-        rtype.GetProperty(memberName) |> nullableToOption |> Option.map propertyToExpr
+        rtype.GetProperty(memberName) |> nullableToOption |> Option.map (staticPropertyToExpr rtype)
         |> Option.tryResolve (fun () -> match rtype.GetMethods() |> Array.filter (fun mi -> mi.Name = memberName) with | [||] -> None | methods -> methods |> overloadedMethodToExpr |> Some)
         |> Option.tryResolve (fun () -> rtype.GetField(memberName) |> nullableToOption |> Option.map fieldToExpr)
         |> function | Some (objToExpr) -> Some (objToExpr null) | None -> failwith (sprintf "Member name of %s was ambiguous: %s" rtypename memberName)            
@@ -213,7 +232,7 @@ let rec resolveMembers (rtype: System.Type) (bindingflags: BindingFlags) =
     let methodCollections = rtype.GetMethods(bindingflags) |> Seq.groupBy (fun mi -> mi.Name)
     let fields = rtype.GetFields(bindingflags)               
     seq {
-        for prop in properties do yield prop.Name, propertyToExpr prop
+        for prop in properties do yield prop.Name, propertyToExpr rtype prop
         for (name, methods) in methodCollections do yield name, overloadedMethodToExpr methods
         for field in fields do yield field.Name, fieldToExpr field
     }     
