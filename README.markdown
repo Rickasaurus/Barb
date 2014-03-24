@@ -140,6 +140,7 @@ The '...' here indicates an unbounded expression and is not actual Barb syntax. 
 	()	 			Unit
 	new <name>		Creates a new .NET instance of Class "name"
 	.				Invocation or Decimal Point within a Number
+    ..              Invoke on each in a set and collect
 	null 			Creates an instance of null
 	true			Creates a boolean of value true
 	false			Creates a boolean of value false
@@ -159,13 +160,35 @@ The '...' here indicates an unbounded expression and is not actual Barb syntax. 
 	\/				Set Union
 	/\				Set Intersection
 	/?\				Set Has Intersection
+    =)              Is Superset
+    (=              Is Subset
+
+#### Nested Invocation ####
+
+In Barb you can invoke the same method or property on a set of objects and then get the result quite easily:
+
+    Collection..Property
+
+You can also chain this when the properties each return collections:
+   
+    Collection..MethodReturningCollection()..Property
+
+It also can be used at arbitrary depth for dealing with collections of collections.
+
+    CollectionOfCollections...Property
+
+This feature can be mixed interchangeably with standard "0th layer" invocations.  
+
+    Collection..Property.Items..Item
+
+Items in the collection which do not support the invocation are skipped.
 
 #### Set Operator Semantics ####
 
 Any instance can be thought of as a one element set except for null, which indicates an empty set.  Any IEnumerable will be considered a set containing the number of unique elements within it.
 
 
-#### Nullity Semantics ####
+#### Null Semantics ####
 
 Outside of the context of sets or calls into .NET null should always consume.  That is, invoking something with a null member name returns null.  Similarly, invoking any member on null will return null.  In the context of arithmetic (1 * null = null), etc. 
 
