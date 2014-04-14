@@ -216,7 +216,7 @@ let resolveInvoke (o: obj) (memberName: string) =
     if o = null then None
     else match cachedResolveMember (o.GetType(), memberName) with
          | Some (resolvedMember) -> resolvedMember o |> Some
-         | None -> failwith (sprintf "Unable to lookup specified member %s in object %s" memberName (o.GetType().Name))
+         | None -> failwith (sprintf "Unable to find member %s in object of type %s" memberName (o.GetType().Name))
 
 let rec resolveInvokeAtDepth (depth: int) (o: obj) (memberName: string) =
     match depth, box o with

@@ -7,8 +7,9 @@ open System.Collections.Concurrent
 open Barb.Interop
 open Barb.Representation
 
-type BarbExecutionException (message, offset, length) =
+type BarbExecutionException (message, trace: string, offset, length) =
     inherit BarbException (message, offset, length)
+    member t.Trace = trace
 
 let indexIntoTuple (elements: ExprTypes array) (index: obj) = 
     match index with 
@@ -40,7 +41,6 @@ let inline SubExpressionIfNeeded (input: ExprRep list): ExprTypes =
 let resolveExpression exprs initialBindings settings (finalReduction: bool) = 
 
     let rec (|ResolveSingle|_|) bindings lists =
-            printfn "%A" lists
             match lists with 
             | left, ({ Expr = rExpr; Offset = exprOffset; Length = exprLength } & erep) :: rt ->
                 try 
@@ -54,9 +54,9 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         |> Some
                     | IndexArgs ({ Expr = SubExpression exp }) when finalReduction ->
                         match reduceExpressions [] exp bindings |> fst |> List.rev with
-                        | [] -> failwith (sprintf "No indexer found in [ ]")
+                        | [] -> failwith "No indexer found in [ ]"
                         | single :: [] -> IndexArgs single |> wrapit
-                        | other -> failwith (sprintf "Indexer could not be fully reduced.")
+                        | other -> failwith "Indexer could not be fully reduced"
                         |> Some
                     | Tuple tc -> 
                         let reducedTuples = 
@@ -69,13 +69,14 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         | false -> reducedTuples |> Tuple |> Unresolved
                         |> wrapit |> Some           
                     | Unknown unk -> 
-                        let res = bindings |> Map.tryFind unk |> Option.bind (fun res -> res.Force() |> wrapit |> Some)
-                        res
+                        match bindings |> Map.tryFind unk |> Option.bind (fun res -> res.Force() |> wrapit |> Some) with
+                        | None when finalReduction -> raise <| BarbExecutionException(sprintf "Specified unknown was unable to be resolved: %s" unk, (sprintf "%A" lists), exprOffset, exprLength)
+                        | v -> v
                     | Generator ({Expr = Obj(s)}, {Expr = Obj(i)}, {Expr = Obj(e)}) ->
                         match s, i, e with
                         | (:? int64 as s), (:? int64 as i), (:? int64 as e) -> Obj (seq {s .. i .. e }) |> wrapit |> Some
                         | (:? float as s), (:? float as i), (:? float as e) -> Obj (seq {s .. i .. e }) |> wrapit |> Some
-                        | _ -> failwith (sprintf "Unexpected Generator Parameters: %A, %A, %A" s i e)
+                        | _ -> raise <| BarbExecutionException("Unexpected Generator Paramters", (sprintf "%A, %A, %A" s i e), exprOffset, exprLength)
                     | Generator (sexpr, iexpr, eexpr) ->
                         let rs, _ = reduceExpressions [] [sexpr] bindings
                         let ri, _ = reduceExpressions [] [iexpr] bindings
@@ -86,7 +87,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         | s, i, e when not finalReduction -> 
                             let gen = {sexpr with Expr = SubExpressionIfNeeded s}, {iexpr with Expr = SubExpressionIfNeeded i}, {eexpr with Expr = SubExpressionIfNeeded e}
                             Generator gen |> Unresolved |> wrapit |> Some
-                        | _ -> failwith (sprintf "One or more generator expressions could not be resolved: %A, %A, %A" rs ri re)
+                        | _ -> raise <| BarbExecutionException("One or more generator expressions could not be resolved", (sprintf "%A, %A, %A" rs ri re), exprOffset, exprLength)
                     | IfThenElse (ifexpr, thenexpr, elseexpr) ->
                         match reduceExpressions [] [ifexpr] bindings |> fst with
                         // If fully resolved in initial reduction, resolve and return the result clause
@@ -117,13 +118,13 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                             | { Expr = Obj (null) } :: [] -> Obj null |> wrapit |> Some
                             | { Expr = Obj (:? bool as res)} :: [] -> Obj res |> wrapit |> Some
                             | res when not finalReduction -> And ({lExpr with Expr = Obj true}, {rExpr with Expr = res |> List.rev |> SubExpressionIfNeeded}) |> Unresolved |> wrapit |> Some
-                            | res -> failwith (sprintf "Right hand side of And did not evaluate properly: %A" rExpr)
+                            | res -> raise <| BarbExecutionException("Right hand side of And did not evaluate properly", sprintf "%A" rExpr, exprOffset, exprLength)
                         // Left hand side did not evaluate fully, try to reduce both and return
                         | res when not finalReduction -> 
                             let repL = { lExpr with Expr = res |> List.rev |> SubExpressionIfNeeded }
                             let repR = { rExpr with Expr = reduceExpressions [] [rExpr] bindings |> fst |> List.rev |> SubExpressionIfNeeded }
                             And (repL, repR) |> Unresolved |> wrapit |> Some
-                        | res -> failwith (sprintf "Right hand side of And did not evaluate properly: %A" rExpr)
+                        | res -> raise <| BarbExecutionException("Left hand side of And did not evaluate properly", sprintf "%A" lExpr, exprOffset, exprLength)
                     | Or (lExpr, rExpr) ->
                         // Left and side of the Or 
                         match reduceExpressions [] [lExpr] bindings |> fst with
@@ -138,18 +139,18 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                             | res when not finalReduction -> 
                                 let orExpr = Or ({lExpr with Expr = Obj false}, {rExpr with Expr = res |> List.rev |> SubExpressionIfNeeded}) 
                                 orExpr |> Unresolved |> wrapit |> Some
-                            | res -> failwith (sprintf "Right hand side of Or did not evaluate properly: %A" rExpr)
+                            | res -> raise <| BarbExecutionException("Right hand side of Or did not evaluate properly", sprintf "%A" rExpr, exprOffset, exprLength)
                         // Left hand side did not evaluate fully, try to reduce both and return
                         | res when not finalReduction -> 
                             let repL = { lExpr with Expr = res |> List.rev |> SubExpressionIfNeeded }
                             let repR = { rExpr with Expr = reduceExpressions [] [rExpr] bindings |> fst |> List.rev |> SubExpressionIfNeeded }
                             Or (repL, repR) |> Unresolved |> wrapit |> Some
-                        | res -> failwith (sprintf "Left hand side of Or did not evaluate properly: %A" lExpr)
+                        | res -> raise <| BarbExecutionException("Left hand side of Or did not evaluate properly", sprintf "%A" lExpr, exprOffset, exprLength)
                     | _ -> None
                     |> Option.map (fun res -> res, left, rt)
                 with
                 | :? BarbException as ex -> reraise () 
-                | ex -> raise <| new BarbExecutionException(ex.Message, exprOffset, exprLength)
+                | ex -> raise <| new BarbExecutionException(ex.Message, sprintf "%A" lists, exprOffset, exprLength)
             | _ -> None
 
     and (|ResolveTuple|_|) bindings =
@@ -170,7 +171,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                     cachedResolveStatic (settings.Namespaces, l, r)
                 // Perform a .NET-Application wide scope invocation
                 | Unknown l, AppliedInvoke (depth, r) when finalReduction || settings.BindGlobalsWhenReducing -> 
-                    failwith "Static invocations above depth 0 are not currently supported."
+                    raise <| new BarbExecutionException (sprintf "Static invocations above depth 0 are not currently supported.", sprintf "%A" (l,r), lOffset, (rOffset - lOffset) + rLength)
                 // New is allowed so C# users feel at home, it really does nothing though
                 | New, Unknown r -> Unknown r |> Some
                 // Provides F#-like construction without new
@@ -182,9 +183,12 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 // Invoke on null should always be null
                 | Obj null, AppliedInvoke _ -> Obj null |> Some
                 // Finds and returns a particular memeber of the given object
-                | Obj l, AppliedInvoke (0, r) when finalReduction -> resolveInvoke l r
+                | Obj l, AppliedInvoke (0, r) when finalReduction -> 
+                    try resolveInvoke l r
+                    with ex -> raise <| BarbExecutionException(ex.Message, sprintf "%A" (l,r), rOffset, rLength)
                 | Obj l, AppliedInvoke (depth, r) when finalReduction -> 
-                    Tuple [| for o in resolveInvokeAtDepth depth l r -> { lrep with Expr = o } |] |> Some
+                    try Tuple [| for o in resolveInvokeAtDepth depth l r -> { lrep with Expr = o } |] |> Some
+                    with ex -> raise <| BarbExecutionException(ex.Message, sprintf "%A" (l,r), rOffset, rLength)
                 // Combine Invocations for Flattened Nested Invocation
                 | Invoke, AppliedInvoke (depth, r) -> AppliedInvoke (depth + 1, r) |> Some
                 // Index the given indexed property representation via IndexArgs
@@ -200,7 +204,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
             | :? BarbException as ex -> reraise ()  
             | ex ->
                 let totalLength = (rOffset - lOffset) + rLength 
-                raise <| new BarbExecutionException (ex.Message, lOffset, totalLength)
+                raise <| new BarbExecutionException (sprintf "Unexpected exception in tuple reduction: %s" ex.Message, sprintf "%A" (l,r), lOffset, totalLength)
         | _ -> None
     
     and (|ResolveTriple|_|) =
@@ -209,16 +213,12 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
             // If InfixOp_R1 <= InfixOp_R2 then we can safely apply InfixOp_R1
             | ((lInfix & {Offset = oOffset; Length = oLength; Expr = (Infix (lp, lfun))}) :: {Expr = Obj l} :: lt), 
               ({Expr = Obj r} :: (rInfix & {Expr = (Infix (rp, rfrun))}) :: rt) when finalReduction ->
-                try 
                     if lp <= rp then Some ({lInfix with Expr = Obj (lfun l r)}, lt, ({rInfix with Expr = Infix (rp, rfrun)}) :: rt)
                     else None
-                with | ex -> raise <| new BarbExecutionException (ex.Message, oOffset, oLength)
             // Order of Operations case 2: Obj InfixOp Obj END 
             // We've reached the end of our list, it's safe to use InfixOp
             | ((lInfix & {Offset = oOffset; Length = oLength; Expr = (Infix (lp, lfun))}) :: {Expr = Obj l} :: lt), ({Expr = Obj r} :: []) when finalReduction ->
-                try 
                     Some ({lInfix with Expr = Obj (lfun l r)}, lt, [])
-                with | ex -> raise <| new BarbExecutionException (ex.Message, oOffset, oLength)
             | _ -> None
 
     // Tries to merge/convert local tokens, if it can't it moves to the right
@@ -254,14 +254,16 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
         | l,  r :: rt -> reduceExpressions (r :: l) rt bindings
         // Single Element, Done Reducing
         | l :: [], [] -> [l], bindings
-        | catchall when finalReduction -> 
+        | ((lh :: lr) & left, (rh :: rr) & right) when finalReduction -> 
             let offset, length = 
-                match catchall with
+                match (left, right) with
                 | {Offset = lOffset; Length = lLength} :: _, {Offset = rOffset; Length = rLength} :: _ -> lOffset, (rOffset - lOffset) + rLength 
                 | {Offset = lOffset; Length = lLength} :: _, _ -> lOffset, lLength
                 | _,  {Offset = rOffset; Length = rLength} :: _ -> rOffset, rLength
                 | _ -> 0u, 0u
-            raise <| new BarbExecutionException (sprintf "Unexpected case: %A" catchall, offset, length)
+            let message = sprintf "Unexpected case: %A %A" lh rh
+            let trace = sprintf "%A" (left, right)
+            raise <| new BarbExecutionException (message, trace, offset, length)
         // Multiple Elements, Done Reducing
         | left, [] -> left, bindings
 
