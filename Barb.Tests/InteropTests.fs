@@ -289,3 +289,13 @@ let ``should support exporting nested tuples`` () =
 let ``invoke on null should return null`` () =
     let predicate = buildExpr<unit, bool> "(null).Hello == null"
     Assert.True(predicate())
+
+type RecordWithStatic = { CName: string }
+    with static member Prefix = "Mr"
+
+[<Fact>] 
+let ``reflection should work in the presence of static properties`` ()  =
+    let testRecord = { CName = "Dude Duderson"}
+    let predicate = buildExpr<RecordWithStatic,bool> "Prefix + ' ' + CName = 'Mr Dude Duderson'"
+    let result = predicate testRecord
+    Assert.True(result)

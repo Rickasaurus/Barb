@@ -138,20 +138,25 @@ let staticPropertyToExpr (rtype: System.Type) (prop: PropertyInfo) =
         let lambda = Expression.Lambda(propexp)
         let compiledLambda = lambda.Compile()
         (fun obj -> compiledLambda.DynamicInvoke() |> Returned)
-       // (fun obj -> prop.GetValue(obj, null) |> Returned)
     | prms ->
         let typeArgs = prms |> Array.map (fun pi -> pi.ParameterType)
         (fun (obj: obj) -> [(fun args -> prop.GetValue(obj, args)), typeArgs] |> IndexedProperty)
 
 let propertyToExpr (rtype: System.Type) (prop: PropertyInfo) = 
-    let objparam = Expression.Parameter(rtype, "objparam")  
     match prop.GetIndexParameters() with
-    | [||] -> 
-        let propexp = Expression.Property(objparam, prop)
-        let funcType = typedefof<Func<_,_>>.MakeGenericType(rtype, prop.PropertyType);
-        let lambda = Expression.Lambda(funcType, propexp, objparam)
-        let compiledLambda = lambda.Compile()
-        (fun obj -> compiledLambda.DynamicInvoke([|obj|]) |> Returned)
+    | [||] ->
+        if prop.GetGetMethod().IsStatic then
+            let propexp = Expression.Property(null, prop)
+            let lambda = Expression.Lambda(propexp)
+            let compiledLambda = lambda.Compile()
+            (fun obj -> compiledLambda.DynamicInvoke() |> Returned)
+        else
+            let objparam = Expression.Parameter(rtype, "objparam")  
+            let propexp = Expression.Property(objparam, prop)
+            let funcType = typedefof<Func<_,_>>.MakeGenericType(rtype, prop.PropertyType);
+            let lambda = Expression.Lambda(funcType, propexp, objparam)
+            let compiledLambda = lambda.Compile()
+            (fun obj -> compiledLambda.DynamicInvoke([|obj|]) |> Returned)
      | prms ->
         let typeArgs = prms |> Array.map (fun pi -> pi.ParameterType)
         (fun (obj: obj) -> [(fun args -> prop.GetValue(obj, args)), typeArgs] |> IndexedProperty)
