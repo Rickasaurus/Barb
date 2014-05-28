@@ -292,10 +292,15 @@ let executeIndexer (sigs: MethodSig) (param: obj) =
     |> Option.map (fun (exec, converted) -> exec [| converted |])
     |> Option.map Returned
 
+let typesMatch (mTypes: Type []) (args: obj []) =
+    if mTypes.Length <> args.Length then false
+    else Array.zip mTypes args |> Seq.forall (fun (t,a) -> a = null || t = a.GetType())
+
 let executeParameterizedMethod (sigs: MethodSig) (args: obj) =
     let arrayArgs = convertPotentiallyTupled args
     sigs
-    |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = arrayArgs.Length)
+    |> List.tryFind (fun (exec, paramTypes) -> typesMatch paramTypes arrayArgs)
+    |> Option.tryResolve (fun () -> sigs |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = arrayArgs.Length))
     |> Option.tryResolve (fun () -> sigs |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = 1))
     |> Option.map (fun (exec, paramTypes) -> 
         // If the it only takes one parameter but we have args, treat the args as a collection
