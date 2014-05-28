@@ -310,9 +310,23 @@ let ``should properly be able to reflect things out of an obj type`` () =
    Assert.Equal(bb.Value, res)
 
 [<Fact>]
-let ``should properly be able to transform an array with dotdot syntax`` () =
+let ``should properly be able to call a unit method on an array with dotdot syntax`` () =
    let bb = { Value = [|" The Dude "; "The Word "|] }
    let pred = buildExpr<BoxBox,string []> "Value..Trim()"
    let res = pred bb 
    Assert.True((res = [|"The Dude"; "The Word"|]))
+
+[<Fact>]
+let ``should properly be able to call a method of one paramter on an array with dotdot syntax`` () =
+   let bb = { Value = [|"The Dude"; "The Word"|] }
+   let pred = buildExpr<BoxBox,string []> "Value..Remove(5)"
+   let res = pred bb 
+   Assert.True((res = [|"The D"; "The W"|]))
+
+[<Fact>]
+let ``should properly be able to call a method of two paramters on an array with dotdot syntax`` () =
+   let bb = { Value = [|"The Dude"; "The Word"|] }
+   let pred = buildExpr<BoxBox,string []> "Value..Replace('The', 'Da')"
+   let res = pred bb 
+   Assert.True((res = [|"Da Dude"; "Da Word"|]))
     

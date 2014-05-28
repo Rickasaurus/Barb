@@ -164,12 +164,13 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 | Prefix l, Obj r -> Returned (l r) |> Some
                 // Execute a parameterless method
                 | Method l, Unit -> executeUnitMethod l
-                // Execute a parameterless method with nested invoke
-                | Tuple t, Unit -> 
+                // Execute a method with nested invoke
+                | Tuple t, Unit  
+                | Tuple t, Obj _ ->
                     Tuple [| for e in t do 
                                 let res, _ = reduceExpressions [] ( e :: rrep :: [] ) bindings in 
                                     yield { lrep with Expr = SubExpressionIfNeeded res } |] |> Some
-                // Execute some method given parameters r
+                // Execute some method given arguments r
                 | Method l, Obj r -> executeParameterizedMethod l r 
                 // Perform a .NET-Application wide scope invocation
                 | Unknown l, AppliedInvoke (depth, r) when depth = 0 && finalReduction || settings.BindGlobalsWhenReducing -> 
