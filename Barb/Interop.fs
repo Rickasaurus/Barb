@@ -261,10 +261,13 @@ and convertToSameType (obj1: obj) (obj2: obj) : (obj * obj) =
                     | _ -> obj1, System.Convert.ChangeType(obj2, obj1.GetType())
     with _ -> failwith (sprintf "Failed to find a conversion for %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))   
 
+
 let convertToTargetType (ttype: Type) (param: obj) = 
     match param with
     | null -> Some null
-    | :? (obj []) as objs when ttype = typeof<string[]> -> objs |> Array.map (fun e -> e :?> string) |> box |> Some
+    // Special Case For speed
+    | :? (obj []) as objs when ttype = typeof<string[]> -> Array.ConvertAll(objs, fun v -> v :?> string) |> box |> Some 
+    | :? (obj []) as objs when ttype = typeof<int64[]>  -> Array.ConvertAll(objs, fun v -> v :?> int64) |> box |> Some 
     | _ when ttype.IsGenericTypeDefinition -> Some param
     | _ when ttype = typeof<IEnumerable> && param.GetType() = typeof<string> -> Some ([| param |] |> box)
     | _ when ttype.IsAssignableFrom(param.GetType()) -> Some param
