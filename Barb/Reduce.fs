@@ -164,6 +164,11 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 | Prefix l, Obj r -> Returned (l r) |> Some
                 // Execute a parameterless method
                 | Method l, Unit -> executeUnitMethod l
+                // Execute a parameterless method with nested invoke
+                | Tuple t, Unit -> 
+                    Tuple [| for e in t do 
+                                let res, _ = reduceExpressions [] ( e :: rrep :: [] ) bindings in 
+                                    yield { lrep with Expr = SubExpressionIfNeeded res } |] |> Some
                 // Execute some method given parameters r
                 | Method l, Obj r -> executeParameterizedMethod l r 
                 // Perform a .NET-Application wide scope invocation

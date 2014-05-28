@@ -65,6 +65,7 @@ and ExprRep =
         Length: uint32
         Expr: ExprTypes
     }
+    with override t.ToString() = sprintf "{ Off = %i; Len = %i; %A }" t.Offset t.Length t.Expr
 
 and Bindings = (String, ExprTypes Lazy) Map 
 

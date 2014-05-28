@@ -144,7 +144,7 @@ let staticPropertyToExpr (rtype: System.Type) (prop: PropertyInfo) =
 
 let propertyToExpr (rtype: System.Type) (prop: PropertyInfo) = 
     match prop.GetIndexParameters() with
-    | [||] ->
+    | [||] ->        
         if prop.GetGetMethod().IsStatic then
             let propexp = Expression.Property(null, prop)
             let lambda = Expression.Lambda(propexp)
@@ -261,13 +261,17 @@ and convertToSameType (obj1: obj) (obj2: obj) : (obj * obj) =
                     | _ -> obj1, System.Convert.ChangeType(obj2, obj1.GetType())
     with _ -> failwith (sprintf "Failed to find a conversion for %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))   
 
+let (|TypeIsEqualTo|_|) (check: Type) (equalToType: Type) = if check = equalToType then Some () else None
+
 let convertToTargetType (ttype: Type) (param: obj) = 
-    if param = null then Some null
-    elif ttype.IsGenericTypeDefinition then Some param
-    elif ttype = typeof<IEnumerable> && param.GetType() = typeof<string> then Some ([| param |] |> box)
-    elif ttype.IsAssignableFrom(param.GetType()) then Some param
-    elif ttype = typeof<IEnumerable> then Some ([| param |] |> box)
-    else
+    match param with
+    | null -> Some null
+    | :? (obj []) as objs when ttype = typeof<string[]> -> objs |> Array.map (fun e -> e :?> string) |> box |> Some
+    | _ when ttype.IsGenericTypeDefinition -> Some param
+    | _ when ttype = typeof<IEnumerable> && param.GetType() = typeof<string> -> Some ([| param |] |> box)
+    | _ when ttype.IsAssignableFrom(param.GetType()) -> Some param
+    | _ when ttype = typeof<IEnumerable> -> Some ([| param |] |> box)
+    | _ ->
         let des = TypeDescriptor.GetConverter(ttype)
         match des.CanConvertFrom(param.GetType()) with
         | true -> Some <| des.ConvertFrom(param)

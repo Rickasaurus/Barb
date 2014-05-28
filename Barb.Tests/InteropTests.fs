@@ -299,3 +299,20 @@ let ``reflection should work in the presence of static properties`` ()  =
     let predicate = buildExpr<RecordWithStatic,bool> "Prefix + ' ' + CName = 'Mr Dude Duderson'"
     let result = predicate testRecord
     Assert.True(result)
+
+type BoxBox = { Value : obj }
+
+[<Fact>]
+let ``should properly be able to reflect things out of an obj type`` () =
+   let bb = { Value = "One Two Three" }
+   let pred = buildExpr<BoxBox,obj> "Value"
+   let res = pred bb
+   Assert.Equal(bb.Value, res)
+
+[<Fact>]
+let ``should properly be able to transform an array with dotdot syntax`` () =
+   let bb = { Value = [|" The Dude "; "The Word "|] }
+   let pred = buildExpr<BoxBox,string []> "Value..Trim()"
+   let res = pred bb 
+   Assert.True((res = [|"The Dude"; "The Word"|]))
+    
