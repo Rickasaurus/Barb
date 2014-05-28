@@ -261,8 +261,6 @@ and convertToSameType (obj1: obj) (obj2: obj) : (obj * obj) =
                     | _ -> obj1, System.Convert.ChangeType(obj2, obj1.GetType())
     with _ -> failwith (sprintf "Failed to find a conversion for %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))   
 
-let (|TypeIsEqualTo|_|) (check: Type) (equalToType: Type) = if check = equalToType then Some () else None
-
 let convertToTargetType (ttype: Type) (param: obj) = 
     match param with
     | null -> Some null
