@@ -329,4 +329,11 @@ let ``should properly be able to call a method of two paramters on an array with
    let pred = buildExpr<BoxBox,string []> "Value..Replace('The', 'Da')"
    let res = pred bb 
    Assert.True((res = [|"Da Dude"; "Da Word"|]))
+
+[<Fact>]
+let ``should properly be able to call a method of two paramters on an array of one element with dotdot syntax`` () =
+   let bb = { Value = [|"The Dude"|] }
+   let pred = buildExpr<BoxBox,string []> "Value..Replace('The', '')"
+   let res = pred bb 
+   Assert.True((res = [|" Dude"|]))
     

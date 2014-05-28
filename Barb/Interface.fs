@@ -81,19 +81,24 @@ module Compiler =
                | Some (typedRes) -> typedRes       
                | None -> naiveResult
 
-    let buildExprWithSettings<'I, 'O> settings predicate =
-        let buildFunction = parse settings >> reduce >> setInput typeof<'I> >> setOutput typeof<'O> >> toFunction
+    let buildUntypedExprWithSettings inputType outputType settings predicate = 
+        let buildFunction = parse settings >> reduce >> setInput inputType >> setOutput outputType >> toFunction
         let expression = buildFunction predicate 
-        fun (input : 'I) -> 
+        fun (input : obj) -> 
             match expression input with
-            | :? 'O as result -> result
-            | untypedRes -> convertToTargetType typeof<'O> untypedRes 
+            | null -> null
+            | result when result.GetType() = outputType -> result
+            | untypedRes -> convertToTargetType outputType untypedRes 
                             |> function 
-                               | Some (typedRes) -> typedRes :?> 'O               
+                               | Some (typedRes) -> typedRes           
                                | None -> failwith (sprintf "Unexpected output type/format: %A/%s" untypedRes (untypedRes.GetType().Name))
 
+    let buildExprWithSettings<'I, 'O> settings predicate =
+        let utfun = buildUntypedExprWithSettings typeof<'I> typeof<'O> settings predicate 
+        fun (input: 'I) -> (utfun input) :?> 'O
+
     let buildExpr<'I,'O> predicate =
-        buildExprWithSettings<'I,'O> BarbSettings.Default predicate   
+        buildExprWithSettings<'I,'O> BarbSettings.Default predicate  
 
 type BarbFunc<'I,'O> (predicate, ?settings) =
     let settings = defaultArg settings BarbSettings.Default
@@ -101,3 +106,8 @@ type BarbFunc<'I,'O> (predicate, ?settings) =
     member t.Execute (record: 'I) =     
         func record
 
+type UntypedBarbFunc (inputType, outputType, predicate, ?settings) =
+    let settings = defaultArg settings BarbSettings.Default
+    let func : obj -> obj = Compiler.buildUntypedExprWithSettings inputType outputType settings (predicate)
+    member t.Execute (record: obj) =     
+        func record
