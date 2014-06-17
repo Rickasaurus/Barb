@@ -187,7 +187,7 @@ let cachedResolveMember =
 
 let getTypeByName (namespaces: string Set) (typename: string) = 
     AppDomain.CurrentDomain.GetAssemblies()  
-    |> Seq.collect (fun a -> a.GetTypes())
+    |> Seq.collect (fun a -> try a.GetTypes() with ex -> Array.empty) 
     |> Seq.filter (fun typ -> typ.Name = typename)
     |> Seq.filter (fun typ -> namespaces.Contains(typ.Namespace))
     |> Seq.toList
