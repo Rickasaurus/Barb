@@ -144,8 +144,9 @@ let staticPropertyToExpr (rtype: System.Type) (prop: PropertyInfo) =
 
 let propertyToExpr (rtype: System.Type) (prop: PropertyInfo) = 
     match prop.GetIndexParameters() with
-    | [||] ->        
-        if prop.GetGetMethod().IsStatic then
+    | [||] ->    
+        let gmeth = prop.GetGetMethod()    
+        if gmeth <> null && gmeth.IsStatic then
             let propexp = Expression.Property(null, prop)
             let lambda = Expression.Lambda(propexp)
             let compiledLambda = lambda.Compile()

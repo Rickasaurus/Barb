@@ -6,9 +6,10 @@ open System.Text.RegularExpressions
 open System.Reflection
 open System.ComponentModel
 open System.Linq
+open System.Linq.Expressions
 open System.Collections.Concurrent
 open System.Collections.Generic
-
+open Microsoft.FSharp.Quotations
 open Microsoft.FSharp.Reflection
 
 module Option =
@@ -55,4 +56,14 @@ type CachingReflectiveArrayBuilder () =
                             .Invoke(null, null) 
                             :?> obj -> obj
            do builderMap := Map.add lType.FullName builder currentMap
-           builder     
+           builder    
+           
+let getMethod = 
+    function
+    | Patterns.Call (_, m, _) when m.IsGenericMethod -> m.GetGenericMethodDefinition()
+    | Patterns.Call (_, m, _) -> m
+    | _ -> failwith "Incorrect getMethod Pattern"
+
+let inline application prms expr = Expr.Application(expr, prms)
+let inline coerse typ expr = Expr.Coerce(expr, typ)
+ 

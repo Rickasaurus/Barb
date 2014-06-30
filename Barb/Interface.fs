@@ -8,11 +8,17 @@ open System.Collections
 open System.Collections.Generic
 open System.Collections.Concurrent
 open System.Reflection
+open System.Linq
+open System.Linq.Expressions
+open Microsoft.FSharp.Reflection
+open Microsoft.FSharp.Quotations
 
 open Barb.Interop
 open Barb.Representation
 open Barb.Parse
 open Barb.Reduce
+
+open Helpers
 
 module Compiler =
 
@@ -100,13 +106,20 @@ module Compiler =
     let buildExpr<'I,'O> predicate =
         buildExprWithSettings<'I,'O> BarbSettings.Default predicate  
 
+    let buildAsExprWithSettings intype outtype settings predicate = 
+        let utfun = buildUntypedExprWithSettings intype outtype settings predicate         
+        let arg = Var("x", intype, false)
+        let useArg = Expr.Var(arg)
+        let contents = useArg |> coerse typeof<obj> |> application <@ utfun @> |> coerse outtype
+        Expr.Lambda(arg, contents)
+
 type BarbFunc<'I,'O> (predicate, ?settings) =
     let settings = defaultArg settings BarbSettings.Default
     let func : 'I -> 'O = Compiler.buildExprWithSettings settings (predicate)
     member t.Execute (record: 'I) =     
         func record
 
-type UntypedBarbFunc (inputType, outputType, predicate, ?settings) =
+type BarbFuncUntyped (inputType, outputType, predicate, ?settings) =
     let settings = defaultArg settings BarbSettings.Default
     let func : obj -> obj = Compiler.buildUntypedExprWithSettings inputType outputType settings (predicate)
     member t.Execute (record: obj) =     
