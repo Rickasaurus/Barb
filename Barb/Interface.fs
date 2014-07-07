@@ -33,10 +33,9 @@ module Compiler =
 
         { BarbData.Default with Contents = [parsedTokens]; Settings = settings }
 
-    let reduce (parsed: BarbData) : BarbData =
-
-        let additionalBindings =
-            parsed.Settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, lazy (Obj kv.Value))
+    let reduce (parsed: BarbData) : BarbData =        
+        //let additionalBindings =
+        //    parsed.Settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, lazy (Obj kv.Value))
 
         let reducedExpression = 
             resolveExpression parsed.Contents Map.empty parsed.Settings false |> fst |> List.rev
@@ -60,14 +59,18 @@ module Compiler =
     let toFunction (data: BarbData) : (obj -> obj) =
         let memberMap =
             resolveMembers data.InputType (BindingFlags.Instance ||| BindingFlags.Static ||| BindingFlags.NonPublic ||| BindingFlags.Public)
-            |> Map.ofSeq
+            |> Map.ofSeq 
+
+        let moduleBindings = 
+            getModulesByNamespaceName data.Settings.Namespaces
+            |> Seq.collect getContentsFromModule |> Seq.toArray
         
         let additionalBindings =
             data.Settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, lazy (Obj kv.Value))
                     
         let calculateResult input = 
             let inputBindings =
-                additionalBindings               
+                Seq.concat [ moduleBindings |> Seq.ofArray; additionalBindings ]          
                 |> Seq.fold (fun s (k,v) -> s |> Map.add k v )
                     (memberMap |> Map.map (fun k prop -> lazy (prop input)))        
 

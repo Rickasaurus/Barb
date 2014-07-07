@@ -14,6 +14,8 @@ open System.Collections.Generic
 open System.Runtime.CompilerServices
 open System.Numerics  
 
+open Microsoft.FSharp.Reflection
+
 open Barb.Helpers
 open Barb.Representation
 
@@ -185,6 +187,33 @@ let cachedResolveMember =
     let inputToKey (rtype: System.Type, caseName) = rtype.FullName + "~" + caseName
     let resolveMember (rtype, caseName) = resolveMember rtype caseName
     memoizeBy inputToKey resolveMember
+
+let dotNotationToFullname (ns: string) = 
+    match ns.LastIndexOf('.') with
+    | -1 -> None
+    | idx -> ns.Remove(idx, 1).Insert(idx, "+") |> Some
+
+let getModulesByNamespaceName (namespaces: string Set) =
+    let moduleFullnames = 
+        namespaces 
+        |> Seq.filter (not << String.IsNullOrWhiteSpace)
+        |> Seq.choose dotNotationToFullname 
+        |> Set.ofSeq
+    AppDomain.CurrentDomain.GetAssemblies() 
+    |> Seq.collect (fun a -> try a.GetTypes() with ex -> Array.empty) 
+    |> Seq.filter (FSharpType.IsModule) 
+    |> Seq.filter (fun typ -> moduleFullnames |> Set.contains typ.FullName)
+
+let getContentsFromModule (modTyp: Type) = 
+    // type MethodSig = ((obj array -> obj) * Type array) list
+    seq {
+        for mi in modTyp.GetMembers() do
+            yield match mi with
+                  | :? PropertyInfo as pi -> pi.Name, lazy (  pi.GetValue(null) |> Obj ) 
+                  | :? MethodInfo as mi -> mi.Name, lazy ( [ (fun args -> mi.Invoke(null, args)), mi.GetParameters() |> Array.map (fun pi -> pi.ParameterType) ] |> Method )
+                  | :? FieldInfo as fi -> fi.Name, lazy ( fi.GetValue(null) |> Obj )
+                  | _ -> failwithf "Unknown MemberInfo subtype: %A" mi
+    }
 
 let getTypeByName (namespaces: string Set) (typename: string) = 
     AppDomain.CurrentDomain.GetAssemblies()  
