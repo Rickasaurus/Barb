@@ -129,59 +129,89 @@ let rec resolveResultType (output: obj) =
 //    | ConvertSequence contents -> Obj contents
     | other -> Obj other
 
-let fieldToExpr (fld: FieldInfo) =
-    fun (obj: obj) ->
-        fld.GetValue(obj, null) |> Returned
+let fieldToExpr (fld: FieldInfo list) = fld |> FieldGet
+//    fun (obj: obj) ->
+//        fld.GetValue(obj, null) |> Returned
 
-let staticPropertyToExpr (rtype: System.Type) (prop: PropertyInfo) = 
+//let staticPropertyToExpr (rtype: System.Type) (prop: PropertyInfo) = 
+//    match prop.GetIndexParameters() with
+//    | [||] ->
+//       let propexp = Expression.Property(null, prop)
+//        let lambda = Expression.Lambda(propexp)
+//        let compiledLambda = lambda.Compile()
+//        (fun obj -> compiledLambda.DynamicInvoke() |> Returned)
+//    | prms -> 
+//        let typeArgs = prms |> Array.map (fun pi -> pi.ParameterType)
+//        (fun (obj: obj) -> [(fun args -> prop.GetValue(obj, args)), typeArgs] |> IndexedProperty)
+
+let validateProperty (prop: PropertyInfo)  =
     match prop.GetIndexParameters() with
-    | [||] ->
-        let propexp = Expression.Property(null, prop)
-        let lambda = Expression.Lambda(propexp)
-        let compiledLambda = lambda.Compile()
-        (fun obj -> compiledLambda.DynamicInvoke() |> Returned)
-    | prms ->
-        let typeArgs = prms |> Array.map (fun pi -> pi.ParameterType)
-        (fun (obj: obj) -> [(fun args -> prop.GetValue(obj, args)), typeArgs] |> IndexedProperty)
+    | [||] when prop.CanRead -> prop
+    | [||] when not <| prop.CanRead -> failwithf "Accessed property is not readable: %s" prop.Name
+    | _ -> failwithf "Indexed Properties are not currently supported: %s" prop.Name
 
-let propertyToExpr (rtype: System.Type) (prop: PropertyInfo) = 
-    match prop.GetIndexParameters() with
-    | [||] ->    
-        let gmeth = prop.GetGetMethod()    
-        if gmeth <> null && gmeth.IsStatic then
-            let propexp = Expression.Property(null, prop)
-            let lambda = Expression.Lambda(propexp)
-            let compiledLambda = lambda.Compile()
-            (fun obj -> compiledLambda.DynamicInvoke() |> Returned)
-        else
-            let objparam = Expression.Parameter(rtype, "objparam")  
-            let propexp = Expression.Property(objparam, prop)
-            let funcType = typedefof<Func<_,_>>.MakeGenericType(rtype, prop.PropertyType);
-            let lambda = Expression.Lambda(funcType, propexp, objparam)
-            let compiledLambda = lambda.Compile()
-            (fun obj -> compiledLambda.DynamicInvoke([|obj|]) |> Returned)
-     | prms ->
-        let typeArgs = prms |> Array.map (fun pi -> pi.ParameterType)
-        (fun (obj: obj) -> [(fun args -> prop.GetValue(obj, args)), typeArgs] |> IndexedProperty)
+let tryGetProperty (getStatic: bool) (rtype: System.Type) (name: string) : PropertyInfo list = 
+    let bindingFlags = if getStatic then BindingFlags.Static ||| BindingFlags.Public else BindingFlags.Instance ||| BindingFlags.Public
+    let propInfos = rtype.GetProperties(bindingFlags) |> Array.filter (fun pi -> pi.Name = name) |> Array.filter (fun pi -> pi.GetIndexParameters().Length = 0)
+    match propInfos with
+    | [||] -> []
+    | ps -> ps |> Array.map (validateProperty) |> Array.toList    
 
-let overloadedMethodToExpr (methods: MethodInfo seq) =
-    let methodsWithPrms = methods |> Seq.map (fun mi -> mi, mi.GetParameters() |> Array.map (fun pi -> pi.ParameterType)) |> Seq.toList
-    fun (instance: obj) -> 
-        let methodOverloads =
-            [
-                for mi, prms in methodsWithPrms do
-                    let resolver = 
-                        fun (args) -> 
-                            mi.Invoke(instance, args)
-                    yield resolver, prms
-            ]
-        Method methodOverloads
+let tryGetIndexedProperty (getStatic: bool) (rtype: System.Type) (name: string) : PropertyInfo list = 
+    let bindingFlags = if getStatic then BindingFlags.Static ||| BindingFlags.Public else BindingFlags.Instance ||| BindingFlags.Public
+    let propInfos = rtype.GetProperties(bindingFlags) |> Array.filter (fun pi -> pi.Name = name) |> Array.filter (fun pi -> pi.GetIndexParameters().Length > 0)
+    match propInfos with
+    | [||] -> []
+    | ps -> ps |> Array.toList    
 
-let rec resolveMember (rtype: System.Type) (memberName: string) : (obj -> ExprTypes) option =
-    rtype.GetProperty(memberName) |> nullableToOption |> Option.map (propertyToExpr rtype)
-    |> Option.tryResolve (fun () -> match rtype.GetMethods() |> Array.filter (fun mi -> mi.Name = memberName) with | [||] -> None | methods -> methods |> overloadedMethodToExpr |> Some)
-    |> Option.tryResolve (fun () -> rtype.GetField(memberName) |> nullableToOption |> Option.map fieldToExpr)
-    |> Option.tryResolve (fun () -> rtype.GetInterfaces() |> Seq.tryPick (fun i -> resolveMember i memberName))
+let tryGetMethod (getStatic: bool) (rtype: Type) (name: string) : MethodInfo list =
+    let bindingFlags = if getStatic then BindingFlags.Static ||| BindingFlags.Public else BindingFlags.Instance ||| BindingFlags.Public
+    let methodInfos = rtype.GetMethods(bindingFlags) |> Array.filter (fun mi -> mi.Name = name)
+    match methodInfos with
+    | [||] -> []
+    | ms -> ms |> Array.toList
+
+type ResolvedMember =
+    | ResolvedMethod of MethodInfo
+    | ResolvedProperty of PropertyInfo
+    | ResolvedIndexedProperty of PropertyInfo
+
+let (|AllResolvedMethod|AllResolvedProperty|AllResolvedIndexedProperty|MixedResolution|EmptyResolution|) (ms: ResolvedMember list) =
+    let foundResolvedMethod = ref false
+    let foundResolvedProperty = ref false
+    let foundResolvedIndexableProperty = ref false
+    for m in ms do
+        match m with
+        | ResolvedMethod mi -> foundResolvedMethod := true
+        | ResolvedProperty pi -> foundResolvedProperty := true
+        | ResolvedIndexedProperty pi -> foundResolvedIndexableProperty := true
+    match !foundResolvedMethod, !foundResolvedProperty, !foundResolvedIndexableProperty with
+    | true, true, _ | true, _, true | _, true, true -> MixedResolution ms
+    | false, false, false -> EmptyResolution
+    | true, false, false -> AllResolvedMethod 
+    | false, true, false -> AllResolvedProperty 
+    | false, false, true -> AllResolvedIndexedProperty
+
+let resolveMembersToExpr (o: obj) (ms: ResolvedMember list) = 
+    match ms with
+    | AllResolvedMethod -> AppliedMethod(o, ms |> List.map (function | ResolvedMethod mi -> mi)) |> InvokableExpr
+    | AllResolvedProperty -> AppliedProperty(o, ms |> List.map (function | ResolvedProperty mi -> mi) |> List.head) // Note: Punting for now on the multi non-indexed property case
+    | AllResolvedIndexedProperty -> AppliedIndexedProperty(o, ms |> List.map (function | ResolvedIndexedProperty mi -> mi))
+
+let resolvedMemberToExpr (o: obj) (m: ResolvedMember) =
+    match m with
+    | ResolvedMethod(mi) -> InvokableExpr <| AppliedMethod(o, [mi])
+    | ResolvedProperty(pi) -> AppliedProperty(o, pi)
+    | ResolvedIndexedProperty(pi) -> AppliedIndexedProperty(o, [pi]) 
+
+let rec resolveMember (rtype: System.Type) (memberName: string) : ResolvedMember list =
+    [
+        yield! tryGetProperty false rtype memberName |> List.map (ResolvedProperty)
+        yield! tryGetMethod false rtype memberName |> List.map (ResolvedMethod)
+        yield! tryGetIndexedProperty false rtype memberName |> List.map (ResolvedIndexedProperty)
+        yield! rtype.GetInterfaces() |> Seq.collect (fun ii -> resolveMember ii memberName)
+    ]
+//    |> Option.tryResolve (fun () -> rtype.GetField(memberName) |> nullableToOption |> Option.map fieldToExpr)
 
 let cachedResolveMember = 
     let inputToKey (rtype: System.Type, caseName) = rtype.FullName + "~" + caseName
@@ -205,8 +235,11 @@ let getContentsFromModule (modTyp: Type) =
     seq {
         for mi in modTyp.GetMembers() do
             match mi with
-            | :? PropertyInfo as pi -> yield pi.Name, lazy (  pi.GetValue(null) |> Obj ) 
-            | :? MethodInfo as mi ->   yield mi.Name, lazy ( [ (fun args -> mi.Invoke(null, args)), mi.GetParameters() |> Array.map (fun pi -> pi.ParameterType) ] |> Method )
+            | :? PropertyInfo as pi -> 
+                match pi.GetIndexParameters() with
+                | [||] -> yield pi.Name, lazy ( pi.GetValue(null) |> Obj ) 
+                | prms -> yield pi.Name, lazy ( AppliedIndexedProperty(null, [pi]))
+            | :? MethodInfo as mi ->   yield mi.Name, lazy ( InvokableExpr <| AppliedMethod(null,  [mi]))
             | :? FieldInfo as fi ->    yield fi.Name, lazy ( fi.GetValue(null) |> Obj )
             | _ -> ()
     }
@@ -218,14 +251,21 @@ let getTypeByName (namespaces: string Set) (typename: string) =
     |> Seq.filter (fun typ -> namespaces.Contains(typ.Namespace))
     |> Seq.toList
 
-let resolveStatic (namespaces: string Set) (rtypename: string) (memberName: string) : ExprTypes option =
+let resolveStatic (namespaces: string Set) (rtypename: string) (memberName: string) : ExprTypes list =
     match getTypeByName namespaces rtypename with
-    | [] -> None
-    | rtype :: [] ->        
-        rtype.GetProperty(memberName) |> nullableToOption |> Option.map (staticPropertyToExpr rtype)
-        |> Option.tryResolve (fun () -> match rtype.GetMethods() |> Array.filter (fun mi -> mi.Name = memberName) with | [||] -> None | methods -> methods |> overloadedMethodToExpr |> Some)
-        |> Option.tryResolve (fun () -> rtype.GetField(memberName) |> nullableToOption |> Option.map fieldToExpr)
-        |> function | Some (objToExpr) -> Some (objToExpr null) | None -> failwith (sprintf "Member name of %s was ambiguous: %s" rtypename memberName)            
+    | [] -> []
+    | rtype :: [] -> 
+        [
+            yield! tryGetProperty true rtype memberName |> List.map (fun pi -> AppliedProperty(null, pi))
+            let mi = tryGetMethod true rtype memberName in 
+                        if mi |> List.isEmpty |> not then
+                            yield InvokableExpr <| AppliedMethod(null, mi)
+            let pi = tryGetIndexedProperty true rtype memberName in 
+                        if pi |> List.isEmpty |> not then
+                            yield AppliedIndexedProperty(null, pi)
+        ]
+//        |> Option.tryResolve (fun () -> rtype.GetField(memberName) |> nullableToOption |> Option.map fieldToExpr)
+//        |> function | Some (objToExpr) -> Some (objToExpr null) | None -> failwith (sprintf "Member name of %s was ambiguous: %s" rtypename memberName)            
     | manytype -> failwith (sprintf "Type name was ambiguous: %s" rtypename) 
 
 // Note: may not properly fail if types are loaded later, but I'm willing to sacrifice this for now in the name of complexity reduction
@@ -243,29 +283,80 @@ let executeConstructor (namespaces: string Set) (rtypename: string) (parameters:
         rtype.GetConstructor paramTypes |> nullableToOption |> Option.map (fun ctor -> ctor.Invoke(args) |> Obj )         
     | manytype -> failwith (sprintf "Type name was ambiguous: %s" rtypename) 
 
-let resolveInvoke (o: obj) (memberName: string) =
+let typesMatch (mTypes: Type []) (args: obj []) =
+    if mTypes.Length <> args.Length then false
+    else Array.zip mTypes args |> Seq.forall (fun (t,a) -> a = null || t = a.GetType())
+
+let convertToTargetType (ttype: Type) (param: obj) = 
+    match param with
+    | null -> Some null
+    // Special Case For speed
+    | :? (obj []) as objs when ttype = typeof<string[]> -> Array.ConvertAll(objs, fun v -> v :?> string) |> box |> Some 
+    | :? (obj []) as objs when ttype = typeof<int64[]>  -> Array.ConvertAll(objs, fun v -> v :?> int64) |> box |> Some 
+    | _ when ttype.IsGenericTypeDefinition -> Some param
+    | _ when ttype = typeof<IEnumerable> && param.GetType() = typeof<string> -> Some ([| param |] |> box)
+    | _ when ttype.IsAssignableFrom(param.GetType()) -> Some param
+    | _ when ttype = typeof<IEnumerable> -> Some ([| param |] |> box)
+    | _ ->
+        let des = TypeDescriptor.GetConverter(ttype)
+        match des.CanConvertFrom(param.GetType()) with
+        | true -> Some <| des.ConvertFrom(param)
+        | false -> try Some <| System.Convert.ChangeType(param, ttype) with _ -> None
+
+let executeParameterizedMethod (o: obj) (sigs: MethodInfo list) (args: obj) =
+    let arrayArgs = convertPotentiallyTupled args
+    let methodsWithParamArgs =
+        sigs
+        |> List.map (fun mi -> mi, mi.GetParameters() |> Array.map (fun p -> p.ParameterType))
+    methodsWithParamArgs
+    |> List.tryFind (fun (exec, paramTypes) -> typesMatch paramTypes arrayArgs)
+    |> Option.tryResolve (fun () -> methodsWithParamArgs |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = arrayArgs.Length))
+    |> Option.tryResolve (fun () -> methodsWithParamArgs |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = 1))
+    |> Option.map (fun (mi, paramTypes) -> 
+        // If the it only takes one parameter but we have args, treat the args as a collection
+        let arrayArgs = if  paramTypes.Length = 1 && arrayArgs.Length > 1 then [|box arrayArgs|] else arrayArgs
+        Array.zip paramTypes arrayArgs
+        |> Array.map (fun (tType, param) -> convertToTargetType tType param)
+        |> Array.map (function | Some rParam -> rParam | None -> failwith (sprintf "Unable to resolve method parameters: %A -> %A" arrayArgs paramTypes))
+        |> fun rParams -> mi.Invoke(o,rParams))
+    |> Option.map Returned
+
+let resolveMembersByInstance (o: obj) (memberName: string) : ResolvedMember list option =
     if o = null then None
     else match cachedResolveMember (o.GetType(), memberName) with
-         | Some (resolvedMember) -> resolvedMember o |> Some
-         | None -> failwith (sprintf "Unable to find member %s in object of type %s" memberName (o.GetType().Name))
+         | [] -> failwith (sprintf "Unable to find member %s in object of type %s" memberName (o.GetType().Name))
+         | resolvedMembers -> Some resolvedMembers //failwithf "Unable to decide which member of name %s to invoke on type %s" memberName (o.GetType().FullName)
+
+let resolveInvokeByInstance (o: obj) (memberName: string) : ExprTypes option =
+    match resolveMembersByInstance o memberName with
+    | Some (ms) -> resolveMembersToExpr o ms |> Some
+    | _ -> None
 
 let rec resolveInvokeAtDepth (depth: int) (o: obj) (memberName: string) =
     match depth, box o with
     | 0, _ -> failwith "Unexpected Error: resolveInvokeAtDepth was called with a depth of 0"
     | 1, (:? IEnumerable as enum) -> 
-        [| for e in enum do match resolveInvoke e memberName with Some v -> yield v | None -> () |] 
-    | n, (:? IEnumerable as enum) -> 
-        [| for e in enum do yield! resolveInvokeAtDepth (n - 1) e memberName |]
+         [ for e in enum do match resolveMembersByInstance e memberName with 
+                                  | Some(mis) -> yield e, mis 
+                                  | _ -> failwithf "Member of name %s not found on object %s" memberName (o.GetType().FullName) ] 
+    | n, (:? IEnumerable as enum) ->  
+         [ for e in enum do yield! resolveInvokeAtDepth (n - 1) e memberName ]
     | _, o -> failwith "Cannot invoke at depth with a non-enumerable object"
 
 let rec resolveMembers (rtype: System.Type) (bindingflags: BindingFlags) =
     let properties = rtype.GetProperties(bindingflags)
-    let methodCollections = rtype.GetMethods(bindingflags) |> Seq.groupBy (fun mi -> mi.Name)
+    let methodCollections = rtype.GetMethods(bindingflags) 
+                            |> Seq.filter (fun mi -> not (mi.IsSpecialName && (mi.Name.StartsWith("set_") || mi.Name.StartsWith("get_"))))
+                            |> Seq.groupBy (fun mi -> mi.Name)
     let fields = rtype.GetFields(bindingflags)               
     seq {
-        for prop in properties do yield prop.Name, propertyToExpr rtype prop
-        for (name, methods) in methodCollections do yield name, overloadedMethodToExpr methods
-        for field in fields do yield field.Name, fieldToExpr field
+        for prop in properties do  
+            match prop.GetIndexParameters() with
+            | [||] -> yield prop.Name, fun o -> AppliedProperty(o, prop) 
+            | prms -> yield prop.Name, fun o -> AppliedIndexedProperty(o, [prop])
+        for (name, methods) in methodCollections do 
+            yield name, fun o -> let mis = methods |> Seq.toList in InvokableExpr <| AppliedMethod(o, mis) 
+        //for field in fields do yield field.Name, fieldToExpr field
     }     
 
 let rec inline convertSequence seq1 seq2 = 
@@ -287,55 +378,21 @@ and convertToSameType (obj1: obj) (obj2: obj) : (obj * obj) =
                     | _ -> obj1, System.Convert.ChangeType(obj2, obj1.GetType())
     with _ -> failwith (sprintf "Failed to find a conversion for %A of %s and %A of %s" obj1 (obj1.GetType().ToString()) obj2 (obj2.GetType().ToString()))   
 
-
-let convertToTargetType (ttype: Type) (param: obj) = 
-    match param with
-    | null -> Some null
-    // Special Case For speed
-    | :? (obj []) as objs when ttype = typeof<string[]> -> Array.ConvertAll(objs, fun v -> v :?> string) |> box |> Some 
-    | :? (obj []) as objs when ttype = typeof<int64[]>  -> Array.ConvertAll(objs, fun v -> v :?> int64) |> box |> Some 
-    | _ when ttype.IsGenericTypeDefinition -> Some param
-    | _ when ttype = typeof<IEnumerable> && param.GetType() = typeof<string> -> Some ([| param |] |> box)
-    | _ when ttype.IsAssignableFrom(param.GetType()) -> Some param
-    | _ when ttype = typeof<IEnumerable> -> Some ([| param |] |> box)
-    | _ ->
-        let des = TypeDescriptor.GetConverter(ttype)
-        match des.CanConvertFrom(param.GetType()) with
-        | true -> Some <| des.ConvertFrom(param)
-        | false -> try Some <| System.Convert.ChangeType(param, ttype) with _ -> None
-
-let executeUnitMethod (sigs: MethodSig) =
+let executeUnitMethod (o: obj) (sigs: MethodInfo list) =
     sigs 
-    |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = 0)
-    |> Option.bind (fun (exec, paramTypes) -> Some <| exec Array.empty)
+    |> List.map (fun mi -> mi, mi.GetParameters())
+    |> List.tryFind (fun (mi, paramTypes) -> paramTypes.Length = 0)
+    |> Option.bind (fun (mi, paramTypes) -> mi.Invoke(o, [||]) |> Some)
     |> Option.map Returned
 
-let executeIndexer (sigs: MethodSig) (param: obj) =
-    sigs
-    |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = 1)
-    |> Option.bind (fun (exec, paramTypes) -> 
+let executeIndexer (o: obj) (sigs: PropertyInfo list) (param: obj) =
+    sigs 
+    |> List.map (fun (mi: PropertyInfo) -> mi, mi.GetIndexParameters() |> Array.map (fun p -> p.ParameterType))
+    |> List.tryFind (fun (mi, paramTypes) -> paramTypes.Length = 1)
+    |> Option.bind (fun (mi, paramTypes) -> 
         convertToTargetType (paramTypes.[0]) param 
-        |> Option.map (fun converted -> exec, converted))
-    |> Option.map (fun (exec, converted) -> exec [| converted |])
-    |> Option.map Returned
-
-let typesMatch (mTypes: Type []) (args: obj []) =
-    if mTypes.Length <> args.Length then false
-    else Array.zip mTypes args |> Seq.forall (fun (t,a) -> a = null || t = a.GetType())
-
-let executeParameterizedMethod (sigs: MethodSig) (args: obj) =
-    let arrayArgs = convertPotentiallyTupled args
-    sigs
-    |> List.tryFind (fun (exec, paramTypes) -> typesMatch paramTypes arrayArgs)
-    |> Option.tryResolve (fun () -> sigs |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = arrayArgs.Length))
-    |> Option.tryResolve (fun () -> sigs |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = 1))
-    |> Option.map (fun (exec, paramTypes) -> 
-        // If the it only takes one parameter but we have args, treat the args as a collection
-        let arrayArgs = if  paramTypes.Length = 1 && arrayArgs.Length > 1 then [|box arrayArgs|] else arrayArgs
-        Array.zip paramTypes arrayArgs
-        |> Array.map (fun (tType, param) -> convertToTargetType tType param)
-        |> Array.map (function | Some rParam -> rParam | None -> failwith (sprintf "Unable to resolve method parameters: %A -> %A" arrayArgs paramTypes))
-        |> fun rParams -> exec rParams)
+        |> Option.map (fun converted -> mi, converted))
+    |> Option.map (fun (mi, converted) -> mi.GetValue(o, [| converted |]))
     |> Option.map Returned
 
 let resolveObjectIndexer (rtype: System.Type) =

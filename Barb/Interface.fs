@@ -69,10 +69,11 @@ module Compiler =
             data.Settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, lazy (Obj kv.Value))
                     
         let calculateResult input = 
+            let applyToMember (mi: MethodInfo list) = lazy (AppliedMethod(input, mi))
             let inputBindings =
                 Seq.concat [ moduleBindings |> Seq.ofArray; additionalBindings ]          
                 |> Seq.fold (fun s (k,v) -> s |> Map.add k v )
-                    (memberMap |> Map.map (fun k prop -> lazy (prop input)))        
+                    (memberMap |> Map.map (fun k prop -> lazy prop input))        
 
             #if DEBUG
             let ibOutput = Environment.NewLine + (sprintf "IB: %A" inputBindings) + Environment.NewLine in

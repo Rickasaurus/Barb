@@ -2,6 +2,7 @@
 
 open System
 open System.Collections.Generic
+open System.Reflection
 
 type BarbException (message, offset: uint32, length: uint32) = 
     inherit Exception (message)
@@ -28,20 +29,28 @@ type MethodSig = ((obj array -> obj) * Type array) list
 // Mutable so we can update the bindings with itself for easy recursion.
 type LambdaRecord = { Params: string list; mutable Bindings: Bindings; Contents: ExprRep }
 
+and InvokableExpr =
+    | AppliedMultiMethod of (obj * MethodInfo list) list
+    | AppliedMethod of obj * MethodInfo list    
+
 and ExprTypes = 
     (* Units *)
     | Unit
     | Invoke
     | New
-    | Method of MethodSig
-    | IndexedProperty of MethodSig
+    | InvokableExpr of InvokableExpr
+    | AppliedProperty of obj * PropertyInfo
+    | AppliedMultiProperty of (obj * PropertyInfo) list
+    | AppliedInvoke of int * string // where int is the collection depth to perform the invocation, 0 is top level    
+    | AppliedIndexedProperty of obj * PropertyInfo list
+    | FieldGet of FieldInfo list
     | Obj of obj
+    | LazyObj of Lazy<obj>
     | Returned of obj
     | Prefix of (obj -> obj)    
     | Postfix of (obj -> obj)
     | Infix of int * (obj -> obj -> obj) 
     | IndexArgs of ExprRep
-    | AppliedInvoke of int * string // where int is the collection depth to perform the invocation, 0 is top level
     | Unknown of string
     (* Containers *)
     | SubExpression of ExprRep list

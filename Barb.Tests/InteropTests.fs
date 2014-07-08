@@ -15,6 +15,15 @@ type DudeRecordWithInt = { Name: string; Age: int }
     with member t.GetAge() = t.Age
 
 [<Fact>]
+let ``should support simple dynamic property lookup on unknown types`` () =
+    let childRec = { Name = "Dude Duderson"; Age = 20 }
+    let parentRec = { State = "Washington"; Data = childRec :> obj }
+    let predicate = buildExpr<ParentWithObject,string> "Data.Name"
+    let result = predicate parentRec
+    Assert.Equal<string>("Dude Duderson", result)
+
+
+[<Fact>]
 let ``should support dynamic property lookup on unknown types`` () =
     let childRec = { Name = "Dude Duderson"; Age = 20 }
     let parentRec = { State = "Washington"; Data = childRec :> obj }
@@ -31,7 +40,14 @@ let ``should support dynamic method lookup on unknown types`` () =
     Assert.True(result)
 
 [<Fact>] 
-let ``should support no argument methods`` () =
+let ``should support no argument methods 1`` () =
+    let testRecord = { Name = " Dude Duderson "; Age = 20 }
+    let predicate = buildExpr<DudeRecordWithInt,string> "Name.Trim()"
+    let result = predicate testRecord
+    Assert.Equal<string>("Dude Duderson", result)
+
+[<Fact>] 
+let ``should support no argument methods 2`` () =
     let testRecord = { Name = " Dude Duderson "; Age = 20 }
     let predicate = buildExpr<DudeRecordWithInt,bool> "Name.Trim() = \"Dude Duderson\""
     let result = predicate testRecord

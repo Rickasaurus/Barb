@@ -72,6 +72,8 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         match bindings |> Map.tryFind unk |> Option.bind (fun res -> res.Force() |> wrapit |> Some) with
                         | None when finalReduction -> raise <| BarbExecutionException(sprintf "Specified unknown was unable to be resolved: %s" unk, (sprintf "%A" lists), exprOffset, exprLength)
                         | v -> v
+                    | AppliedProperty(o, p) -> p.GetValue(o, [||]) |> Returned |> wrapit |> Some
+                    | AppliedMultiProperty(ops) -> [| for (o, pi) in ops -> pi.GetValue(o, [||]) |> Returned |> wrapit |] |> Tuple |> wrapit |> Some
                     | Generator ({Expr = Obj(s)}, {Expr = Obj(i)}, {Expr = Obj(e)}) ->
                         match s, i, e with
                         | (:? int64 as s), (:? int64 as i), (:? int64 as e) -> Obj (seq {s .. i .. e }) |> wrapit |> Some
@@ -163,7 +165,13 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 // Apply a prefix function and return the result
                 | Prefix l, Obj r -> Returned (l r) |> Some
                 // Execute a parameterless method
-                | Method l, Unit -> executeUnitMethod l
+                | InvokableExpr exp, Unit -> 
+                    match exp with
+                    | AppliedMethod (o,l) -> executeUnitMethod o l
+                    | AppliedMultiMethod (osl) -> 
+                        [| for (o,mi) in osl do yield! executeUnitMethod o mi |> Option.toArray |] // Note: Currently Drops Elements Without the given Method
+                        |> Array.map (fun res -> { lrep with Expr = res })
+                        |> Tuple |> Some
                 // Execute a method with nested invoke
                 | Tuple t, Unit  
                 | Tuple t, Obj _ ->
@@ -171,12 +179,22 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                                 let res, _ = reduceExpressions [] ( e :: rrep :: [] ) bindings in 
                                     yield { lrep with Expr = SubExpressionIfNeeded res } |] |> Some
                 // Execute some method given arguments r
-                | Method l, Obj r -> executeParameterizedMethod l r 
+                | InvokableExpr exp, Obj r -> 
+                    match exp with                                       
+                    | AppliedMethod (o,l) -> executeParameterizedMethod o l r 
+                    | AppliedMultiMethod (osl) -> 
+                        [| for (o,mi) in osl do yield! executeParameterizedMethod o mi r |> Option.toArray |] // Note: Currently Drops Elements Without the given Method
+                        |> Array.map (fun res -> { lrep with Expr = res })
+                        |> Tuple |> Some
                 // Perform a .NET-Application wide scope invocation
-                | Unknown l, AppliedInvoke (depth, r) when depth = 0 && finalReduction || settings.BindGlobalsWhenReducing -> 
-                    cachedResolveStatic (settings.Namespaces, l, r)
+                | Unknown l, AppliedInvoke (depth, name) when depth = 0 && finalReduction || settings.BindGlobalsWhenReducing -> 
+                    let mis = cachedResolveStatic (settings.Namespaces, l, name)
+                    match mis with
+                    | mi :: [] -> mi |> Some
+                    | [] -> None
+                    | mis -> failwith "Multiple results returned for invoke"
                 // Perform a .NET-Application wide scope invocation
-                | Unknown l, AppliedInvoke (depth, r) when finalReduction || settings.BindGlobalsWhenReducing -> 
+                | Unknown l, AppliedInvoke (depth, r) when depth > 0 && finalReduction || settings.BindGlobalsWhenReducing -> 
                     raise <| new BarbExecutionException (sprintf "Static invocations above depth 0 are not currently supported.", sprintf "%A" (l,r), lOffset, (rOffset - lOffset) + rLength)
                 // New is allowed so C# users feel at home, it really does nothing though
                 | New, Unknown r -> Unknown r |> Some
@@ -188,17 +206,27 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 | Invoke, IndexArgs r -> IndexArgs r |> Some
                 // Invoke on null should always be null
                 | Obj null, AppliedInvoke _ -> Obj null |> Some
-                // Finds and returns a particular memeber of the given object
+                // Finds and returns memebers of the given name of the given object
                 | Obj l, AppliedInvoke (0, r) when finalReduction -> 
-                    try resolveInvoke l r
+                    try resolveInvokeByInstance l r
                     with ex -> raise <| BarbExecutionException(ex.Message, sprintf "%A" (l,r), rOffset, rLength)
                 | Obj l, AppliedInvoke (depth, r) when finalReduction -> 
-                    try Tuple [| for o in resolveInvokeAtDepth depth l r -> { lrep with Expr = o } |] |> Some
+                    try 
+                        let res = resolveInvokeAtDepth depth l r //-> { lrep with Expr = AppliedMethod([|o|],  } |] |> Some
+                        match res |> List.collect (fun (o, rms) -> rms) with
+                        | EmptyResolution -> None 
+                        | MixedResolution _ -> failwithf "Both properties and methods were found for %s in the nested invocation." r
+                        | AllResolvedMethod _ -> 
+                            let mires = res |> List.map (fun (o, rms) -> o, rms |> List.map (function | ResolvedMethod mi -> mi))
+                            AppliedMultiMethod(mires) |> InvokableExpr |> Some
+                        | AllResolvedProperty _ -> 
+                            let pires = res |> List.map (fun (o, rms) -> o, rms |> (function | [ResolvedProperty mi] -> mi))
+                            AppliedMultiProperty(pires) |> Some
                     with ex -> raise <| BarbExecutionException(ex.Message, sprintf "%A" (l,r), rOffset, rLength)
                 // Combine Invocations for Flattened Nested Invocation
                 | Invoke, AppliedInvoke (depth, r) -> AppliedInvoke (depth + 1, r) |> Some
                 // Index the given indexed property representation via IndexArgs
-                | IndexedProperty l, IndexArgs ({ Expr = Obj r }) -> executeIndexer l r
+                | AppliedIndexedProperty (o,l), IndexArgs ({ Expr = Obj r }) -> executeIndexer o l r
                 // Index the given object it via IndexArgs
                 | Obj l, IndexArgs ({ Expr = Obj r }) -> callIndexedProperty l r
                 // Partially apply the given object to the lambda.  Will execute the a lambda if it's the final argument.
