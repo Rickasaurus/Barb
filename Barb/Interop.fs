@@ -282,11 +282,7 @@ let executeConstructor (namespaces: string Set) (rtypename: string) (parameters:
         let paramTypes = args |> Array.map (fun p -> p.GetType())
         rtype.GetConstructor paramTypes |> nullableToOption |> Option.map (fun ctor -> ctor.Invoke(args) |> Obj )         
     | manytype -> failwith (sprintf "Type name was ambiguous: %s" rtypename) 
-
-let typesMatch (mTypes: Type []) (args: obj []) =
-    if mTypes.Length <> args.Length then false
-    else Array.zip mTypes args |> Seq.forall (fun (t,a) -> a = null || t = a.GetType())
-
+   
 let convertToTargetType (ttype: Type) (param: obj) = 
     match param with
     | null -> Some null
@@ -303,23 +299,55 @@ let convertToTargetType (ttype: Type) (param: obj) =
         | true -> Some <| des.ConvertFrom(param)
         | false -> try Some <| System.Convert.ChangeType(param, ttype) with _ -> None
 
+type MethodMatch =
+    | PerfectMatch = 0 
+    | GenericMatch = 1
+    | LengthMatch = 2
+    | OneArgMatch = 3
+    | NoMatch = 255
+
+let getMethodMatch (prms: ParameterInfo []) (args: obj []) =
+    if prms.Length = args.Length then
+        let zipped = Array.zip prms args
+        if zipped |> Seq.forall (fun (t,a) -> a = null || t.ParameterType = a.GetType()) then MethodMatch.PerfectMatch
+        elif zipped |> Seq.forall (fun (t,a) -> a = null || t.ParameterType = a.GetType() || t.ParameterType.IsGenericParameter) then MethodMatch.GenericMatch
+        else MethodMatch.LengthMatch
+    elif prms.Length = 1 then MethodMatch.OneArgMatch
+    else MethodMatch.NoMatch
+
+let resolveGenerics (mi: MethodInfo) (prms: ParameterInfo[]) (args: obj[]) =
+        let resolvedPrms = Array.zip prms args
+                            |> Array.choose (fun (p,a) -> match p.ParameterType.IsGenericParameter with 
+                                                            | true -> Some (p.ParameterType.GenericParameterPosition, a.GetType()) 
+                                                            | false -> None)
+                            |> Seq.groupBy fst |> Seq.map (fun (pos, ptyp) -> pos, ptyp |> Seq.head |> snd) |> Seq.sortBy fst
+                            |> Seq.map snd |> Seq.toArray
+        // Punting a bit, just taking the first type found and hoping it works out for now
+        mi.MakeGenericMethod(resolvedPrms)
+
+let convertArgs (prms: ParameterInfo[]) (args: obj[]) =
+    Array.zip prms args |> Array.map (fun (prm, arg) -> convertToTargetType prm.ParameterType arg)
+    |> Array.map (function | Some rParam -> rParam | None -> failwith (sprintf "Unable to resolve method parameters: %A -> %A" args prms))
+
 let executeParameterizedMethod (o: obj) (sigs: MethodInfo list) (args: obj) =
     let arrayArgs = convertPotentiallyTupled args
-    let methodsWithParamArgs =
-        sigs
-        |> List.map (fun mi -> mi, mi.GetParameters() |> Array.map (fun p -> p.ParameterType))
-    methodsWithParamArgs
-    |> List.tryFind (fun (exec, paramTypes) -> typesMatch paramTypes arrayArgs)
-    |> Option.tryResolve (fun () -> methodsWithParamArgs |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = arrayArgs.Length))
-    |> Option.tryResolve (fun () -> methodsWithParamArgs |> List.tryFind (fun (exec, paramTypes) -> paramTypes.Length = 1))
-    |> Option.map (fun (mi, paramTypes) -> 
-        // If the it only takes one parameter but we have args, treat the args as a collection
-        let arrayArgs = if  paramTypes.Length = 1 && arrayArgs.Length > 1 then [|box arrayArgs|] else arrayArgs
-        Array.zip paramTypes arrayArgs
-        |> Array.map (fun (tType, param) -> convertToTargetType tType param)
-        |> Array.map (function | Some rParam -> rParam | None -> failwith (sprintf "Unable to resolve method parameters: %A -> %A" arrayArgs paramTypes))
-        |> fun rParams -> mi.Invoke(o,rParams))
-    |> Option.map Returned
+    let methodsWithParamArgs = sigs |> List.map (fun mi -> mi, mi.GetParameters())
+    
+    let orderedDispaches = 
+        methodsWithParamArgs
+        |> List.map (fun (mi, prms) -> mi, prms, getMethodMatch prms arrayArgs)
+        |> List.sortBy (fun (_,_,cls) -> int cls) // Lowest Is Bestest
+
+    // Punt for now and only look at the top winner
+    let mi, newargs = 
+        match orderedDispaches with
+        | (mi, prms, MethodMatch.PerfectMatch) :: _ -> mi, arrayArgs
+        | (mi, prms, MethodMatch.GenericMatch) :: _ -> resolveGenerics mi prms arrayArgs, arrayArgs
+        | (mi, prms, MethodMatch.LengthMatch) :: _ -> mi, convertArgs prms arrayArgs
+        | (mi, prms, MethodMatch.OneArgMatch) :: _ -> mi, convertArgs prms [|box arrayArgs|]
+        | __ -> failwithf "No match found for the given operation on %s" (o.GetType().FullName)
+
+    mi.Invoke(o, newargs) |> Returned |> Some
 
 let resolveMembersByInstance (o: obj) (memberName: string) : ResolvedMember list option =
     if o = null then None
