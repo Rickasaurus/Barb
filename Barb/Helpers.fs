@@ -18,6 +18,7 @@ module Option =
         | Some value -> Some value
         | None -> func()
 
+
 let memoizeBy inputToKey f =
     let cache = ConcurrentDictionary<_, _>()
     fun x ->
@@ -70,3 +71,23 @@ module FSharpExpr =
     let inline application prms expr = Expr.Application(expr, prms)
     let inline coerse typ expr = Expr.Coerce(expr, typ)
 
+module FSharpType =
+    /// Caches the constructors used to generate option types in order to speed reflection
+    let private optionCtorCachedBuilder =   
+        let inputToKey (containedType: System.Type, outerType: System.Type, caseName) = String.Format("{0}~{1}~{2}", containedType.FullName, outerType.FullName, caseName)
+        let preComputeCtor (containedType, outerType: System.Type, caseName) = 
+            outerType.MakeGenericType([|containedType|])
+                |> Reflection.FSharpType.GetUnionCases
+                |> Array.find (fun c -> c.Name = caseName)
+                |> Reflection.FSharpValue.PreComputeUnionConstructor
+        memoizeBy inputToKey preComputeCtor
+
+    /// Create an option type Some instance
+    let MakeOptionSome (stype: System.Type) (value: _) =
+        let ctor = optionCtorCachedBuilder(stype, typedefof<option<_>>, "Some")
+        ctor [| value |]
+
+    /// Create an option type None instance (in most cases it's better to use null instead)
+    let MakeOptionNone (stype: System.Type) =
+        let ctor = optionCtorCachedBuilder(stype, typedefof<option<_>>,"None")
+        ctor [| |]

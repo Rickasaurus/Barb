@@ -56,23 +56,15 @@ let ``Barb should be able to open a top level module as if it were a namespace a
 [<Fact>]
 let ``Barb should be able to wrap a result in an option type``() =
     let settings = BarbSettings.Default 
-    let pred = "Some 99"
+    let pred = "99"
     let func = new BarbFunc<unit,int64 option>(pred, settings)
     let res = func.Execute()
     Assert.Equal(Some 99L, res)
 
-//[<Fact>]
-let ``Barb should be able to wrap a result in an none option type``() =
-    let settings = BarbSettings.Default 
-    let pred = "None"
-    let func = new BarbFunc<unit,int64 option>(pred, settings)
-    let res = func.Execute()
-    Assert.Equal(None, res)
-    
-//[<Fact>]
+[<Fact>]
 let ``Barb should be able to wrap and convert a result in an option type``() =
     let settings = BarbSettings.Default 
-    let pred = "Some 99"
+    let pred = "99"
     let func = new BarbFunc<unit,int option>(pred, settings)
     let res = func.Execute()
     Assert.Equal(Some 99, res)

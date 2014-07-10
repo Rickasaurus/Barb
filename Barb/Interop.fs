@@ -124,9 +124,8 @@ let rec resolveResultType (output: obj) =
     match output with
     | null -> Obj null
     | :? string -> Obj output
-//    | DecomposeOption contents -> resolveResultType contents
+    | DecomposeOption contents -> resolveResultType contents
     | SupportedNumberType contents -> Obj contents
-//    | ConvertSequence contents -> Obj contents
     | other -> Obj other
 
 let fieldToExpr (fld: FieldInfo list) = fld |> FieldGet
@@ -283,12 +282,19 @@ let executeConstructor (namespaces: string Set) (rtypename: string) (parameters:
         rtype.GetConstructor paramTypes |> nullableToOption |> Option.map (fun ctor -> ctor.Invoke(args) |> Obj )         
     | manytype -> failwith (sprintf "Type name was ambiguous: %s" rtypename) 
    
-let convertToTargetType (ttype: Type) (param: obj) = 
+let rec convertToTargetType (ttype: Type) (param: obj) = 
     match param with
+    | null when ttype.IsGenericType && ttype.GetGenericTypeDefinition() = typedefof<_ option> -> FSharpType.MakeOptionNone (ttype.GetGenericArguments().[0]) |> Some
     | null -> Some null
     // Special Case For speed
     | :? (obj []) as objs when ttype = typeof<string[]> -> Array.ConvertAll(objs, fun v -> v :?> string) |> box |> Some 
     | :? (obj []) as objs when ttype = typeof<int64[]>  -> Array.ConvertAll(objs, fun v -> v :?> int64) |> box |> Some 
+    | _ when ttype.IsGenericType && ttype.GetGenericTypeDefinition() = typedefof<_ option> -> 
+        let innerType = ttype.GetGenericArguments().[0]
+        match convertToTargetType innerType param with
+        | Some value -> FSharpType.MakeOptionSome innerType value |> Some
+        | None -> None
+    | DecomposeOption value -> convertToTargetType ttype param 
     | _ when ttype.IsGenericTypeDefinition -> Some param   
     | _ when ttype = typeof<IEnumerable> && param.GetType() = typeof<string> -> Some ([| param |] |> box)
     | _ when ttype.IsAssignableFrom(param.GetType()) -> Some param
