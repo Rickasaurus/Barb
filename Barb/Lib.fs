@@ -82,3 +82,7 @@ module Table =
         |> Seq.cast<string []>
         |> Seq.filter (fun row -> row |> Array.exists (fun e -> Barb.Interop.objectsEqualInner e element))
         |> Seq.toArray
+
+module TopLevel = 
+    let Some (v: 'a) = Some v
+    let None = None

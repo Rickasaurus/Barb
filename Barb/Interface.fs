@@ -19,7 +19,7 @@ open Barb.Parse
 open Barb.Reduce
 
 open Helpers
-
+open Helpers.FSharpExpr
 module Compiler =
 
     let parse (settings: BarbSettings) (predicate: string) : BarbData = 
@@ -84,18 +84,21 @@ module Compiler =
             |> fst |> resolveExpressionResult
 
         fun input -> 
-            let naiveResult = calculateResult input
-            naiveResult
-            |> convertToTargetType data.OutputType 
-            |> function 
-               | Some (typedRes) -> typedRes       
-               | None -> naiveResult
+            match calculateResult input with
+            | result when result.GetType() = data.OutputType -> result
+            | result ->
+                result
+                |> convertToTargetType data.OutputType 
+                |> function 
+                   | Some (typedRes) -> typedRes       
+                   | None -> result
 
     let buildUntypedExprWithSettings inputType outputType settings predicate = 
         let buildFunction = parse settings >> reduce >> setInput inputType >> setOutput outputType >> toFunction
         let expression = buildFunction predicate 
         fun (input : obj) -> 
-            match expression input with
+            let res = expression input
+            match res with
             | null -> null
             | result when result.GetType() = outputType -> result
             | untypedRes -> convertToTargetType outputType untypedRes 

@@ -57,13 +57,16 @@ type CachingReflectiveArrayBuilder () =
                             :?> obj -> obj
            do builderMap := Map.add lType.FullName builder currentMap
            builder    
-           
-let getMethod = 
-    function
-    | Patterns.Call (_, m, _) when m.IsGenericMethod -> m.GetGenericMethodDefinition()
-    | Patterns.Call (_, m, _) -> m
-    | _ -> failwith "Incorrect getMethod Pattern"
 
-let inline application prms expr = Expr.Application(expr, prms)
-let inline coerse typ expr = Expr.Coerce(expr, typ)
- 
+module FSharpExpr =            
+    let getMethod = 
+        function
+        | Patterns.Call (_, m, _) when m.IsGenericMethod -> m.GetGenericMethodDefinition()
+        | Patterns.Call (_, m, _) -> m
+        | _ -> failwith "Incorrect getMethod Pattern"
+    
+    let X<'T> : 'T = Unchecked.defaultof<'T>
+
+    let inline application prms expr = Expr.Application(expr, prms)
+    let inline coerse typ expr = Expr.Coerce(expr, typ)
+

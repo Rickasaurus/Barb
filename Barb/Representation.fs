@@ -21,7 +21,7 @@ type BarbSettings =
                 BindGlobalsWhenReducing = true
                 FailOnCatchAll = true
                 AdditionalBindings = [] |> dict
-                Namespaces = [null; ""; "System"; "Microsoft.FSharp"; "Microsoft.FSharp.Collections"; "Barb.Lib"] |> Set.ofList
+                Namespaces = [null; ""; "System"; "Microsoft.FSharp"; "Microsoft.FSharp.Collections"; "Barb.Lib"; "Barb.Lib.TopLevel"] |> Set.ofList
             }
 
 type MethodSig = ((obj array -> obj) * Type array) list

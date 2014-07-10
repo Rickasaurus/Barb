@@ -124,7 +124,7 @@ let rec resolveResultType (output: obj) =
     match output with
     | null -> Obj null
     | :? string -> Obj output
-    | DecomposeOption contents -> resolveResultType contents
+//    | DecomposeOption contents -> resolveResultType contents
     | SupportedNumberType contents -> Obj contents
 //    | ConvertSequence contents -> Obj contents
     | other -> Obj other
@@ -289,7 +289,7 @@ let convertToTargetType (ttype: Type) (param: obj) =
     // Special Case For speed
     | :? (obj []) as objs when ttype = typeof<string[]> -> Array.ConvertAll(objs, fun v -> v :?> string) |> box |> Some 
     | :? (obj []) as objs when ttype = typeof<int64[]>  -> Array.ConvertAll(objs, fun v -> v :?> int64) |> box |> Some 
-    | _ when ttype.IsGenericTypeDefinition -> Some param
+    | _ when ttype.IsGenericTypeDefinition -> Some param   
     | _ when ttype = typeof<IEnumerable> && param.GetType() = typeof<string> -> Some ([| param |] |> box)
     | _ when ttype.IsAssignableFrom(param.GetType()) -> Some param
     | _ when ttype = typeof<IEnumerable> -> Some ([| param |] |> box)
@@ -306,24 +306,40 @@ type MethodMatch =
     | OneArgMatch = 3
     | NoMatch = 255
 
-let getMethodMatch (prms: ParameterInfo []) (args: obj []) =
+let getMethodMatch (mi: MethodInfo) (prms: ParameterInfo []) (args: obj []) =
     if prms.Length = args.Length then
         let zipped = Array.zip prms args
         if zipped |> Seq.forall (fun (t,a) -> a = null || t.ParameterType = a.GetType()) then MethodMatch.PerfectMatch
-        elif zipped |> Seq.forall (fun (t,a) -> a = null || t.ParameterType = a.GetType() || t.ParameterType.IsGenericParameter) then MethodMatch.GenericMatch
+        elif mi.IsGenericMethod then MethodMatch.GenericMatch             
         else MethodMatch.LengthMatch
     elif prms.Length = 1 then MethodMatch.OneArgMatch
     else MethodMatch.NoMatch
 
+let resolveGenericByName (prm: ParameterInfo) (arg: obj) = 
+    let argType = arg.GetType()
+    if prm.ParameterType.IsGenericParameter then // will be true for 'a (fully generic)               
+        [|prm.Name, argType|] 
+    elif prm.ParameterType.IsGenericType then // Will be true for 'a seq (nested generic)
+        let names = prm.ParameterType.GenericTypeArguments |> Array.map (fun v -> v.Name)        
+        let types = argType.GenericTypeArguments
+        Array.zip names types
+    else // Shouldn't get here
+        failwith "Parameter was unexpectedly not Generic"
+
 let resolveGenerics (mi: MethodInfo) (prms: ParameterInfo[]) (args: obj[]) =
-        let resolvedPrms = Array.zip prms args
-                            |> Array.choose (fun (p,a) -> match p.ParameterType.IsGenericParameter with 
-                                                            | true -> Some (p.ParameterType.GenericParameterPosition, a.GetType()) 
-                                                            | false -> None)
-                            |> Seq.groupBy fst |> Seq.map (fun (pos, ptyp) -> pos, ptyp |> Seq.head |> snd) |> Seq.sortBy fst
-                            |> Seq.map snd |> Seq.toArray
-        // Punting a bit, just taking the first type found and hoping it works out for now
-        mi.MakeGenericMethod(resolvedPrms)
+    let gnamepos = mi.GetGenericArguments() |> Array.map (fun gi -> gi.Name, gi.GenericParameterPosition) |> Map.ofArray
+
+    let resolvedGenerics = 
+        Array.zip prms args
+        |> Array.choose (fun (p,a) -> match p.ParameterType.ContainsGenericParameters with 
+                                      | true -> resolveGenericByName p a |> Some
+                                      | false -> None)
+        |> Array.collect id
+        |> Seq.groupBy fst |> Seq.map (fun (name, ptyp) -> name, ptyp |> Seq.head |> snd) 
+        |> Seq.sortBy (fun (n,t) -> gnamepos |> Map.find n)
+
+    let resolvedPrms = resolvedGenerics |> Seq.map (snd) |> Seq.toArray
+    mi.MakeGenericMethod(resolvedPrms)
 
 let convertArgs (prms: ParameterInfo[]) (args: obj[]) =
     Array.zip prms args |> Array.map (fun (prm, arg) -> convertToTargetType prm.ParameterType arg)
@@ -335,7 +351,7 @@ let executeParameterizedMethod (o: obj) (sigs: MethodInfo list) (args: obj) =
     
     let orderedDispaches = 
         methodsWithParamArgs
-        |> List.map (fun (mi, prms) -> mi, prms, getMethodMatch prms arrayArgs)
+        |> List.map (fun (mi, prms) -> mi, prms, getMethodMatch mi prms arrayArgs)
         |> List.sortBy (fun (_,_,cls) -> int cls) // Lowest Is Bestest
 
     // Punt for now and only look at the top winner
