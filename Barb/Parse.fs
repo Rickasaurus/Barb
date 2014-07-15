@@ -171,7 +171,7 @@ let generateIndexArgs (exprs: ExprRep list) : ExprRep =
 let generateBind : ExprRep list -> ExprRep = 
     function
     | exprs & { Offset = offset; Length = length; Expr = SubExpression([{ Expr = Unknown(name) }]) } :: bindExpr :: scopeExpr :: [] -> 
-        { Offset = offset; Length = length; Expr = Binding (name, bindExpr, scopeExpr) }
+        { Offset = offset; Length = length; Expr = BVar (name, bindExpr, scopeExpr) }
     | list -> failwith (sprintf "Incorrect binding syntax: %A" list)
 
 let generateAnd (exprs: ExprRep list) : ExprRep = 

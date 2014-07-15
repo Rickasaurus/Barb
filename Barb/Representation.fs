@@ -56,8 +56,8 @@ and ExprTypes =
     (* Containers *)
     | SubExpression of ExprRep list
     | Tuple of ExprRep array
-    // Binding: Name, Bound Expression, Scope
-    | Binding of string * ExprRep * ExprRep
+    // Bound Value: Name, Bound Expression, Scope
+    | BVar of string * ExprRep * ExprRep
     | Lambda of LambdaRecord
     | IfThenElse of ExprRep * ExprRep * ExprRep
     | Generator of ExprRep * ExprRep * ExprRep
@@ -77,7 +77,11 @@ and ExprRep =
     }
     with override t.ToString() = sprintf "{ Off = %i; Len = %i; %A }" t.Offset t.Length t.Expr
 
-and Bindings = (String, ExprTypes Lazy) Map 
+and BindingContents = 
+    | ComingLater
+    | Existing of ExprTypes Lazy
+
+and Bindings = (String, BindingContents) Map 
 
 type BarbData = 
     {
@@ -106,7 +110,7 @@ and exprExists (pred: ExprTypes -> bool) (expr: ExprTypes) =
     | SubExpression (repList) -> repList |> List.exists (exprExistsInRep pred)
     | Tuple (repArray) -> repArray |> Array.exists (exprExistsInRep pred)
     | IndexArgs (rep) -> exprExistsInRep pred rep
-    | Binding (name, rep, scopeRep) -> 
+    | BVar (name, rep, scopeRep) -> 
         exprExistsInRep pred rep || exprExistsInRep pred scopeRep
     | Lambda (lambda) -> exprExistsInRep pred (lambda.Contents)
     | IfThenElse (ifRep, thenRep, elseRep) ->

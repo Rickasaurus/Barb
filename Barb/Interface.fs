@@ -20,6 +20,7 @@ open Barb.Reduce
 
 open Helpers
 open Helpers.FSharpExpr
+
 module Compiler =
 
     let parse (settings: BarbSettings) (predicate: string) : BarbData = 
@@ -33,19 +34,33 @@ module Compiler =
 
         { BarbData.Default with Contents = [parsedTokens]; Settings = settings }
 
-    let reduce (parsed: BarbData) : BarbData =        
-        //let additionalBindings =
-        //    parsed.Settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, lazy (Obj kv.Value))
+    let reduce (data: BarbData) : BarbData =        
+        let memberMap =
+            resolveMembers data.InputType (BindingFlags.Instance ||| BindingFlags.Static ||| BindingFlags.NonPublic ||| BindingFlags.Public)
+            |> Seq.map (fun (name,contents) -> name, ComingLater)
+
+        let moduleBindings = 
+            getModulesByNamespaceName data.Settings.Namespaces
+            |> Seq.collect getContentsFromModule 
+            |> Seq.map (fun (n,lexpr) -> n, Existing lexpr)
+        
+        let additionalBindings =
+            data.Settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, (Existing <| lazy (Obj kv.Value)))
+            
+        let allBindings = 
+            // memberMap last to ensure those overwrite anything conflicting from the others
+            seq { yield! moduleBindings; yield! additionalBindings; yield! memberMap }        
+            |> Map.ofSeq
 
         let reducedExpression = 
-            resolveExpression parsed.Contents Map.empty parsed.Settings false |> fst |> List.rev
+            resolveExpression data.Contents allBindings data.Settings false |> fst |> List.rev
 
         #if DEBUG
         let reOutput = Environment.NewLine + (sprintf "RE: %A" reducedExpression) + Environment.NewLine in
             System.Diagnostics.Debug.WriteLine(reOutput)
         #endif
-           
-        { parsed with Contents = reducedExpression }
+        
+        { data with Contents = reducedExpression }
 
     let reduceFinal (context: Bindings) (parsed: BarbData) : ExprRep list * Bindings =
         resolveExpression parsed.Contents context parsed.Settings true
@@ -61,19 +76,12 @@ module Compiler =
             resolveMembers data.InputType (BindingFlags.Instance ||| BindingFlags.Static ||| BindingFlags.NonPublic ||| BindingFlags.Public)
             |> Map.ofSeq 
 
-        let moduleBindings = 
-            getModulesByNamespaceName data.Settings.Namespaces
-            |> Seq.collect getContentsFromModule |> Seq.toArray
-        
         let additionalBindings =
-            data.Settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, lazy (Obj kv.Value))
-                    
+            data.Settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, (Existing <| lazy (Obj kv.Value)))
+
         let calculateResult input = 
             let applyToMember (mi: MethodInfo list) = lazy (AppliedMethod(input, mi))
-            let inputBindings =
-                Seq.concat [ moduleBindings |> Seq.ofArray; additionalBindings ]          
-                |> Seq.fold (fun s (k,v) -> s |> Map.add k v )
-                    (memberMap |> Map.map (fun k prop -> lazy prop input))        
+            let inputBindings = memberMap |> Map.map (fun k prop -> Existing <| lazy prop input)
 
             #if DEBUG
             let ibOutput = Environment.NewLine + (sprintf "IB: %A" inputBindings) + Environment.NewLine in

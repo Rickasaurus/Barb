@@ -30,7 +30,7 @@ let applyArgToLambda (l: LambdaRecord) (arg: obj) =
     match l.Params with
     | [] -> failwith (sprintf "Unexpected Lambda Argument %A" arg)
     | bindname :: restprms ->
-        let bindings = l.Bindings |> Map.add bindname (Obj arg |> Lazy.CreateFromValue)
+        let bindings = l.Bindings |> Map.add bindname (Existing (Obj arg |> Lazy.CreateFromValue))
         Lambda({ l with Params = restprms; Bindings = bindings })
 
 let inline SubExpressionIfNeeded (input: ExprRep list): ExprTypes =   
@@ -69,9 +69,12 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         | false -> reducedTuples |> Tuple |> Unresolved
                         |> wrapit |> Some           
                     | Unknown unk -> 
-                        match bindings |> Map.tryFind unk |> Option.bind (fun res -> res.Force() |> wrapit |> Some) with
+                        match bindings |> Map.tryFind unk with
+                        | Some ComingLater when finalReduction -> raise <| BarbExecutionException(sprintf "Expected value not bound: %s" unk, (sprintf "%A" lists), exprOffset, exprLength)
+                        | Some ComingLater -> None
+                        | Some (Existing v) -> v.Force() |> wrapit |> Some
                         | None when finalReduction -> raise <| BarbExecutionException(sprintf "Specified unknown was unable to be resolved: %s" unk, (sprintf "%A" lists), exprOffset, exprLength)
-                        | v -> v
+                        | None -> None
                     | AppliedProperty(o, p) -> p.GetValue(o, [||]) |> Returned |> wrapit |> Some
                     | AppliedMultiProperty(ops) -> [| for (o, pi) in ops -> pi.GetValue(o, [||]) |> Returned |> wrapit |] |> Tuple |> wrapit |> Some
                     | Generator ({Expr = Obj(s)}, {Expr = Obj(i)}, {Expr = Obj(e)}) ->
@@ -261,7 +264,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
         | left, (rExpr & {Expr = Unresolved(expr)}) :: rt -> 
             reduceExpressions ({rExpr with Expr = expr} :: left) rt bindings
         // Binding
-        | left, (({Expr = Binding (bindName, bindInnerExpr, boundScope)} & bindExpr) :: rt)  ->
+        | left, (({Expr = BVar (bindName, bindInnerExpr, boundScope)} & bindExpr) :: rt)  ->
             match reduceExpressions [] [bindInnerExpr] bindings |> fst with
             // Recursive Lambda Binding
             | lmbExpr :: [] & {Expr = Lambda(lambda)} :: [] 
@@ -271,14 +274,14 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                     let reducedExpr, _ = reduceExpressions [] [lambda.Contents] cleanBinds
                     let recLambda = 
                         let newLambda = {lambda with Contents = { lambda.Contents with Expr = SubExpressionIfNeeded reducedExpr }}
-                        do newLambda.Bindings <- newLambda.Bindings |> Map.add bindName (Lambda newLambda |> Lazy.CreateFromValue)
+                        do newLambda.Bindings <- newLambda.Bindings |> Map.add bindName (Existing (Lambda newLambda |> Lazy.CreateFromValue))
                         { lmbExpr with Expr = Lambda newLambda }
-                    let newbindings = bindings |> Map.add bindName (lazy recLambda.Expr)
+                    let newbindings = bindings |> Map.add bindName (Existing (lazy recLambda.Expr))
                     let res = { bindExpr with Expr = reduceExpressions [] [boundScope] newbindings |> fst |> SubExpressionIfNeeded }
                     reduceExpressions left (res :: rt) newbindings
             // Normal Value Binding
             | rexpr -> 
-                let newbindings = bindings |> Map.add bindName (lazy SubExpressionIfNeeded rexpr) in
+                let newbindings = bindings |> Map.add bindName (Existing (lazy SubExpressionIfNeeded rexpr)) in
                     let res = { bindExpr with Expr = reduceExpressions [] [boundScope] newbindings |> fst |> SubExpressionIfNeeded }
                     reduceExpressions left (res :: rt) bindings
         | ResolveSingle bindings (res, lt, rt)
