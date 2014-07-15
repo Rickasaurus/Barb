@@ -43,6 +43,7 @@ and ExprTypes =
     | AppliedMultiProperty of (obj * PropertyInfo) list
     | AppliedInvoke of int * string // where int is the collection depth to perform the invocation, 0 is top level    
     | AppliedIndexedProperty of obj * PropertyInfo list
+    | RecordUpdate of string * (string * ExprRep) list
     | FieldGet of FieldInfo list
     | Obj of obj
     | LazyObj of Lazy<obj>

@@ -56,7 +56,6 @@ type DelimType =
     | Open
     | SCap of string
     | RCap of string
-    | MCap of DelimType
 
 type SubexpressionType = 
     {
@@ -358,41 +357,45 @@ let parseProgram (startText: string) =
         try
             match result with
             | { Offset = cSubExprOffset; Expr = SubExpression cSubExpr } :: rSubExprs -> 
+                let getCurrentSubexpression () = SubExpression (cSubExpr |> List.rev)
                 match str with
                 | FinishOpenExpression currentCaptures (subtype, expressionStartOffset, crem) ->
                     let length = (uint32 str.Offset) - expressionStartOffset
-                    let innerResult = { Offset = expressionStartOffset; Length = length; Expr = SubExpression (cSubExpr |> List.rev) } :: rSubExprs  
+                    let innerResult = { Offset = expressionStartOffset; Length = length; Expr = getCurrentSubexpression () } :: rSubExprs  
                     let value = innerResult |> List.rev |> subtype.Func in 
                         crem, value
                 | _ when str.Length = 0u -> 
                     // End of the road, wrap unclosed expressions in a subexpression
-                    let cSubExprRev = cSubExpr |> List.rev
-                    let newSubExpr = { Offset = str.Offset; Length = str.Offset - cSubExprRev.Head.Offset; Expr = SubExpression cSubExprRev } 
+                    let cSubExprRevOffset = (cSubExpr |> List.rev).Head.Offset
+                    let newSubExpr = { Offset = str.Offset; Length = str.Offset - cSubExprRevOffset; Expr = getCurrentSubexpression () } 
                     str, listToSubExpression (newSubExpr :: rSubExprs)            
                 | OngoingExpression currentCaptures (captures, crem) ->
                     match captures with
                     // Expression is Finished
                     | ({ Pattern = []; Func = func }, offset) :: parents -> 
-                        let subExprRep = { Offset = offset; Length = crem.Offset - cSubExprOffset; Expr = SubExpression (cSubExpr |> List.rev) }
+                        let subExprRep = { Offset = offset; Length = crem.Offset - cSubExprOffset; Expr = getCurrentSubexpression () }
                         let innerResult = subExprRep :: rSubExprs  
                         let value = innerResult |> List.rev |> func in 
                             crem, value   
                     // Expression Continues
                     | ({ Pattern = h :: rest; Func = _ }, prevOffset) :: parents -> 
                         let fresh = { Offset = str.Offset; Length = UInt32.MaxValue; Expr = SubExpression [] }
-                        let stale = { Offset = prevOffset; Length = str.Offset - prevOffset; Expr = SubExpression (cSubExpr |> List.rev) }
+                        let stale = { Offset = prevOffset; Length = str.Offset - prevOffset; Expr = getCurrentSubexpression () }
                         parseProgramInner crem (fresh :: stale :: rSubExprs) captures
                     | [] -> failwith "Unexpected output from OngoingExpression"
                 | RefineOpenExpression currentCaptures (subtype, crem) ->
                     // Mid-Expression we find evidence that further restricts the kind of expression it is
                     let fresh = { Offset = str.Offset; Length = UInt32.MaxValue; Expr = SubExpression [] }
-                    let stale = { Offset = cSubExprOffset; Length = crem.Offset - cSubExprOffset; Expr = SubExpression (cSubExpr |> List.rev) }
+                    // stale is the first finished chunk as defined by the first delimiter of the open expression
+                    let stale = { Offset = cSubExprOffset; Length = crem.Offset - cSubExprOffset; Expr = getCurrentSubexpression () }
                     let rem, value = parseProgramInner crem (fresh :: stale :: []) ((subtype, str.Offset) :: currentCaptures) 
+                    // Return when the refined expression has finished.
                     let finalExpr = {value with Expr = SubExpression [value]}
                     parseProgramInner rem (finalExpr :: rSubExprs) currentCaptures    
                 | NewExpression currentCaptures (subtype, crem) ->
                     let newExpr = { Offset = str.Offset; Length = UInt32.MaxValue; Expr = SubExpression [] }   
                     let rem, value = parseProgramInner crem [newExpr] ((subtype, str.Offset) :: currentCaptures)  
+                    // Return when the new expression has finished.
                     let finalExpr = { Offset = crem.Offset; Length = rem.Offset - str.Offset; Expr = SubExpression (value :: cSubExpr)}   
                     parseProgramInner rem (finalExpr :: rSubExprs) currentCaptures
                 | Skip whitespaceVocabulary res
