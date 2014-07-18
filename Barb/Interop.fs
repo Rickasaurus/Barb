@@ -365,7 +365,7 @@ let executeParameterizedMethod (o: obj) (sigs: MethodInfo list) (args: obj []) =
         | (mi, prms, MethodMatch.LengthMatch) :: _ -> mi, convertArgs prms args
         | __ -> failwithf "No match found for the given operation on %s" (o.GetType().FullName)
 
-    mi.Invoke(o, newargs) |> Returned |> Some
+    mi.Invoke(o, newargs)
 
 let resolveMembersByInstance (o: obj) (memberName: string) : ResolvedMember list option =
     if o = null then None
@@ -428,8 +428,9 @@ let executeUnitMethod (o: obj) (sigs: MethodInfo list) =
     sigs 
     |> List.map (fun mi -> mi, mi.GetParameters())
     |> List.tryFind (fun (mi, paramTypes) -> paramTypes.Length = 0)
-    |> Option.bind (fun (mi, paramTypes) -> mi.Invoke(o, [||]) |> Some)
-    |> Option.map Returned
+    |> function
+       | Some (mi, paramTypes) -> mi.Invoke(o, [||])
+       | None -> failwithf "Unable to find a method with no parameters for unit invocation for: %A" o
 
 let executeIndexer (o: obj) (sigs: PropertyInfo list) (param: obj) =
     sigs 

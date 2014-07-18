@@ -185,24 +185,24 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 // Execute a parameterless method
                 | InvokableExpr exp, Unit -> 
                     match exp with
-                    | AppliedMethod (o,l) -> executeUnitMethod o l
+                    | AppliedMethod (o,l) -> executeUnitMethod o l |> Returned |> Some
                     | AppliedMultiMethod (osl) -> 
-                        [| for (o,mi) in osl do yield! executeUnitMethod o mi |> Option.toArray |] // Note: Currently Drops Elements Without the given Method
-                        |> Array.map (fun res -> { lrep with Expr = res })
+                        [| for (o,mi) in osl do yield executeUnitMethod o mi |]
+                        |> Array.map (fun res -> { lrep with Expr = res |> Returned })
                         |> ArrayBuilder |> Some
-                // Execute some method given arguments on the right
+                // Execute some method given arguments 
                 | InvokableExpr exp, ResolvedTuple r -> 
                     match exp with                                       
-                    | AppliedMethod (o,l) -> executeParameterizedMethod o l r
+                    | AppliedMethod (o,l) -> executeParameterizedMethod o l r |> Returned |> Some
                     | AppliedMultiMethod (osl) -> 
-                        [| for (o,mi) in osl do yield! executeParameterizedMethod o mi r |> Option.toArray |] // Note: Currently Drops Elements Without the given Method
+                        [| for (o,mi) in osl do yield executeParameterizedMethod o mi r |> Returned |] 
                         |> Array.map (fun res -> { lrep with Expr = res })
                         |> ArrayBuilder |> Some
                 | InvokableExpr exp, Obj r -> 
                     match exp with                                       
-                    | AppliedMethod (o,l) -> executeParameterizedMethod o l [|r|]
+                    | AppliedMethod (o,l) -> executeParameterizedMethod o l [|r|] |> Returned |> Some
                     | AppliedMultiMethod (osl) -> 
-                        [| for (o,mi) in osl do yield! executeParameterizedMethod o mi [|r|] |> Option.toArray |] // Note: Currently Drops Elements Without the given Method
+                        [| for (o,mi) in osl do yield executeParameterizedMethod o mi [|r|] |> Returned |] 
                         |> Array.map (fun res -> { lrep with Expr = res })
                         |> ArrayBuilder |> Some
                 // Perform a .NET-Application wide scope invocation
