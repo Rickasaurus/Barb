@@ -16,6 +16,10 @@ let indexIntoTuple (elements: ExprTypes array) (index: obj) =
     | :? int64 as idx -> elements.[int idx] 
     | _ -> failwith (sprintf "Bad type for tuple index: %A" index)
 
+let argsFromTuple (tuple: ExprRep array) = 
+    tuple |> Array.map (fun ex -> ex.Expr) 
+    |> Array.map (function | Obj v -> v | other -> failwith (sprintf "Cannot resolve the given tuple-internal expression to a object type: %A" other))    
+
 let tupleToObj (tuple: ExprRep array) = 
     tuple |> Array.map (fun ex -> ex.Expr) 
     |> Array.map (function | Obj v -> v | other -> failwith (sprintf "Cannot resolve the given tuple-internal expression to a object type: %A" other))
@@ -63,10 +67,9 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         let reducedTuples = 
                             tc |> Array.map (fun t -> 
                                     match reduceExpressions [] [t] bindings |> fst  with 
-                                    | ({ Expr = Obj o } & oobj) :: [] -> oobj 
                                     | res -> SubExpressionIfNeeded res |> wrapit)
                         match reducedTuples |> Array.forall (function | {Expr = Obj o} -> true | _ -> false) with
-                        | true -> reducedTuples |> tupleToObj |> Obj
+                        | true -> reducedTuples |> Tuple |> Resolved
                         | false -> reducedTuples |> Tuple |> Unresolved
                         |> wrapit |> Some           
                     | ArrayBuilder ar ->
@@ -77,6 +80,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                                     | res -> SubExpressionIfNeeded res |> wrapit)
                         match reducedArray |> Array.forall (function | {Expr = Obj o} -> true | _ -> false) with
                         | true -> reducedArray |> tupleToObj |> Obj
+                        | false when reducedArray.Length = 0 -> [||] |> box |> Obj
                         | false -> reducedArray |> ArrayBuilder |> Unresolved
                         |> wrapit |> Some            
                     | Unknown unk -> 
@@ -87,7 +91,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         | None when finalReduction -> raise <| BarbExecutionException(sprintf "Specified unknown was unable to be resolved: %s" unk, (sprintf "%A" lists), exprOffset, exprLength)
                         | None -> None
                     | AppliedProperty(o, p) -> p.GetValue(o, [||]) |> Returned |> wrapit |> Some
-                    | AppliedMultiProperty(ops) -> [| for (o, pi) in ops -> pi.GetValue(o, [||]) |> Returned |> wrapit |] |> Tuple |> wrapit |> Some
+                    | AppliedMultiProperty(ops) -> [| for (o, pi) in ops -> pi.GetValue(o, [||]) |> Returned |> wrapit |] |> ArrayBuilder |> wrapit |> Some
                     | Generator ({Expr = Obj(s)}, {Expr = Obj(i)}, {Expr = Obj(e)}) ->
                         match s, i, e with
                         | (:? int64 as s), (:? int64 as i), (:? int64 as e) -> Obj (seq {s .. i .. e }) |> wrapit |> Some
@@ -185,15 +189,22 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                     | AppliedMultiMethod (osl) -> 
                         [| for (o,mi) in osl do yield! executeUnitMethod o mi |> Option.toArray |] // Note: Currently Drops Elements Without the given Method
                         |> Array.map (fun res -> { lrep with Expr = res })
-                        |> Tuple |> Some
+                        |> ArrayBuilder |> Some
                 // Execute some method given arguments r
-                | InvokableExpr exp, Obj r -> 
+                | InvokableExpr exp, ResolvedTuple r -> 
                     match exp with                                       
-                    | AppliedMethod (o,l) -> executeParameterizedMethod o l r 
+                    | AppliedMethod (o,l) -> executeParameterizedMethod o l r
                     | AppliedMultiMethod (osl) -> 
                         [| for (o,mi) in osl do yield! executeParameterizedMethod o mi r |> Option.toArray |] // Note: Currently Drops Elements Without the given Method
                         |> Array.map (fun res -> { lrep with Expr = res })
-                        |> Tuple |> Some
+                        |> ArrayBuilder |> Some
+                | InvokableExpr exp, Obj r -> 
+                    match exp with                                       
+                    | AppliedMethod (o,l) -> executeParameterizedMethod o l r
+                    | AppliedMultiMethod (osl) -> 
+                        [| for (o,mi) in osl do yield! executeParameterizedMethod o mi r |> Option.toArray |] // Note: Currently Drops Elements Without the given Method
+                        |> Array.map (fun res -> { lrep with Expr = res })
+                        |> ArrayBuilder |> Some
                 // Perform a .NET-Application wide scope invocation
                 | Unknown l, AppliedInvoke (depth, name) when depth = 0 && finalReduction || settings.BindGlobalsWhenReducing -> 
                     let mis = cachedResolveStatic (settings.Namespaces, l, name)
@@ -208,6 +219,8 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 | New, Unknown r -> Unknown r |> Some
                 // Provides F#-like construction without new
                 | Unknown l, Obj r -> executeConstructor settings.Namespaces l r
+                // Provides F#-like construction without new
+                | Unknown l, ResolvedTuple r -> executeConstructor settings.Namespaces l r
                 // Simplify to a single invocation ExprType
                 | Invoke, Unknown r -> AppliedInvoke (0, r) |> Some
                 // Here for F#-like indexing, the invoking '.' is simply removed 
@@ -220,7 +233,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                     with ex -> raise <| BarbExecutionException(ex.Message, sprintf "%A" (l,r), rOffset, rLength)
                 | Obj l, AppliedInvoke (depth, r) when finalReduction -> 
                     try 
-                        let res = resolveInvokeAtDepth depth l r //-> { lrep with Expr = AppliedMethod([|o|],  } |] |> Some
+                        let res = resolveInvokeAtDepth depth l r 
                         match res |> List.collect (fun (o, rms) -> rms) with
                         | EmptyResolution -> None 
                         | MixedResolution _ -> failwithf "Both properties and methods were found for %s in the nested invocation." r

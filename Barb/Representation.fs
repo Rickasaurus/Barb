@@ -125,3 +125,11 @@ and exprExists (pred: ExprTypes -> bool) (expr: ExprTypes) =
 
 let wrapResolved (rep: ExprRep) = { rep with Expr = Resolved rep.Expr }
 let wrapUnresolved (rep: ExprRep) = { rep with Expr = Unresolved rep.Expr }
+
+let (|ResolvedTuple|_|) (v: ExprTypes) =
+    match v with 
+    | Resolved(Tuple tc) -> 
+        tc |> Array.map (fun ex -> ex.Expr) 
+        |> Array.map (function | Obj v -> v | other -> failwith (sprintf "Resolved tuple should only contian objects: %A" other))
+        |> Some
+    | _ -> None

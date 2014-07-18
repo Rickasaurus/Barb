@@ -157,9 +157,9 @@ let ``should propertly call IDictionary ContainsKey`` () =
     Assert.True(result)
 
 [<Fact>]
-let ``should support using the results of calls to build incremental tuples`` () = 
+let ``should support using the results of calls to build incremental arrays`` () = 
     let testRecord = { Name = "Dude Duderson"; Index = 1 }
-    let predicate = buildExpr<IndexedName,bool> "{Index .. 3} = (1, 2, 3)"
+    let predicate = buildExpr<IndexedName,bool> "{Index .. 3} = [|1; 2; 3|]"
     let result = predicate testRecord
     Assert.True(result)  
 
@@ -257,8 +257,8 @@ let ``plus should work with different types but may be slow`` () =
     Assert.True(func({ x = "helleh"; y = "helleh" }))
 
 [<Fact>]
-let ``tuple implementation should support Length property`` () =
-    let func = buildExpr<unit,bool> "let tpl = (1,2,3) in tpl.Length = 3"
+let ``array implementation should support Length property`` () =
+    let func = buildExpr<unit,bool> "let tpl = [|1;2;3|] in tpl.Length = 3"
     Assert.True(func())
 
 type StrArrayType = { Strs: string array }
@@ -296,10 +296,6 @@ let ``should be able to create new objects without new`` () =
 // Wish List / Ideas
 //
 
-//[<Fact>] // Need support, but the reflection is difficult
-let ``should support exporting nested tuples`` () =
-    let predicate = buildExpr<unit,int array array> "((1,2), (3,4), (5,6))"
-    Assert.Equal<int array array>([|[|1; 2|]; [|3;4|]; [|5;6|]|], predicate())
 
 [<Fact>] 
 let ``invoke on null should return null`` () =

@@ -126,7 +126,11 @@ let generateTuple (exprs: ExprRep list) : ExprRep =
 
 let generateArray (exprs: ExprRep list) : ExprRep = 
     let offset, length = exprRepListOffsetLength exprs in 
-        { Offset = offset; Length = length; Expr = ArrayBuilder (exprs |> List.toArray) }    
+        match exprs with
+        | { Expr = SubExpression s } :: [] when s.Length = 0 -> 
+            { Offset = offset; Length = length; Expr = ArrayBuilder [||] }    
+        | exprs ->
+            { Offset = offset; Length = length; Expr = ArrayBuilder (exprs |> List.toArray) }    
 
 let generateLambda (exprs: ExprRep list) : ExprRep = 
     match exprs with 

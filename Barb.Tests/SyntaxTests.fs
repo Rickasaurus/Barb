@@ -263,23 +263,23 @@ let ``should follow scoping rules for bound variables`` () =
 type TestListRec<'T> = { Nums: 'T list }
 
 [<Fact>] 
-let ``tuples should compare correctly with reference type lists`` () = 
+let ``arrays should compare correctly with reference type lists`` () = 
     let testRecord = { Nums = ["one";"two";"three"] }
-    let predicate = buildExpr<TestListRec<string>,bool> "Nums = (\"one\",\"two\",\"three\")"
+    let predicate = buildExpr<TestListRec<string>,bool> "Nums = [|\"one\";\"two\";\"three\"|]"
     let result = predicate testRecord
     Assert.True(result)    
 
 [<Fact>] 
-let ``tuples should compare correctly with value-type lists`` () = 
+let ``arrays should compare correctly with value-type lists`` () = 
     let testRecord = { Nums = [1;2;3;4;5] }
-    let predicate = buildExpr<TestListRec<int>,bool> "Nums = (1,2,3,4,5)"
+    let predicate = buildExpr<TestListRec<int>,bool> "Nums = [|1;2;3;4;5|]"
     let result = predicate testRecord
     Assert.True(result)    
 
 [<Fact>] 
-let ``bound tuples should compare correctly with value-type lists`` () = 
+let ``bound arrays should compare correctly with value-type lists`` () = 
     let testRecord = { Nums = [1;2;3;4;5] }
-    let predicate = buildExpr<TestListRec<int>,bool> "let x = (1,2,3,4,5) in x = Nums"
+    let predicate = buildExpr<TestListRec<int>,bool> "let x = [|1;2;3;4;5|] in x = Nums"
     let result = predicate testRecord
     Assert.True(result)    
 
@@ -393,32 +393,32 @@ let ``should support if-then-else with initial/final spacing`` () =
     Assert.True(result)  
 
 [<Fact>]
-let ``should support iterative incremental tuple building`` () = 
-    let predicate = buildExpr<unit,bool> "{1 .. 5} = (1, 2, 3, 4, 5)"
+let ``should support iterative incremental array building`` () = 
+    let predicate = buildExpr<unit,bool> "{1 .. 5} = [|1; 2; 3; 4; 5|]"
     let result = predicate ()
     Assert.True(result)  
 
 [<Fact>]
-let ``should support iterative incremental tuple building with jumps`` () = 
-    let predicate = buildExpr<unit,bool> "{0 .. 2 .. 10} = (0, 2, 4, 6, 8, 10)"
+let ``should support iterative incremental array building with jumps`` () = 
+    let predicate = buildExpr<unit,bool> "{0 .. 2 .. 10} = [|0; 2; 4; 6; 8; 10|]"
     let result = predicate ()
     Assert.True(result)  
 
 [<Fact>]
-let ``should treat tuples properly without subexpressions`` () = 
-    let predicate = buildExpr<unit,bool> "(1,2,3) = (1,2,3)"
+let ``should treat arrays properly without subexpressions`` () = 
+    let predicate = buildExpr<unit,bool> "[|1;2;3|] = [|1;2;3|]"
     let result = predicate ()
     Assert.True(result)  
 
 [<Fact>]
-let ``should treat tuples properly even when in a left subexpression`` () = 
-    let predicate = buildExpr<unit,bool> "((1,2,3)) = (1,2,3)"
+let ``should treat arrays properly even when in a left subexpression`` () = 
+    let predicate = buildExpr<unit,bool> "([|1;2;3|]) = [|1;2;3|]"
     let result = predicate ()
     Assert.True(result)  
 
 [<Fact>]
-let ``should treat tuples properly even when in a right subexpression`` () = 
-    let predicate = buildExpr<unit,bool> "(1,2,3) = ((1,2,3))"
+let ``should treat arrays properly even when in a right subexpression`` () = 
+    let predicate = buildExpr<unit,bool> "[|1;2;3|] = ([|1;2;3|])"
     let result = predicate ()
     Assert.True(result)        
 
@@ -429,15 +429,15 @@ let ``should support recursion`` () =
     Assert.True(result)  
 
 [<Fact>]
-let ``tuples should be indexable`` () = 
-    let predicate = buildExpr<unit,bool> "(1,2,3)[1] = 2"
+let ``arrays should be indexable`` () = 
+    let predicate = buildExpr<unit,bool> "[|1;2;3|][1] = 2"
     let result = predicate ()
     Assert.True(result)  
 
 
 [<Fact>] 
-let ``should support nested tuples internally`` () =
-    let predicate = buildExpr<unit,bool> "((1,2), (3,4), (5,6)).[1] = (3,4)"
+let ``should support nested arrays internally`` () =
+    let predicate = buildExpr<unit,bool> "[|[|1;2|]; [|3;4|]; [|5;6|]|].[1] = [|3;4|]"
     Assert.True(predicate())
 
 [<Fact>]
@@ -450,101 +450,106 @@ type InnerType = { Things: string array }
 type OuterType = { Stuff: InnerType }
 
 [<Fact>]
-let ``tuple parsing should not cause problems with nested property calls`` () =
-    let input = { Stuff = { Things = [|"one"; "two"; "three"|]} }
-    let predicate = buildExpr<OuterType, bool> "(Stuff.Things, ('four','five')) = (('one','two','three'),('four','five'))"
-    let result = predicate input
+let ``union operator should union arrays`` () =
+    let predstr = @"[|1;2;3|] \/ [|4;5;6|] = [|1;2;3;4;5;6|]"
+    let predicate = buildExpr<unit, bool> predstr
+    let result = predicate ()
     Assert.True(result)
 
+
 [<Fact>]
-let ``union operator should union tuples`` () =
-    let predstr = @"(1,2,3) \/ (4,5,6) = (1,2,3,4,5,6)"
+let ``union operator should union arrays with singltons on the right`` () =
+    let predstr = @"[|1;2;3|] \/ 5 = [|1;2;3;5|]"
     let predicate = buildExpr<unit, bool> predstr
     let result = predicate ()
     Assert.True(result)
 
 [<Fact>]
-let ``union operator should union tuples with singltons on the right`` () =
-    let predstr = @"(1,2,3) \/ 5 = (1,2,3,5)"
+let ``union operator should union arrays with singltons on the left`` () =
+    let predstr = @"5 \/ [|1;2;3|] = [|5;1;2;3|]"
     let predicate = buildExpr<unit, bool> predstr
     let result = predicate ()
     Assert.True(result)
 
 [<Fact>]
-let ``union operator should union tuples with singltons on the left`` () =
-    let predstr = @"5 \/ (1,2,3) = (5,1,2,3)"
+let ``null should act as identity for the array operator`` () =
+    let predstr = @"null \/ [|1;2;3|] = [|1;2;3|]"
+    let predicate = buildExpr<unit, bool> predstr
+    let result = predicate ()
+    Assert.True(result)
+    let predstr = @"[|1;2;3|] \/ null = [|1;2;3|]"
     let predicate = buildExpr<unit, bool> predstr
     let result = predicate ()
     Assert.True(result)
 
 [<Fact>]
-let ``null should act as identity for the union operator`` () =
-    let predstr = @"null \/ (1,2,3) = (1,2,3)"
+let ``empty array should act as identity for the array operator`` () =
+    let predstr = @"[||] \/ [|1;2;3|] = [|1;2;3|]"
     let predicate = buildExpr<unit, bool> predstr
     let result = predicate ()
     Assert.True(result)
-    let predstr = @"(1,2,3) \/ null = (1,2,3)"
+    let predstr = @"[|1;2;3|] \/ [||] = [|1;2;3|]"
     let predicate = buildExpr<unit, bool> predstr
     let result = predicate ()
     Assert.True(result)
 
 [<Fact>]
-let ``intersection operator should find the intersection of tuples`` () =
-    let predicate = buildExpr<unit, bool> @"(2,3,4) /\ (3,4,5) = (3,4)" 
+let ``intersection operator should find the intersection of arrays`` () =
+    let predicate = buildExpr<unit, bool> @"[|2;3;4|] /\ [|3;4;5|] = [|3;4|]" 
     let result = predicate ()
     Assert.True(result)
 
 [<Fact>]
-let ``intersection operator should find the intersection of tuples with a singleton`` () =
-    let predicate = buildExpr<unit, bool> @"(2,3,4) /\ 3 = 3" 
+let ``intersection operator should find the intersection of arrays with a singleton`` () =
+    let predicate = buildExpr<unit, bool> @"[|2;3;4|] /\ 3 = 3" 
     let result = predicate ()
     Assert.True(result)
 
 [<Fact>]
 let ``intersection operator on null should return null`` () =
-    let predicate = buildExpr<unit, bool> @"(2,3,4) /\ null = null" 
+    let predicate = buildExpr<unit, bool> @"[|2;3;4|] /\ null = null" 
     let result = predicate ()
     Assert.True(result)
-    let predicate = buildExpr<unit, bool> @"null /\ (2,3,4) = null" 
-    let result = predicate ()
-    Assert.True(result)
-
-[<Fact>]
-let ``hasintersection operator should show if tuples have intersection`` () =
-    let predicate = buildExpr<unit, bool> @"(2,3,4) /?\ (3,4,5)" 
+    let predicate = buildExpr<unit, bool> @"null /\ [|2;3;4|] = null" 
     let result = predicate ()
     Assert.True(result)
 
 [<Fact>]
-let ``hasintersection operator should show if tuples don't have intersection`` () =
-    let predicate = buildExpr<unit, bool> @"(1,2,3) /?\ (4,5,6)" 
+let ``hasintersection operator should show if arrays have intersection`` () =
+    let predicate = buildExpr<unit, bool> @"[|2;3;4|] /?\ [|3;4;5|]" 
+    let result = predicate ()
+    Assert.True(result)
+
+[<Fact>]
+let ``hasintersection operator should show if arrays don't have intersection`` () =
+    let predicate = buildExpr<unit, bool> @"[|1;2;3|] /?\ [|4;5;6|]" 
     let result = predicate ()
     Assert.False(result)
 
 [<Fact>]
 let ``hasintersection operator should work with single elements on the right`` () =
-    let predicate = buildExpr<unit, bool> @"(1,2,3) /?\ 2" 
+    let predicate = buildExpr<unit, bool> @"[|1;2;3|] /?\ 2" 
     let result = predicate ()
     Assert.True(result)
-    let predicate = buildExpr<unit, bool> @"(1,2,3) /?\ 4" 
+    let predicate = buildExpr<unit, bool> @"[|1;2;3|] /?\ 4" 
     let result = predicate ()
     Assert.False(result)
 
 [<Fact>]
 let ``hasintersection operator should work with single elements on the left`` () =
-    let predicate = buildExpr<unit, bool> @"2 /?\ (1,2,3)" 
+    let predicate = buildExpr<unit, bool> @"2 /?\ [|1;2;3|]" 
     let result = predicate ()
     Assert.True(result)
-    let predicate = buildExpr<unit, bool> @"4 /?\ (1,2,3)" 
+    let predicate = buildExpr<unit, bool> @"4 /?\ [|1;2;3|]" 
     let result = predicate ()
     Assert.False(result)
 
 [<Fact>]
 let ``hasintersection operator should consider null to be the empty set`` () =
-    let predicate = buildExpr<unit, bool> @"null /?\ (1,2,3)" 
+    let predicate = buildExpr<unit, bool> @"null /?\ [|1;2;3|]" 
     let result = predicate ()
     Assert.False(result)
-    let predicate = buildExpr<unit, bool> @"(1,2,3) /?\ null" 
+    let predicate = buildExpr<unit, bool> @"[|1;2;3|] /?\ null" 
     let result = predicate ()
     Assert.False(result)
     let predicate = buildExpr<unit, bool> @"null /?\ null" 
@@ -554,11 +559,11 @@ let ``hasintersection operator should consider null to be the empty set`` () =
 [<Fact>]
 let ``issubset operator should work correctly in true cases`` () =
     let cases = [
-            @"(1,2,3) (= (1,2,3)"
-            @"(1,2) (= (1,2,3)"
-            @"(1) (= (1,2,3)"
-            @"null (= (1,2,3)"
-            @"null (= (1)"
+            @"[|1;2;3|] (= [|1;2;3|]"
+            @"[|1;2|] (= [|1;2;3|]"
+            @"[|1|] (= [|1;2;3|]"
+            @"null (= [|1;2;3|]"
+            @"null (= [|1|]"
         ]
     for predstr in cases do         
         let predicate = buildExpr<unit, bool> predstr
@@ -568,12 +573,12 @@ let ``issubset operator should work correctly in true cases`` () =
 [<Fact>]
 let ``issubset operator should work correctly in false cases`` () =
     let cases = [
-            @"(1,2,3,4) (= (1,2,3)"
-            @"(2,3,4) (= (1,2,3)"
-            @"(3,4) (= (1,2,3)"
-            @"(4) (= (1,2,3)"
-            @"(1,2,3,4) (= null"
-            @"(1) (= null"
+            @"[|1;2;3;4|] (= [|1;2;3|]"
+            @"[|2;3;4|] (= [|1;2;3|]"
+            @"[|3;4|] (= [|1;2;3|]"
+            @"[|4|] (= [|1;2;3|]"
+            @"[|1;2;3;4|] (= null"
+            @"[|1|] (= null"
         ]
     for predstr in cases do         
         let predicate = buildExpr<unit, bool> predstr
@@ -583,11 +588,11 @@ let ``issubset operator should work correctly in false cases`` () =
 [<Fact>]
 let ``issuperset operator should work correctly in true cases`` () =
     let cases = [
-            @"(1,2,3) =) (1,2,3)"
-            @"(1,2,3) =) (1,2) "
-            @"(1,2,3) =) (1)"
-            @"(1,2,3) =) null"
-            @"(1) =) null"
+            @"[|1;2;3|] =) [|1;2;3|]"
+            @"[|1;2;3|] =) [|1;2|] "
+            @"[|1;2;3|] =) [|1|]"
+            @"[|1;2;3|] =) null"
+            @"[|1|] =) null"
         ]
     for predstr in cases do         
         let predicate = buildExpr<unit, bool> predstr
@@ -597,12 +602,12 @@ let ``issuperset operator should work correctly in true cases`` () =
 [<Fact>]
 let ``issuperset operator should work correctly in false cases`` () =
     let cases = [
-            @"(1,2,3) =) (1,2,3,4)"
-            @"(1,2,3) =) (2,3,4)"
-            @"(1,2,3) =) (3,4)"
-            @"(1,2,3) =) (4)"
-            @"null =) (1,2,3,4)"
-            @"null =) (1)"
+            @"[|1;2;3|] =) [|1;2;3;4|]"
+            @"[|1;2;3|] =) [|2;3;4|]"
+            @"[|1;2;3|] =) [|3;4|]"
+            @"[|1;2;3|] =) [|4|]"
+            @"null =) [|1;2;3;4|]"
+            @"null =) [|1|]"
         ]
     for predstr in cases do         
         let predicate = buildExpr<unit, bool> predstr
@@ -611,7 +616,7 @@ let ``issuperset operator should work correctly in false cases`` () =
 
 [<Fact>]
 let ``issuperset operator should work correctly in parens`` () =    
-    let predicate = buildExpr<unit, bool> @"((1,2,3) =) (1,2,3))"
+    let predicate = buildExpr<unit, bool> @"([|1;2;3|] =) [|1;2;3|])"
     let result = predicate ()
     Assert.True(result)
 
@@ -624,7 +629,7 @@ let ``Any indexing on null should return null`` () =
 
 [<Fact>] 
 let ``Any out of bounds indexing should return null`` () =
-    let predicate = buildExpr<unit, bool> @"(1,2,3)[6] = null" 
+    let predicate = buildExpr<unit, bool> @"[|1;2;3|][6] = null" 
     let result = predicate ()
     Assert.True(result)    
 
@@ -634,7 +639,7 @@ type PersonOneLoc = { Locations: Location array  }
 [<Fact>]
 let ``should support mutli-calls over arrays 1 deep`` () = 
     let p = { Locations = [| { City = "New York" }; { City = "Hoboken" } |] }
-    let predicate = buildExpr<PersonOneLoc,bool> "Locations..City /?\ (\"Hoboken\")"
+    let predicate = buildExpr<PersonOneLoc,bool> "Locations..City /?\ [|\"Hoboken\"|]"
     let result = predicate (p)
     Assert.True(result)  
 
@@ -647,11 +652,11 @@ let ``should support multi-calls over two subtypes for a single value`` () =
     let l1 = { City = { Name = "Hoboken"; ZipCodes = [| "90210"; "12345"; "07030" |] } }
     let l2 = { City = { Name = "New York"; ZipCodes = [| "54321"; "00000"; "44444" |] } }
     let p = { Name = "Dude Duderson"; Locations = [| l1; l2 |] }
-    let predicate = buildExpr<TestPerson2,bool> "let n = Locations..City..Name in n = (\"Hoboken\", \"New York\")" in 
+    let predicate = buildExpr<TestPerson2,bool> "let n = Locations..City..Name in n = [|\"Hoboken\"; \"New York\"|]" in 
         let result = predicate (p)
         Assert.True(result)  
 
-    let predicate = buildExpr<TestPerson2,bool> "let n = Locations..City..Name in n /?\ (\"Hoboken\") and n /?\ (\"New York\")" in 
+    let predicate = buildExpr<TestPerson2,bool> "let n = Locations..City..Name in n /?\ [|\"Hoboken\"|] and n /?\ [|\"New York\"|]" in 
         let result = predicate (p)
         Assert.True(result)  
 
@@ -661,7 +666,7 @@ let ``should support multi-calls over two subtypes for a collection of values`` 
     let l2 = { City = { Name = "New York"; ZipCodes = [| "54321"; "00000"; "44444" |] } }
     let p = { Name = "Dude Duderson"; Locations = [| l1; l2 |] }
 
-    let predicate = buildExpr<TestPerson2,bool> "let z = (Lib.flatten (Locations..City..ZipCodes)) in z /?\ (\"00000\") and z /?\ (\"12345\")" in 
+    let predicate = buildExpr<TestPerson2,bool> "let z = (Lib.flatten (Locations..City..ZipCodes)) in z /?\ [|\"00000\"|] and z /?\ [|\"12345\"|]" in 
         let result = predicate (p)
         Assert.True(result) 
 //
