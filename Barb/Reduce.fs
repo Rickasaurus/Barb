@@ -200,9 +200,9 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         |> ArrayBuilder |> Some
                 | InvokableExpr exp, Obj r -> 
                     match exp with                                       
-                    | AppliedMethod (o,l) -> executeParameterizedMethod o l r
+                    | AppliedMethod (o,l) -> executeParameterizedMethod o l [|r|]
                     | AppliedMultiMethod (osl) -> 
-                        [| for (o,mi) in osl do yield! executeParameterizedMethod o mi r |> Option.toArray |] // Note: Currently Drops Elements Without the given Method
+                        [| for (o,mi) in osl do yield! executeParameterizedMethod o mi [|r|] |> Option.toArray |] // Note: Currently Drops Elements Without the given Method
                         |> Array.map (fun res -> { lrep with Expr = res })
                         |> ArrayBuilder |> Some
                 // Perform a .NET-Application wide scope invocation
@@ -218,7 +218,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 // New is allowed so C# users feel at home, it really does nothing though
                 | New, Unknown r -> Unknown r |> Some
                 // Provides F#-like construction without new
-                | Unknown l, Obj r -> executeConstructor settings.Namespaces l r
+                | Unknown l, Obj r -> executeConstructor settings.Namespaces l [|r|]
                 // Provides F#-like construction without new
                 | Unknown l, ResolvedTuple r -> executeConstructor settings.Namespaces l r
                 // Simplify to a single invocation ExprType

@@ -273,11 +273,10 @@ let cachedResolveStatic =
     let resolveMember (namespaces, typename, membername) = resolveStatic namespaces typename membername
     memoizeBy inputToKey resolveMember
 
-let executeConstructor (namespaces: string Set) (rtypename: string) (parameters: obj) : ExprTypes option =
+let executeConstructor (namespaces: string Set) (rtypename: string) (args: obj []) : ExprTypes option =
     match getTypeByName namespaces rtypename with
     | [] -> None
     | rtype :: [] -> 
-        let args = convertPotentiallyTupled parameters
         let paramTypes = args |> Array.map (fun p -> p.GetType())
         rtype.GetConstructor paramTypes |> nullableToOption |> Option.map (fun ctor -> ctor.Invoke(args) |> Obj )         
     | manytype -> failwith (sprintf "Type name was ambiguous: %s" rtypename) 
@@ -352,22 +351,20 @@ let convertArgs (prms: ParameterInfo[]) (args: obj[]) =
     Array.zip prms args |> Array.map (fun (prm, arg) -> convertToTargetType prm.ParameterType arg)
     |> Array.map (function | Some rParam -> rParam | None -> failwith (sprintf "Unable to resolve method parameters: %A -> %A" args prms))
 
-let executeParameterizedMethod (o: obj) (sigs: MethodInfo list) (args: obj) =
-    let arrayArgs = convertPotentiallyTupled args
+let executeParameterizedMethod (o: obj) (sigs: MethodInfo list) (args: obj []) =
     let methodsWithParamArgs = sigs |> List.map (fun mi -> mi, mi.GetParameters())
     
     let orderedDispaches = 
         methodsWithParamArgs
-        |> List.map (fun (mi, prms) -> mi, prms, getMethodMatch mi prms arrayArgs)
+        |> List.map (fun (mi, prms) -> mi, prms, getMethodMatch mi prms args)
         |> List.sortBy (fun (_,_,cls) -> int cls) // Lowest Is Bestest
 
     // Punt for now and only look at the top winner
     let mi, newargs = 
         match orderedDispaches with
-        | (mi, prms, MethodMatch.PerfectMatch) :: _ -> mi, arrayArgs
-        | (mi, prms, MethodMatch.GenericMatch) :: _ -> resolveGenerics mi prms arrayArgs, arrayArgs
-        | (mi, prms, MethodMatch.LengthMatch) :: _ -> mi, convertArgs prms arrayArgs
-        | (mi, prms, MethodMatch.OneArgMatch) :: _ -> mi, convertArgs prms [|box arrayArgs|]
+        | (mi, prms, MethodMatch.PerfectMatch) :: _ -> mi, args
+        | (mi, prms, MethodMatch.GenericMatch) :: _ -> resolveGenerics mi prms args, args
+        | (mi, prms, MethodMatch.LengthMatch) :: _ -> mi, convertArgs prms args
         | __ -> failwithf "No match found for the given operation on %s" (o.GetType().FullName)
 
     mi.Invoke(o, newargs) |> Returned |> Some
