@@ -190,7 +190,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         [| for (o,mi) in osl do yield! executeUnitMethod o mi |> Option.toArray |] // Note: Currently Drops Elements Without the given Method
                         |> Array.map (fun res -> { lrep with Expr = res })
                         |> ArrayBuilder |> Some
-                // Execute some method given arguments r
+                // Execute some method given arguments on the right
                 | InvokableExpr exp, ResolvedTuple r -> 
                     match exp with                                       
                     | AppliedMethod (o,l) -> executeParameterizedMethod o l r

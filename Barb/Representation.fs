@@ -46,7 +46,6 @@ and ExprTypes =
     | RecordUpdate of string * (string * ExprRep) list
     | FieldGet of FieldInfo list
     | Obj of obj
-    | LazyObj of Lazy<obj>
     | Returned of obj
     | Prefix of (obj -> obj)    
     | Postfix of (obj -> obj)
@@ -62,13 +61,13 @@ and ExprTypes =
     | Lambda of LambdaRecord
     | IfThenElse of ExprRep * ExprRep * ExprRep
     | Generator of ExprRep * ExprRep * ExprRep
+    | And of ExprRep * ExprRep
+    | Or of ExprRep * ExprRep
     (* Tags *)
     // Has no Unknowns
     | Resolved of ExprTypes
     // Has Unknowns
     | Unresolved of ExprTypes
-    | And of ExprRep * ExprRep
-    | Or of ExprRep * ExprRep
 
 and ExprRep =
     {
