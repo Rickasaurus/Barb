@@ -56,6 +56,7 @@ and ExprTypes =
     (* Containers *)
     | SubExpression of ExprRep list
     | Tuple of ExprRep array
+    | ArrayBuilder of ExprRep array
     // Bound Value: Name, Bound Expression, Scope
     | BVar of string * ExprRep * ExprRep
     | Lambda of LambdaRecord

@@ -289,6 +289,7 @@ let rec convertToTargetType (ttype: Type) (param: obj) =
     // Special Case For speed
     | :? (obj []) as objs when ttype = typeof<string[]> -> Array.ConvertAll(objs, fun v -> v :?> string) |> box |> Some 
     | :? (obj []) as objs when ttype = typeof<int64[]>  -> Array.ConvertAll(objs, fun v -> v :?> int64) |> box |> Some 
+    | :? (obj []) as objs when ttype = typeof<int32[]>  -> Array.ConvertAll(objs, fun v -> v :?> int64 |> int) |> box |> Some 
     | _ when ttype.IsGenericType && ttype.GetGenericTypeDefinition() = typedefof<_ option> -> 
         let innerType = ttype.GetGenericArguments().[0]
         match convertToTargetType innerType param with

@@ -19,11 +19,12 @@ let indexIntoTuple (elements: ExprTypes array) (index: obj) =
 let tupleToObj (tuple: ExprRep array) = 
     tuple |> Array.map (fun ex -> ex.Expr) 
     |> Array.map (function | Obj v -> v | other -> failwith (sprintf "Cannot resolve the given tuple-internal expression to a object type: %A" other))
+    |> box
 
 let resolveExpressionResult (input: ExprRep list) =
     match input with
     | { Expr = Obj (res) } :: [] -> res
-    | { Expr = Tuple (items) } :: [] -> tupleToObj items |> box
+    | { Expr = Tuple (items) } :: [] -> tupleToObj items
     | otherTokens -> failwith (otherTokens |> List.fold (fun s t -> s + (sprintf "Unexpected result: %A" t.Expr)) "")
 
 let applyArgToLambda (l: LambdaRecord) (arg: obj) =
@@ -65,9 +66,19 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                                     | ({ Expr = Obj o } & oobj) :: [] -> oobj 
                                     | res -> SubExpressionIfNeeded res |> wrapit)
                         match reducedTuples |> Array.forall (function | {Expr = Obj o} -> true | _ -> false) with
-                        | true -> reducedTuples |> (fun tc -> Obj (tupleToObj tc |> box))
+                        | true -> reducedTuples |> tupleToObj |> Obj
                         | false -> reducedTuples |> Tuple |> Unresolved
                         |> wrapit |> Some           
+                    | ArrayBuilder ar ->
+                        let reducedArray = 
+                            ar |> Array.map (fun t -> 
+                                    match reduceExpressions [] [t] bindings |> fst  with 
+                                    | ({ Expr = Obj o } & oobj) :: [] -> oobj 
+                                    | res -> SubExpressionIfNeeded res |> wrapit)
+                        match reducedArray |> Array.forall (function | {Expr = Obj o} -> true | _ -> false) with
+                        | true -> reducedArray |> tupleToObj |> Obj
+                        | false -> reducedArray |> ArrayBuilder |> Unresolved
+                        |> wrapit |> Some            
                     | Unknown unk -> 
                         match bindings |> Map.tryFind unk with
                         | Some ComingLater when finalReduction -> raise <| BarbExecutionException(sprintf "Expected value not bound: %s" unk, (sprintf "%A" lists), exprOffset, exprLength)

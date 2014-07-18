@@ -675,3 +675,13 @@ let ``should support safe while syntax`` () =
     let result = predicate ()
     Assert.True(result)  
 
+[<Fact>]
+let ``barb should support F#-like array syntax`` () = 
+    let predicate = buildExpr<unit,int []> "[| 1; 2; 3; 4; 5 |]" in
+        let result = predicate ()
+        Assert.Equal<int []>([|1;2;3;4;5|], result) 
+    let predicate = buildExpr<unit,int []> "[|1;2;3;4;5|]" in
+        let result = predicate ()
+        Assert.Equal<int []>([|1;2;3;4;5|], result)  
+ 
+    

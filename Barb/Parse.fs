@@ -124,6 +124,10 @@ let generateTuple (exprs: ExprRep list) : ExprRep =
     let offset, length = exprRepListOffsetLength exprs in 
         { Offset = offset; Length = length; Expr = Tuple (exprs |> List.toArray) }
 
+let generateArray (exprs: ExprRep list) : ExprRep = 
+    let offset, length = exprRepListOffsetLength exprs in 
+        { Offset = offset; Length = length; Expr = ArrayBuilder (exprs |> List.toArray) }    
+
 let generateLambda (exprs: ExprRep list) : ExprRep = 
     match exprs with 
     | { Expr = SubExpression(names) } :: contents :: [] ->
@@ -192,6 +196,7 @@ let generateOr (exprs: ExprRep list) : ExprRep =
 let allExpressionTypes = 
     [
         { Pattern = [Open; RCap ","; Open];                         Func = generateTuple }
+        { Pattern = [SCap "[|"; RCap ";"; SCap "|]"];               Func = generateArray }   
         { Pattern = [Open; SCap "=>"; Open];                        Func = generateLambda }
         { Pattern = [SCap "fun"; SCap "->"; Open];                  Func = generateLambda }
         { Pattern = [SCap "if"; SCap "then"; SCap "else"; Open];    Func = generateIfThenElse }
