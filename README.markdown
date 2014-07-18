@@ -107,9 +107,9 @@ Barb can will also reflect into the real type of a given obj, which can be quite
 
 ...and some fancier ones from F#
 
-	buildExpr<unit,seq<int>>("{ 1 .. 5 }") // Returns 1,2,3,4,5
-	buildExpr<unit,seq<int>>("{ 1 .. 2 .. 10 }") // Returns 1,3,5,7,9
-	buildExpr<unit,seq<int>>("(1, 2, 3)") // Returns 1,2,3
+	buildExpr<unit,seq<int>>("{ 1 .. 5 }") // Returns 1,2,3,4,5 as a sequence
+	buildExpr<unit,seq<int>>("{ 1 .. 2 .. 10 }") // Returns 1,3,5,7,9 as a sequence
+	buildExpr<unit,int []>("[|1; 2; 3|]") // Returns 1,2,3 as an array
 
 ...all looping must currently be handled with lambda recursion
 
@@ -123,15 +123,17 @@ Language Details <a id="details" />
 #### Subexpression Forms ####
 	
 	Subscope: 				( <code> )
-	Tuple: 					... <code>, <code>, <code> ...
+	Tuple: 					... <code>, <code>, <code>, ...
+	Array:					[| <code>; <code>; <code>; ... |]
 	Lambda:		 			fun <binding> -> <code> ...
 	Lambda (alternate): 	<binding> => <code> ...
 	Branching:				if <code> then <code> else <code> ...
 	Indexing:				<obj>[ <code> ]
 	Binding:				let <name> = <code> in
 	Binding (Alternate*):	var <name> = <code> in
+	Nested Invocation:		<obj collection>..<Property/Method>
 	
-The '...' here indicates an unbounded expression and is not actual Barb syntax.  Any unbounded expression can be bounded implicitly by a parent expression or explicitly by creating a subscope with parentheses.
+Except in the case of nested invocation the '...' here indicates an unbounded expression and is not actual Barb syntax.  Any unbounded expression can be bounded implicitly by a parent expression or explicitly by creating a subscope with parentheses.
 
 *The var keyword may be used in the future to allow for locally mutable variables.
 
@@ -186,7 +188,6 @@ Items in the collection which do not support the invocation are skipped.
 #### Set Operator Semantics ####
 
 Any instance can be thought of as a one element set except for null, which indicates an empty set.  Any IEnumerable will be considered a set containing the number of unique elements within it.
-
 
 #### Null Semantics ####
 
