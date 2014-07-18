@@ -309,7 +309,6 @@ type MethodMatch =
     | PerfectMatch = 0 
     | GenericMatch = 1
     | LengthMatch = 2
-    | OneArgMatch = 3
     | NoMatch = 255
 
 let getMethodMatch (mi: MethodInfo) (prms: ParameterInfo []) (args: obj []) =
@@ -318,7 +317,6 @@ let getMethodMatch (mi: MethodInfo) (prms: ParameterInfo []) (args: obj []) =
         if zipped |> Seq.forall (fun (t,a) -> a = null || t.ParameterType = a.GetType()) then MethodMatch.PerfectMatch
         elif mi.IsGenericMethod then MethodMatch.GenericMatch             
         else MethodMatch.LengthMatch
-    elif prms.Length = 1 then MethodMatch.OneArgMatch
     else MethodMatch.NoMatch
 
 let resolveGenericByName (prm: ParameterInfo) (arg: obj) = 
