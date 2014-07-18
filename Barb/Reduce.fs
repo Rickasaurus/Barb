@@ -186,12 +186,6 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         [| for (o,mi) in osl do yield! executeUnitMethod o mi |> Option.toArray |] // Note: Currently Drops Elements Without the given Method
                         |> Array.map (fun res -> { lrep with Expr = res })
                         |> Tuple |> Some
-                // Execute a method with nested invoke
-                | Tuple t, Unit  
-                | Tuple t, Obj _ ->
-                    Tuple [| for e in t do 
-                                let res, _ = reduceExpressions [] ( e :: rrep :: [] ) bindings in 
-                                    yield { lrep with Expr = SubExpressionIfNeeded res } |] |> Some
                 // Execute some method given arguments r
                 | InvokableExpr exp, Obj r -> 
                     match exp with                                       
