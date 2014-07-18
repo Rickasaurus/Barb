@@ -315,38 +315,39 @@ let (|NewExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringW
     | _ -> let errorText = sprintf "Ambiguous expression match: %A" matches
            raise (new BarbParsingException(errorText, text.Offset, matches |> List.map (fun (s,e) -> s.Length) |> List.max |> uint32))
 
-let (|MatchOngoingExpression|_|) (text: StringWindow) (current: SubexpressionType) = 
-    match current.Pattern with
-    | (SCap h) :: rest when text.StartsWith(h) -> Some (h, { current with Pattern = rest })
-    | (RCap h) :: rest when text.StartsWith(h) -> Some (h, current)
-    | (RCap _) :: (SCap h) :: rest when text.StartsWith(h) -> Some (h, { current with Pattern = rest })
-    | _ -> None
     
 let (|OngoingExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringWindow) =
-        match typesStack with
-        | (RSubExpr (MatchOngoingExpression text (mtext, expr)), offset) :: parents -> 
-            (((RSubExpr expr, offset) :: parents), text.Subwindow(uint32 mtext.Length)) |> Some
-        | (USubExpr exprs, offset) :: parents -> 
-            match exprs |> List.choose (function | MatchOngoingExpression text (mtext, expr) -> Some (mtext, expr) | _ -> None) with
-            | [] -> None
-            // Refine to a single possible Subexpression type if possible
-            | [(mtext, expr)] -> (((RSubExpr expr, offset) :: parents), text.Subwindow(uint32 mtext.Length)) |> Some
-            // Otherwise reduce to only the longest matches
-            | many -> 
-                let longest, strlen = many |> List.allMaxBy (fun (mtext, expr) -> mtext.Length) 
-                let exprs = longest |> List.map snd
-                (((USubExpr exprs, offset) :: parents), text.Subwindow(uint32 strlen)) |> Some
+    let (|MatchOngoingExpression|_|) (current: SubexpressionType) = 
+        match current.Pattern with
+        | (SCap h) :: rest when text.StartsWith(h) -> Some (h, { current with Pattern = rest })
+        | (RCap h) :: rest when text.StartsWith(h) -> Some (h, current)
+        | (RCap _) :: (SCap h) :: rest when text.StartsWith(h) -> Some (h, { current with Pattern = rest })
         | _ -> None
+
+    match typesStack with
+    | (RSubExpr (MatchOngoingExpression (mtext, expr)), offset) :: parents -> 
+        (((RSubExpr expr, offset) :: parents), text.Subwindow(uint32 mtext.Length)) |> Some
+    | (USubExpr exprs, offset) :: parents -> 
+        let getMatchLen (txt: string, _) = txt.Length
+        match exprs |> List.choose (function | MatchOngoingExpression (mtext, expr) -> Some (mtext, expr) | _ -> None) with
+        | [] -> None
+        // Refine to a single possible Subexpression type if possible
+        | [(mtext, expr)] -> (((RSubExpr expr, offset) :: parents), text.Subwindow(uint32 mtext.Length)) |> Some
+        // Otherwise reduce to only the longest matches
+        | List.AllMaxBy (getMatchLen) (longest, strlen) -> 
+            let exprs = longest |> List.map snd
+            (((USubExpr exprs, offset) :: parents), text.Subwindow(uint32 strlen)) |> Some
+        | failed -> failwithf "Error in implementation of List.AllMaxBy. Example: %A" failed 
+    | _ -> None
 
 let (|RefineOpenExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringWindow) =
     let antimatch = getBestSimpleMappedSymbol text
     let matches, strlen = 
-        [ 
-            for ct in allExpressionTypes do 
-                match ct.Pattern with
-                | Open :: (SCap h) :: rest when text.StartsWith(h) -> yield h, { ct with Pattern = rest } 
-                | Open :: (RCap h) :: rest when text.StartsWith(h) -> yield h, { ct with Pattern = (RCap h) :: rest }
-                | _ -> ()
+        [ for ct in allExpressionTypes do 
+            match ct.Pattern with
+            | Open :: (SCap h) :: rest when text.StartsWith(h) -> yield h, { ct with Pattern = rest } 
+            | Open :: (RCap h) :: rest when text.StartsWith(h) -> yield h, { ct with Pattern = (RCap h) :: rest }
+            | _ -> ()
         ] |> List.allMaxBy (fun (m, rest) -> m.Length)   
     match matches, antimatch with
     | [], _ -> None

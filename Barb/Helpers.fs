@@ -39,6 +39,21 @@ module List =
             else wins, str) 
             ([], 0) 
 
+    let (|AllMaxBy|_|) (func: 'a -> int) (list: 'a list) =
+        let maxitems, maxlen = 
+            list |> List.fold (fun (wins,str) i ->
+                     let newstr = func i
+                     if newstr > str then [i], newstr
+                     elif newstr = str then i :: wins, str
+                     else wins, str) 
+                     ([], 0) 
+        match maxitems with
+        | [] -> None
+        | items -> Some (items, maxlen)
+       
+
+
+
 /// Used to ease reflection when building typed arrays
 /// Converts Array<object> to Array<T> where T is the given type.
 /// Caching of these converters is used because the process to build them is quite slow.
