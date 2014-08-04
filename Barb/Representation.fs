@@ -80,7 +80,8 @@ and ExprRep =
 
 and BindingContents = 
     | ComingLater
-    | Existing of ExprTypes Lazy
+    /// Offset -> Length -> ExprRep
+    | Existing of (uint32 -> uint32 -> ExprRep)
 
 and Bindings = (String, BindingContents) Map 
 
@@ -133,3 +134,5 @@ let (|ResolvedTuple|_|) (v: ExprTypes) =
         |> Array.map (function | Obj v -> v | other -> failwith (sprintf "Resolved tuple should only contian objects: %A" other))
         |> Some
     | _ -> None
+
+let wrapExistingBinding expr = (fun off len -> {Offset = off; Length = len; Expr = expr}) |> Existing

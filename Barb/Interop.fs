@@ -232,24 +232,24 @@ let getModulesByNamespaceName (namespaces: string Set) =
 let getContentsFromModule (modTyp: Type) = 
     // type MethodSig = ((obj array -> obj) * Type array) list
     seq {
+        let mkRepfun expr = fun off len -> { Offset = off; Length = len; Expr = expr }
         for mi in modTyp.GetMembers() do
             match mi with
             | :? PropertyInfo as pi -> 
                 match pi.GetIndexParameters() with
-                | [||] -> yield pi.Name, lazy ( pi.GetValue(null) |> Obj ) 
-                | prms -> yield pi.Name, lazy ( AppliedIndexedProperty(null, [pi]))
+                | [||] -> yield pi.Name, mkRepfun (pi.GetValue(null) |> Obj)
+                | prms -> yield pi.Name, mkRepfun <| AppliedIndexedProperty(null, [pi])
             // Actually Are F# Functions
             | :? MethodInfo as mi ->
                 // Wraps F# functions in the internal lambda type to provide partial application support
-                let lazyExpr =                 
-                    lazy (
-                        let numparams = mi.GetParameters().Length
-                        let mkRep expr = { Offset = 0u; Length = 0u; Expr = expr }  
-                        let prmStrs = [ for i = 0 to numparams - 1 do yield "x" + (string i) ]
-                        let innerExpr = SubExpression [ yield InvokableExpr <| AppliedMethod(null,  [mi]) |> mkRep; yield prmStrs |> List.map (fun s -> Unknown s |> mkRep) |> List.toArray |> Tuple |> mkRep]
-                        { Params = prmStrs; Bindings = Map.empty; Contents = innerExpr |> mkRep} |> Lambda)
+                let lazyExpr off len =                 
+                    let numparams = mi.GetParameters().Length
+                    let mkRep expr = { Offset = off; Length = len; Expr = expr }  
+                    let prmStrs = [ for i = 0 to numparams - 1 do yield "x" + (string i) ]
+                    let innerExpr = SubExpression [ yield InvokableExpr <| AppliedMethod(null,  [mi]) |> mkRep; yield prmStrs |> List.map (fun s -> Unknown s |> mkRep) |> List.toArray |> Tuple |> mkRep]
+                    { Params = prmStrs; Bindings = Map.empty; Contents = innerExpr |> mkRep} |> Lambda |> mkRep
                 yield mi.Name, lazyExpr                    
-            | :? FieldInfo as fi ->    yield fi.Name, lazy ( fi.GetValue(null) |> Obj )
+            | :? FieldInfo as fi ->    yield fi.Name, mkRepfun ( fi.GetValue(null) |> Obj )
             | _ -> ()
     }
 

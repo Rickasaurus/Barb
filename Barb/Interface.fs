@@ -42,10 +42,10 @@ module Compiler =
         let moduleBindings = 
             getModulesByNamespaceName data.Settings.Namespaces
             |> Seq.collect getContentsFromModule 
-            |> Seq.map (fun (n,lexpr) -> n, Existing lexpr)
+            |> Seq.map (fun (n,lexpr) -> n, Existing <| lexpr)
         
         let additionalBindings =
-            data.Settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, (Existing <| lazy (Obj kv.Value)))
+            data.Settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, wrapExistingBinding (Obj kv.Value))
             
         let allBindings = 
             // memberMap last to ensure those overwrite anything conflicting from the others
@@ -77,11 +77,11 @@ module Compiler =
             |> Map.ofSeq 
 
         let additionalBindings =
-            data.Settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, (Existing <| lazy (Obj kv.Value)))
+            data.Settings.AdditionalBindings |> Seq.map (fun kv -> kv.Key, wrapExistingBinding (Obj kv.Value ))
 
         let calculateResult input = 
             let applyToMember (mi: MethodInfo list) = lazy (AppliedMethod(input, mi))
-            let inputBindings = memberMap |> Map.map (fun k prop -> Existing <| lazy prop input)
+            let inputBindings = memberMap |> Map.map (fun k prop -> prop input |> wrapExistingBinding)
 
             #if DEBUG
             let ibOutput = Environment.NewLine + (sprintf "IB: %A" inputBindings) + Environment.NewLine in

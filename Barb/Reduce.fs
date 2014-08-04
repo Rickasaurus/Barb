@@ -35,7 +35,7 @@ let applyArgToLambda (l: LambdaRecord) (arg: obj) =
     match l.Params with
     | [] -> failwith (sprintf "Unexpected Lambda Argument %A" arg)
     | bindname :: restprms ->
-        let bindings = l.Bindings |> Map.add bindname (Existing (Obj arg |> Lazy.CreateFromValue))
+        let bindings = l.Bindings |> Map.add bindname (wrapExistingBinding (Obj arg))
         Lambda({ l with Params = restprms; Bindings = bindings })
 
 let inline SubExpressionIfNeeded (input: ExprRep list): ExprTypes =   
@@ -87,7 +87,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         match bindings |> Map.tryFind unk with
                         | Some ComingLater when finalReduction -> raise <| BarbExecutionException(sprintf "Expected value not bound: %s" unk, (sprintf "%A" lists), exprOffset, exprLength)
                         | Some ComingLater -> None
-                        | Some (Existing v) -> v.Force() |> wrapit |> Some
+                        | Some (Existing v) -> v exprOffset exprLength |> Some
                         | None when finalReduction -> raise <| BarbExecutionException(sprintf "Specified unknown was unable to be resolved: %s" unk, (sprintf "%A" lists), exprOffset, exprLength)
                         | None -> None
                     | AppliedProperty(o, p) -> p.GetValue(o, [||]) |> Returned |> wrapit |> Some
@@ -291,15 +291,15 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                     let cleanBinds = lambda.Params |> List.fold (fun bnds pn -> if bnds |> Map.containsKey pn then bnds |> Map.remove pn else bnds) bindings         
                     let reducedExpr, _ = reduceExpressions [] [lambda.Contents] cleanBinds
                     let recLambda = 
-                        let newLambda = {lambda with Contents = { lambda.Contents with Expr = SubExpressionIfNeeded reducedExpr }}
-                        do newLambda.Bindings <- newLambda.Bindings |> Map.add bindName (Existing (Lambda newLambda |> Lazy.CreateFromValue))
+                        let newLambda = {lambda with Contents = { lambda.Contents with Expr = SubExpressionIfNeeded reducedExpr }}   
+                        do newLambda.Bindings <- newLambda.Bindings |> Map.add bindName (newLambda |> Lambda |> wrapExistingBinding)
                         { lmbExpr with Expr = Lambda newLambda }
-                    let newbindings = bindings |> Map.add bindName (Existing (lazy recLambda.Expr))
+                    let newbindings = bindings |> Map.add bindName (wrapExistingBinding recLambda.Expr)
                     let res = { bindExpr with Expr = reduceExpressions [] [boundScope] newbindings |> fst |> SubExpressionIfNeeded }
                     reduceExpressions left (res :: rt) newbindings
             // Normal Value Binding
             | rexpr -> 
-                let newbindings = bindings |> Map.add bindName (Existing (lazy SubExpressionIfNeeded rexpr)) in
+                let newbindings = bindings |> Map.add bindName (wrapExistingBinding (SubExpressionIfNeeded rexpr)) in
                     let res = { bindExpr with Expr = reduceExpressions [] [boundScope] newbindings |> fst |> SubExpressionIfNeeded }
                     reduceExpressions left (res :: rt) bindings
         | ResolveSingle bindings (res, lt, rt)
