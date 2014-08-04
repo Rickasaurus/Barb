@@ -239,8 +239,9 @@ let getContentsFromModule (modTyp: Type) =
                 | [||] -> yield pi.Name, lazy ( pi.GetValue(null) |> Obj ) 
                 | prms -> yield pi.Name, lazy ( AppliedIndexedProperty(null, [pi]))
             // Actually Are F# Functions
-            | :? MethodInfo as mi -> 
-                let lazyExpr = 
+            | :? MethodInfo as mi ->
+                // Wraps F# functions in the internal lambda type to provide partial application support
+                let lazyExpr =                 
                     lazy (
                         let numparams = mi.GetParameters().Length
                         let mkRep expr = { Offset = 0u; Length = 0u; Expr = expr }  
