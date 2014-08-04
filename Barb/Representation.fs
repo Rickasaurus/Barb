@@ -43,16 +43,14 @@ and ExprTypes =
     | AppliedMultiProperty of (obj * PropertyInfo) list
     | AppliedInvoke of int * string // where int is the collection depth to perform the invocation, 0 is top level    
     | AppliedIndexedProperty of obj * PropertyInfo list
-    | RecordUpdate of string * (string * ExprRep) list
     | FieldGet of FieldInfo list
     | Obj of obj
-    | Returned of obj
     | Prefix of (obj -> obj)    
     | Postfix of (obj -> obj)
     | Infix of int * (obj -> obj -> obj) 
     | IndexArgs of ExprRep
     | Unknown of string
-    (* Containers *)
+    (* Multi-Subexpression Containers *)
     | SubExpression of ExprRep list
     | Tuple of ExprRep array
     | ArrayBuilder of ExprRep array
@@ -65,6 +63,8 @@ and ExprTypes =
     | And of ExprRep * ExprRep
     | Or of ExprRep * ExprRep
     (* Tags *)
+    // Returned by a .NET call of some kind
+    | Returned of obj
     // Has no Unknowns
     | Resolved of ExprTypes
     // Has Unknowns
