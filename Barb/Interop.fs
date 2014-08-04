@@ -238,7 +238,16 @@ let getContentsFromModule (modTyp: Type) =
                 match pi.GetIndexParameters() with
                 | [||] -> yield pi.Name, lazy ( pi.GetValue(null) |> Obj ) 
                 | prms -> yield pi.Name, lazy ( AppliedIndexedProperty(null, [pi]))
-            | :? MethodInfo as mi ->   yield mi.Name, lazy ( InvokableExpr <| AppliedMethod(null,  [mi]))
+            // Actually Are F# Functions
+            | :? MethodInfo as mi -> 
+                let lazyExpr = 
+                    lazy (
+                        let numparams = mi.GetParameters().Length
+                        let mkRep expr = { Offset = 0u; Length = 0u; Expr = expr }  
+                        let prmStrs = [ for i = 0 to numparams - 1 do yield "x" + (string i) ]
+                        let innerExpr = SubExpression [ yield InvokableExpr <| AppliedMethod(null,  [mi]) |> mkRep; yield prmStrs |> List.map (fun s -> Unknown s |> mkRep) |> List.toArray |> Tuple |> mkRep]
+                        { Params = prmStrs; Bindings = Map.empty; Contents = innerExpr |> mkRep} |> Lambda)
+                yield mi.Name, lazyExpr                    
             | :? FieldInfo as fi ->    yield fi.Name, lazy ( fi.GetValue(null) |> Obj )
             | _ -> ()
     }

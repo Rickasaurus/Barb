@@ -28,7 +28,7 @@ let ``Barb should be able to call simple generic functions with two parameters o
     let namespaces = BarbSettings.Default.Namespaces |> Set.add "Barb.Tests.PredicateLanguageGenericInteropTests"
     let settings = { BarbSettings.Default with Namespaces = namespaces } 
 
-    let pred = "returnsecond (10, \"Hello\")"
+    let pred = "returnsecond 10 \"Hello\""
 
     let func = new BarbFunc<unit,string>(pred, settings)
     let res = func.Execute()

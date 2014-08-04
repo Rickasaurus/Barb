@@ -11,6 +11,7 @@ open Xunit
 module TestModule1 = 
     let one = 1
     let addOne (n: int) = n + 1
+    let addTwoNumbers (n: int) (m: int) = n + m
 
 let two = 2
 let addTwo (n: int) = n + 2
@@ -43,6 +44,16 @@ let ``Barb should be able to open a module as if it were a namespace and access 
     let func = new BarbFunc<IntRec,int>(pred, settings)
     let res = func.Execute({ Num = 1 })
     Assert.Equal(2, res)
+
+[<Fact>]
+let ``Barb should be able to open a module as if it were a namespace and access a curried function`` () =
+    let namespaces = BarbSettings.Default.Namespaces |> Set.add "Barb.Tests.FSharpInteropTests.TestModule1"
+    let settings = { BarbSettings.Default with Namespaces = namespaces } 
+    let pred = "addTwoNumbers Num 10"
+    let func = new BarbFunc<IntRec,int>(pred, settings)
+    let res = func.Execute({ Num = 1 })
+    Assert.Equal(11, res)
+
 
 [<Fact>]
 let ``Barb should be able to open a top level module as if it were a namespace and access a function`` () =
