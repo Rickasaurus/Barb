@@ -103,12 +103,19 @@ let (|CaptureString|_|) (b: char) (text: StringWindow) : MatchReturn =
             if i >= text.Length then failwith "Quotes not matched"
             elif text.[i] = '\\' then findSafeIndex(i + 1u)
             elif text.[i] = b && text.[i - 1u] <> '\\' then 
-                let tokenStr = Some (Obj (sb.ToString() :> obj))
+                let tokenStr = Some (Obj (sb.ToString()))
                 let rest = text.Subwindow(i + 1u)
                 Some (tokenStr, rest)
             else sb.Append(text.[i]) |> ignore; findSafeIndex (i + 1u)
         findSafeIndex 1u
     else None  
+
+let (|CaptureChar|_|) (b: char) (text: StringWindow) : MatchReturn = 
+    if text.[0u] = b then 
+        if text.[2u] <> b then failwith "Incorrect character syntax."
+        Some (Some <| Obj text.[1u], text.Subwindow(3u))
+    else None  
+
 
 let (|CaptureUnknown|_|) (endTokens: string list) (text: StringWindow) : MatchReturn =
     let endIndices = 
@@ -429,6 +436,7 @@ let parseProgram (startText: string) =
                 | Skip whitespaceVocabulary res
                 | Num res
                 | MapSymbol res
+                | CaptureChar '`' res
                 | CaptureString '"' res
                 | CaptureString ''' res 
                 | CaptureUnknown endUnknownChars res ->

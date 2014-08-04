@@ -7,6 +7,8 @@ open Barb.Representation
 
 open Xunit
 
+type TestVal<'a> = { V: 'a }
+
 type DudeRecord = { Name: string; Sex: char }
 
 type ParentWithObject = { State: string; Data: obj }
@@ -348,4 +350,10 @@ let ``should properly be able to call a method of two paramters on an array of o
    let pred = buildExpr<BoxBox,string []> "Value..Replace('The', '')"
    let res = pred bb 
    Assert.True((res = [|" Dude"|]))
-    
+   
+[<Fact>]
+let ``should properly be able to call a method of that takes an array of chars with an array of strings wit dotdot syntax`` () =
+   let bb = { V = "The Dude" }
+   let pred = buildExpr<TestVal<string>,string []> "V.Split([|` `|])"
+   let res = pred bb 
+   Assert.True((res = [|"The"; "Dude"|]))

@@ -129,19 +129,6 @@ let rec resolveResultType (output: obj) =
     | other -> Obj other
 
 let fieldToExpr (fld: FieldInfo list) = fld |> FieldGet
-//    fun (obj: obj) ->
-//        fld.GetValue(obj, null) |> Returned
-
-//let staticPropertyToExpr (rtype: System.Type) (prop: PropertyInfo) = 
-//    match prop.GetIndexParameters() with
-//    | [||] ->
-//       let propexp = Expression.Property(null, prop)
-//        let lambda = Expression.Lambda(propexp)
-//        let compiledLambda = lambda.Compile()
-//        (fun obj -> compiledLambda.DynamicInvoke() |> Returned)
-//    | prms -> 
-//        let typeArgs = prms |> Array.map (fun pi -> pi.ParameterType)
-//        (fun (obj: obj) -> [(fun args -> prop.GetValue(obj, args)), typeArgs] |> IndexedProperty)
 
 let validateProperty (prop: PropertyInfo)  =
     match prop.GetIndexParameters() with
@@ -297,6 +284,7 @@ let rec convertToTargetType (ttype: Type) (param: obj) =
     | null -> Some null
     // Special Case For speed
     | :? (obj []) as objs when ttype = typeof<string[]> -> Array.ConvertAll(objs, fun v -> v :?> string) |> box |> Some 
+    | :? (obj []) as objs when ttype = typeof<char[]> -> Array.ConvertAll(objs, fun v -> v :?> char) |> box |> Some 
     | :? (obj []) as objs when ttype = typeof<int64[]>  -> Array.ConvertAll(objs, fun v -> v :?> int64) |> box |> Some 
     | :? (obj []) as objs when ttype = typeof<int32[]>  -> Array.ConvertAll(objs, fun v -> v :?> int64 |> int) |> box |> Some 
     | _ when ttype.IsGenericType && ttype.GetGenericTypeDefinition() = typedefof<_ option> -> 
@@ -306,7 +294,7 @@ let rec convertToTargetType (ttype: Type) (param: obj) =
         | None -> None
     | DecomposeOption value -> convertToTargetType ttype param 
     | _ when ttype.IsGenericTypeDefinition -> Some param   
-    | _ when ttype = typeof<IEnumerable> && param.GetType() = typeof<string> -> Some ([| param |] |> box)
+    | :? string when ttype = typeof<IEnumerable> -> Some ([| param |] |> box)
     | _ when ttype.IsAssignableFrom(param.GetType()) -> Some param
     | _ when ttype = typeof<IEnumerable> -> Some ([| param |] |> box)
     | _ ->

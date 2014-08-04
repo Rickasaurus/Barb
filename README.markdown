@@ -165,6 +165,13 @@ Except in the case of nested invocation the '...' here indicates an unbounded ex
     =)              Is Superset
     (=              Is Subset
 
+#### Strings and Chars ####
+
+Strings and chars are a bit odd in Barb in order to avoid escaping in various file formats such as JSON.
+
+    " "	or ' '		Define String
+    ` `				Define Char
+
 #### Nested Invocation ####
 
 In Barb you can invoke the same method or property on a set of objects and then get the result quite easily:
