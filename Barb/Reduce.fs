@@ -3,6 +3,7 @@
 open System
 open System.Collections
 open System.Collections.Concurrent
+open System.Reflection
 
 open Barb.Interop
 open Barb.Representation
@@ -185,26 +186,42 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 // Execute a parameterless method
                 | InvokableExpr exp, Unit -> 
                     match exp with
-                    | AppliedMethod (o,l) -> executeUnitMethod o l |> Returned |> Some
-                    | AppliedMultiMethod (osl) -> 
-                        [| for (o,mi) in osl do yield executeUnitMethod o mi |]
-                        |> Array.map (fun res -> { lrep with Expr = res |> Returned })
-                        |> ArrayBuilder |> Some
+                    | AppliedMethod (o,l) -> 
+                        try executeUnitMethod o l |> Returned |> Some
+                        with | (:? TargetInvocationException as ex) -> 
+                                raise <| BarbExecutionException("Exception occured while invoking a unit method: " + ex.InnerException.Message, sprintf "%A" (l,r), rOffset, rLength)
+                    | AppliedMultiMethod (osl) ->
+                        try 
+                            [| for (o,mi) in osl do yield executeUnitMethod o mi |]
+                            |> Array.map (fun res -> { lrep with Expr = res |> Returned })
+                            |> ArrayBuilder |> Some
+                        with | (:? TargetInvocationException as ex) -> 
+                                raise <| BarbExecutionException("Exception occured while multi invoking a unit method: " + ex.InnerException.Message, sprintf "%A" (l,r), rOffset, rLength)
                 // Execute some method given arguments 
                 | InvokableExpr exp, ResolvedTuple r -> 
                     match exp with                                       
-                    | AppliedMethod (o,l) -> executeParameterizedMethod o l r |> Returned |> Some
+                    | AppliedMethod (o,l) -> 
+                        try executeParameterizedMethod o l r |> Returned |> Some
+                        with | (:? TargetInvocationException as ex) -> raise <| BarbExecutionException("Exception occured while invoking a method: " + ex.InnerException.Message, sprintf "%A" (l,r), rOffset, rLength)
                     | AppliedMultiMethod (osl) -> 
-                        [| for (o,mi) in osl do yield executeParameterizedMethod o mi r |> Returned |] 
-                        |> Array.map (fun res -> { lrep with Expr = res })
-                        |> ArrayBuilder |> Some
+                        try
+                            [| for (o,mi) in osl do yield executeParameterizedMethod o mi r |> Returned |] 
+                            |> Array.map (fun res -> { lrep with Expr = res })
+                            |> ArrayBuilder |> Some
+                        with | (:? TargetInvocationException as ex) -> 
+                                raise <| BarbExecutionException("Exception occured while multi invoking a method: " + ex.InnerException.Message, sprintf "%A" (l,r), rOffset, rLength)
                 | InvokableExpr exp, Obj r -> 
                     match exp with                                       
-                    | AppliedMethod (o,l) -> executeParameterizedMethod o l [|r|] |> Returned |> Some
+                    | AppliedMethod (o,l) -> 
+                        try executeParameterizedMethod o l [|r|] |> Returned |> Some
+                        with | (:? TargetInvocationException as ex) -> raise <| BarbExecutionException("Exception occured while invoking a method on an external object: " + ex.InnerException.Message, sprintf "%A" (l,r), rOffset, rLength)
                     | AppliedMultiMethod (osl) -> 
-                        [| for (o,mi) in osl do yield executeParameterizedMethod o mi [|r|] |> Returned |] 
-                        |> Array.map (fun res -> { lrep with Expr = res })
-                        |> ArrayBuilder |> Some
+                        try
+                            [| for (o,mi) in osl do yield executeParameterizedMethod o mi [|r|] |> Returned |] 
+                            |> Array.map (fun res -> { lrep with Expr = res })
+                            |> ArrayBuilder |> Some
+                        with | (:? TargetInvocationException as ex) -> 
+                                raise <| BarbExecutionException("Exception occured while multi invoking a method on an external object: " + ex.InnerException.Message, sprintf "%A" (l,r), rOffset, rLength)                       
                 // Perform a .NET-Application wide scope invocation
                 | Unknown l, AppliedInvoke (depth, name) when depth = 0 && finalReduction || settings.BindGlobalsWhenReducing -> 
                     let mis = cachedResolveStatic (settings.Namespaces, l, name)

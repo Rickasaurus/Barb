@@ -2,6 +2,7 @@
 
 open System
 
+open Barb
 open Barb.Compiler
 open Barb.Parse
 open Barb.Representation
@@ -107,3 +108,29 @@ let ``should throw an appropriate exception calling a non-existing property on a
     with | (:? BarbException as ex) -> 
         Assert.Equal<String>("Unable to find member Hello in object of type ColElement", ex.Message)
         Assert.Equal<String>("C@..Hello@ = ('One','Two','Three')", showOffset code ex.Offset ex.Length)
+
+let failFun () = failwith "This function failed."; 0
+
+[<Fact>]
+let ``should properly report an exception thrown inside of a called function`` () =
+    let settings = { BarbSettings.Default with Namespaces = BarbSettings.Default.Namespaces |> Set.add "ErrorReportingTests" }
+    let code = "failFun()"
+    let func = new BarbFunc<unit,int>(code, settings)
+    try 
+        func.Execute() |> ignore
+        Assert.True(false)
+    with | (:? BarbException as ex) ->
+        Assert.Equal<String>("Exception occured while invoking a method: This function failed.", ex.Message)
+        Assert.Equal<String>("@failFun@()", showOffset code ex.Offset ex.Length)
+
+[<Fact>]
+let ``should properly report an exception thrown inside of a called unit function`` () =
+    let settings = { BarbSettings.Default with Namespaces = BarbSettings.Default.Namespaces |> Set.add "ErrorReportingTests" }
+    let code = "failFun ()"
+    let func = new BarbFunc<unit,int>(code, settings)
+    try 
+        func.Execute() |> ignore
+        Assert.True(false)
+    with | (:? BarbException as ex) ->
+        Assert.Equal<String>("Exception occured while invoking a method: This function failed.", ex.Message)
+        Assert.Equal<String>("@failFun@ ()", showOffset code ex.Offset ex.Length)
