@@ -5,6 +5,7 @@ open System
 open Barb
 open Barb.Compiler
 open Barb.Parse
+open Barb.Reduce
 open Barb.Representation
 
 open Xunit
@@ -115,11 +116,11 @@ let failFun () = failwith "This function failed."; 0
 let ``should properly report an exception thrown inside of a called function`` () =
     let settings = { BarbSettings.Default with Namespaces = BarbSettings.Default.Namespaces |> Set.add "ErrorReportingTests" }
     let code = "failFun()"
-    let func = new BarbFunc<unit,int>(code, settings)
     try 
+        let func = new BarbFunc<unit,int>(code, settings)
         func.Execute() |> ignore
         Assert.True(false)
-    with | (:? BarbException as ex) ->
+    with | (:? BarbExecutionException as ex) ->
         Assert.Equal<String>("Exception occured while invoking a method: This function failed.", ex.Message)
         Assert.Equal<String>("@failFun@()", showOffset code ex.Offset ex.Length)
 
@@ -127,10 +128,10 @@ let ``should properly report an exception thrown inside of a called function`` (
 let ``should properly report an exception thrown inside of a called unit function`` () =
     let settings = { BarbSettings.Default with Namespaces = BarbSettings.Default.Namespaces |> Set.add "ErrorReportingTests" }
     let code = "failFun ()"
-    let func = new BarbFunc<unit,int>(code, settings)
     try 
+        let func = new BarbFunc<unit,int>(code, settings)
         func.Execute() |> ignore
         Assert.True(false)
-    with | (:? BarbException as ex) ->
+    with | (:? BarbExecutionException as ex) ->
         Assert.Equal<String>("Exception occured while invoking a method: This function failed.", ex.Message)
         Assert.Equal<String>("@failFun@ ()", showOffset code ex.Offset ex.Length)

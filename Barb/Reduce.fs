@@ -221,7 +221,8 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                     match exp with                                       
                     | AppliedMethod (o,l) -> 
                         try executeParameterizedMethod o l [|r|] |> Returned |> Some
-                        with | (:? TargetInvocationException as ex) -> raise <| BarbExecutionException("Exception occured while invoking a method on an external object: " + ex.InnerException.Message, sprintf "%A" (l,r), rOffset, rLength)
+                        with | (:? TargetInvocationException as ex) -> 
+                                    raise <| BarbExecutionException("Exception occured while invoking a method on an external object: " + ex.InnerException.Message, sprintf "%A" (l,r), rOffset, rLength)
                     | AppliedMultiMethod (osl) -> 
                         try
                             [| for (o,mi) in osl do yield executeParameterizedMethod o mi [|r|] |> Returned |] 
