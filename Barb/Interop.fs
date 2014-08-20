@@ -430,7 +430,11 @@ let executeUnitMethod (o: obj) (sigs: MethodInfo list) =
        | Some (mi, paramTypes) -> mi.Invoke(o, [||])
        | None -> failwithf "Unable to find a method with no parameters for unit invocation for: %A" o
 
-let executeIndexer (o: obj) (sigs: PropertyInfo list) (param: obj) =
+let executeIndexer (o: obj) (sigs: PropertyInfo list) (prms: obj []) =
+    let param = 
+        if prms.Length > 1 then failwith "Index args over length 1 are not currently supported"
+        else prms.[0]
+
     sigs 
     |> List.map (fun (mi: PropertyInfo) -> mi, mi.GetIndexParameters() |> Array.map (fun p -> p.ParameterType))
     |> List.tryFind (fun (mi, paramTypes) -> paramTypes.Length = 1)
@@ -462,7 +466,11 @@ let cachedResolveObjectIndexer =
     let resolveValue rtype = resolveObjectIndexer rtype
     memoizeBy inputToKey resolveValue
 
-let callIndexedProperty (target: obj) (indexVal: obj) =    
+let callIndexedProperty (target: obj) (indexArgs: obj []) =
+    let indexVal = 
+        if indexArgs.Length > 1 then failwith "Index args over length 1 are not currently supported on external objects"
+        else indexArgs.[0]
+    
     if target = null then Some <| Obj null
     else
         let ttype = target.GetType()

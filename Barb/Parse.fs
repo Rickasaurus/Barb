@@ -186,8 +186,8 @@ let makeNumIterator: ExprRep list -> ExprRep =
     | list -> failwith (sprintf "Incorrect generator syntax: %A" list)
 
 let makeIndexArgs (exprs: ExprRep list) : ExprRep = 
-    let offset, length = exprRepListOffsetLength exprs
-    { Offset = offset; Length = length; Expr = IndexArgs <| { Offset = offset; Length = length; Expr = SubExpression exprs } }
+    let offset, length = exprRepListOffsetLength exprs in 
+        { Offset = offset; Length = length; Expr = IndexArgs (exprs |> List.toArray) }
 
 let makeBind : ExprRep list -> ExprRep = 
     function
@@ -219,9 +219,9 @@ let allExpressionTypes =
         { Pattern = [SCap "if"; SCap "then"; SCap "else"; Open];    Func = makeIfThenElse }
         { Pattern = [SCap "("; SCap ")"];                           Func = makeUnitOrSubExpression }
         { Pattern = [SCap "{"; RCap ".."; SCap "}"];                Func = makeNumIterator }
-        { Pattern = [SCap "["; SCap "]"];                           Func = makeIndexArgs }
+        { Pattern = [SCap "["; RCap ","; SCap "]"];                 Func = makeIndexArgs }
 //        { Pattern = [SCap "let"; SCap "="; Open];                   Func = makeBind }
-        { Pattern = [SCap "let"; SCap "="; SCap "in"; Open];              Func = makeBind }
+        { Pattern = [SCap "let"; SCap "="; SCap "in"; Open];        Func = makeBind }
 //        { Pattern = [SCap "var"; SCap "="; Open];                   Func = makeBind }
         { Pattern = [SCap "var"; SCap "="; SCap "in"; Open];        Func = makeBind }
         { Pattern = [Open; SCap "and"; Open];                       Func = makeAnd }

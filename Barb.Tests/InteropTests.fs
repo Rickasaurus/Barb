@@ -267,9 +267,11 @@ type StrArrayType = { Strs: string array }
 
 [<Fact>]
 let ``records contents should be resolved within lambdas`` () =
-    let func = buildExpr<StrArrayType, int> "let f = (fun i -> if i >= Strs.Length then 0 else (f (i + 1)) + Strs.[i].Length) in f 0"
-    let res = func { Strs = [|"1"; "22"; "333" |] }
-    Assert.Equal(6, res)
+    try
+        let func = buildExpr<StrArrayType, int> "let f = (fun i -> if i >= Strs.Length then 0 else (f (i + 1)) + Strs.[i].Length) in f 0"
+        let res = func { Strs = [|"1"; "22"; "333" |] }
+        Assert.Equal(6, res)
+    with | :? BarbException as ex -> raise ex
 
 type StaticTestThingy () =
     static let mutable x = 0

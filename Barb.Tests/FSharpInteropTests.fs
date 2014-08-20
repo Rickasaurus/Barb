@@ -1,6 +1,7 @@
 ﻿module Barb.Tests.FSharpInteropTests
 
 open System
+open System.IO
 
 open Barb
 open Barb.Compiler
@@ -79,3 +80,28 @@ let ``Barb should be able to wrap and convert a result in an option type``() =
     let func = new BarbFunc<unit,int option>(pred, settings)
     let res = func.Execute()
     Assert.Equal(Some 99, res)
+
+
+let getFirstLine (file: string) = 
+    File.ReadLines(file) |> Seq.head
+
+[<Fact>]
+let ``Barb should properly load a file only once when returned from a function``() =
+    let filename = Path.GetRandomFileName()
+    try
+        let code = String.Format("getFirstLine '{0}'", filename);
+        let settings = { BarbSettings.Default with Namespaces = BarbSettings.Default.Namespaces |> Set.add "Barb.Tests.FSharpInteropTests" }
+
+        let firstContents = [|"one"|] 
+        File.WriteAllLines(filename, firstContents)
+        Assert.True(File.Exists(filename))
+
+        let bf = BarbFunc<unit,string>(code, settings)
+        Assert.Equal<string>("one", bf.Execute())
+
+        let secondContents = [|"two"|] 
+        File.Delete(filename)
+        File.WriteAllLines(filename, secondContents)
+        Assert.Equal<string>("one", bf.Execute())
+    finally
+        if File.Exists filename then File.Delete filename

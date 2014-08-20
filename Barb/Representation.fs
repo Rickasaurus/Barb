@@ -48,7 +48,7 @@ and ExprTypes =
     | Prefix of (obj -> obj)    
     | Postfix of (obj -> obj)
     | Infix of int * (obj -> obj -> obj) 
-    | IndexArgs of ExprRep
+    | IndexArgs of ExprRep array
     | Unknown of string
     (* Multi-Subexpression Containers *)
     | SubExpression of ExprRep list
@@ -111,7 +111,7 @@ and exprExists (pred: ExprTypes -> bool) (expr: ExprTypes) =
     | _ when pred expr -> true 
     | SubExpression (repList) -> repList |> List.exists (exprExistsInRep pred)
     | Tuple (repArray) -> repArray |> Array.exists (exprExistsInRep pred)
-    | IndexArgs (rep) -> exprExistsInRep pred rep
+    | IndexArgs (repArray) -> repArray |> Array.exists (exprExistsInRep pred)
     | BVar (name, rep, scopeRep) -> 
         exprExistsInRep pred rep || exprExistsInRep pred scopeRep
     | Lambda (lambda) -> exprExistsInRep pred (lambda.Contents)
@@ -134,5 +134,14 @@ let (|ResolvedTuple|_|) (v: ExprTypes) =
         |> Array.map (function | Obj v -> v | other -> failwith (sprintf "Resolved tuple should only contian objects: %A" other))
         |> Some
     | _ -> None
+
+let (|ResolvedIndexArgs|_|) (v: ExprTypes) =
+    match v with 
+    | Resolved(IndexArgs tc) -> 
+        tc |> Array.map (fun ex -> ex.Expr) 
+        |> Array.map (function | Obj v -> v | other -> failwith (sprintf "Resolved index args should only contian objects: %A" other))
+        |> Some
+    | _ -> None
+
 
 let wrapExistingBinding expr = (fun off len -> {Offset = off; Length = len; Expr = expr}) |> Existing

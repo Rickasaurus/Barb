@@ -58,12 +58,15 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         | single :: [] -> single
                         | many -> SubExpression many |> Unresolved |> wrapit
                         |> Some
-                    | IndexArgs ({ Expr = SubExpression exp }) when finalReduction ->
-                        match reduceExpressions [] exp bindings |> fst |> List.rev with
-                        | [] -> failwith "No indexer found in [ ]"
-                        | single :: [] -> IndexArgs single |> wrapit
-                        | other -> failwith "Indexer could not be fully reduced"
-                        |> Some
+                    | IndexArgs tc -> 
+                        let reducedTuples = 
+                            tc |> Array.map (fun t -> 
+                                    match reduceExpressions [] [t] bindings |> fst  with 
+                                    | res -> SubExpressionIfNeeded res |> wrapit)
+                        match reducedTuples |> Array.forall (function | {Expr = Obj o} -> true | _ -> false) with
+                        | true -> reducedTuples |> IndexArgs |> Resolved
+                        | false -> reducedTuples |> IndexArgs |> Unresolved
+                        |> wrapit |> Some           
                     | Tuple tc -> 
                         let reducedTuples = 
                             tc |> Array.map (fun t -> 
@@ -123,10 +126,14 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                             let repThen = { thenexpr with Expr = reduceExpressions [] [thenexpr] bindings |> fst |> List.rev |> SubExpressionIfNeeded }
                             let repElse = { elseexpr with Expr = reduceExpressions [] [elseexpr] bindings |> fst |> List.rev |> SubExpressionIfNeeded }
                             IfThenElse (repIf, repThen, repElse) |> Unresolved |> wrapit |> Some
-                    // Execute Lambda when fully applied, but only on final reduction to preserve semantics
-                    | Lambda ({Params = []} & l) when finalReduction -> 
-                        let totalBindings = Seq.concat [(Map.toSeq initialBindings); (Map.toSeq l.Bindings)] |> Map.ofSeq
-                        reduceExpressions [] [l.Contents] totalBindings |> fst |> SubExpressionIfNeeded |> wrapit |> Some
+                    // Execute Lambda when fully applied but abort if it doesn't fully reduce
+                    | Lambda {Params = []; Contents = lambdaContents; Bindings = lambdaBindings } -> 
+                        let totalBindings = Seq.concat [(Map.toSeq initialBindings); (Map.toSeq lambdaBindings)] |> Map.ofSeq
+                        match reduceExpressions [] [lambdaContents] totalBindings |> fst with
+                        | {Expr = SubExpression (v :: [])} :: _ -> v |> Some
+                        | {Expr = SubExpression _ } :: _ -> None
+                        | result :: [] -> result |> Some
+                        | many -> None
                     | And (lExpr, rExpr) ->
                         // Left and side of the And 
                         match reduceExpressions [] [lExpr] bindings |> fst with
@@ -242,13 +249,14 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 | Invoke, Unknown r -> AppliedInvoke (0, r) |> Some
                 // Here for F#-like indexing, the invoking '.' is simply removed 
                 | Invoke, IndexArgs r -> IndexArgs r |> Some
+                | Invoke, (ResolvedIndexArgs r) & rhs -> rhs |> Some
                 // Invoke on null should always be null
                 | Obj null, AppliedInvoke _ -> Obj null |> Some
                 // Finds and returns memebers of the given name of the given object
-                | Obj l, AppliedInvoke (0, r) when finalReduction -> 
+                | Obj l, AppliedInvoke (0, r) -> 
                     try resolveInvokeByInstance l r
                     with ex -> raise <| BarbExecutionException(ex.Message, sprintf "%A" (l,r), rOffset, rLength)
-                | Obj l, AppliedInvoke (depth, r) when finalReduction -> 
+                | Obj l, AppliedInvoke (depth, r) -> 
                     try 
                         let res = resolveInvokeAtDepth depth l r 
                         match res |> List.collect (fun (o, rms) -> rms) with
@@ -264,9 +272,9 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 // Combine Invocations for Flattened Nested Invocation
                 | Invoke, AppliedInvoke (depth, r) -> AppliedInvoke (depth + 1, r) |> Some
                 // Index the given indexed property representation via IndexArgs
-                | AppliedIndexedProperty (o,l), IndexArgs ({ Expr = Obj r }) -> executeIndexer o l r
+                | AppliedIndexedProperty (o,l), ResolvedIndexArgs args -> executeIndexer o l args
                 // Index the given object it via IndexArgs
-                | Obj l, IndexArgs ({ Expr = Obj r }) -> callIndexedProperty l r
+                | Obj l, ResolvedIndexArgs args -> callIndexedProperty l args
                 // Partially apply the given object to the lambda.  Will execute the a lambda if it's the final argument.
                 | Lambda (lambda), Obj r -> applyArgToLambda lambda r |> Some          
                 | _ -> None
@@ -296,14 +304,17 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
     // Tries to merge/convert local tokens, if it can't it moves to the right
     and reduceExpressions (lleft: ExprRep list) (lright: ExprRep list) (bindings: Bindings) : ExprRep list * Bindings=
         match lleft, lright with
+        // Eliminate any single case subexpression
+        | left, (rExpr & {Expr = SubExpression(expr :: [])}) :: rt -> reduceExpressions left (expr :: rt) bindings
+        | (lExpr & {Expr = SubExpression(expr::[])}) :: lt, right -> reduceExpressions (expr :: lt) right bindings
+        // Move unresolved expressions to the left hand list
         | left, (rExpr & {Expr = Unresolved(expr)}) :: rt -> 
             reduceExpressions ({rExpr with Expr = expr} :: left) rt bindings
         // Binding
         | left, (({Expr = BVar (bindName, bindInnerExpr, boundScope)} & bindExpr) :: rt)  ->
             match reduceExpressions [] [bindInnerExpr] bindings |> fst with
             // Recursive Lambda Binding
-            | lmbExpr :: [] & {Expr = Lambda(lambda)} :: [] 
-                when not finalReduction ->
+            | lmbExpr :: [] & {Expr = Lambda(lambda)} :: [] when not finalReduction ->
                     // Bindings with the same name as lambda arguments must be removed so that names are not incorrectly bound to same-name variables in scope
                     let cleanBinds = lambda.Params |> List.fold (fun bnds pn -> if bnds |> Map.containsKey pn then bnds |> Map.remove pn else bnds) bindings         
                     let reducedExpr, _ = reduceExpressions [] [lambda.Contents] cleanBinds
