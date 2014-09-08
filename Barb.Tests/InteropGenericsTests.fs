@@ -6,6 +6,8 @@ open Barb
 open Barb.Compiler
 open Barb.Representation
 
+open System.Collections.Generic
+
 open Xunit
 
 let returnit (v: 'a) = v
@@ -63,4 +65,17 @@ let ``Barb should be able to call a function with a single parameter nested gene
     let res = func.Execute()
     Assert.Equal<int>(10, res)
 
-  
+let KeyValuePair (k: 'k) (v: 'v) = new KeyValuePair<'k,'v>(k,v)
+
+[<Fact>]
+let ``Barb should be able to call a constructor with two generic args`` () =
+    let namespaces = BarbSettings.Default.Namespaces 
+                     |> Set.add "System.Collections.Generic"
+                     |> Set.add "Barb.Tests.PredicateLanguageGenericInteropTests"
+    let settings = { BarbSettings.Default with Namespaces = namespaces } 
+
+    let pred = "KeyValuePair 'Hello' 'World'"
+
+    let func = new BarbFunc<unit,KeyValuePair<string, string>>(pred, settings)
+    let res = func.Execute()
+    Assert.Equal<KeyValuePair<string, string>>(new KeyValuePair<_,_>("Hello", "World"), res)  
