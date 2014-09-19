@@ -105,3 +105,16 @@ let ``Barb should properly load a file only once when returned from a function``
         Assert.Equal<string>("one", bf.Execute())
     finally
         if File.Exists filename then File.Delete filename
+
+type TestEnum = 
+    | One = 1
+    | Two = 2
+    | Three = 3
+
+[<Fact>]
+let ``should properly be able to instantiate an enum type`` () =
+    let namespaces = BarbSettings.Default.Namespaces |> Set.add "Barb.Tests.FSharpInteropTests"
+    let settings = { BarbSettings.Default with Namespaces = namespaces } 
+    let func = new BarbFunc<unit,TestEnum>("TestEnum.Two", settings)
+    let res = func.Execute() 
+    Assert.Equal(TestEnum.Two, res)

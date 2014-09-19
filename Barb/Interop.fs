@@ -157,6 +157,10 @@ let tryGetMethod (getStatic: bool) (rtype: Type) (name: string) : MethodInfo lis
     | [||] -> []
     | ms -> ms |> Array.toList
 
+let tryGetEnum (rtype: Type) (name: string) : obj option =
+    if rtype.IsEnum then Enum.Parse(rtype, name) |> Some
+    else None
+
 type ResolvedMember =
     | ResolvedMethod of MethodInfo
     | ResolvedProperty of PropertyInfo
@@ -241,11 +245,14 @@ let getContentsFromModule (modTyp: Type) =
     }
 
 let getTypeByName (namespaces: string Set) (typename: string) = 
-    AppDomain.CurrentDomain.GetAssemblies()  
-    |> Seq.collect (fun a -> try a.GetTypes() with ex -> Array.empty) 
-    |> Seq.filter (fun typ -> typ.Name = typename)
-    |> Seq.filter (fun typ -> namespaces.Contains(typ.Namespace))
-    |> Seq.toList
+    let types =
+        AppDomain.CurrentDomain.GetAssemblies()  
+        |> Array.collect (fun a -> try a.GetTypes() with ex -> Array.empty) 
+        |> Array.filter (fun typ -> typ.Name = typename)
+
+    types
+    |> Array.filter (fun typ -> namespaces.Contains(typ.Namespace) || namespaces |> Set.exists (fun ns -> typ.FullName.StartsWith(ns + "+")))
+    |> Array.toList
 
 let resolveStatic (namespaces: string Set) (rtypename: string) (memberName: string) : ExprTypes list =
     match getTypeByName namespaces rtypename with
@@ -259,6 +266,7 @@ let resolveStatic (namespaces: string Set) (rtypename: string) (memberName: stri
             let pi = tryGetIndexedProperty true rtype memberName in 
                         if pi |> List.isEmpty |> not then
                             yield AppliedIndexedProperty(null, pi)
+            yield! tryGetEnum rtype memberName |> Option.map Obj |> Option.toArray
         ]
 //        |> Option.tryResolve (fun () -> rtype.GetField(memberName) |> nullableToOption |> Option.map fieldToExpr)
 //        |> function | Some (objToExpr) -> Some (objToExpr null) | None -> failwith (sprintf "Member name of %s was ambiguous: %s" rtypename memberName)            
