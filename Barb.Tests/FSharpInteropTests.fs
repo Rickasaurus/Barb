@@ -118,3 +118,16 @@ let ``should properly be able to instantiate an enum type`` () =
     let func = new BarbFunc<unit,TestEnum>("TestEnum.Two", settings)
     let res = func.Execute() 
     Assert.Equal(TestEnum.Two, res)
+
+type TestEnumArrayRec =
+    {
+        Enums: TestEnum []
+    }
+
+[<Fact>]
+let ``should be able to access an array of enum types`` () =
+    let namespaces = BarbSettings.Default.Namespaces |> Set.add "Barb.Tests.FSharpInteropTests"
+    let settings = { BarbSettings.Default with Namespaces = namespaces } 
+    let func = new BarbFunc<TestEnumArrayRec,TestEnum>("Enums.[1]", settings)
+    let res = func.Execute({ Enums = [|TestEnum.One; TestEnum.Two; TestEnum.Three|] }) 
+    Assert.Equal(TestEnum.Two, res)
