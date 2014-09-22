@@ -689,4 +689,7 @@ let ``barb should support F#-like array syntax`` () =
         let result = predicate ()
         Assert.Equal<int []>([|1;2;3;4;5|], result)  
  
-    
+[<Fact>]
+let ``barb should properly support negative numbers`` () =
+    let pred = buildExpr<unit, int>("-3")
+    Assert.Equal(-3, pred())

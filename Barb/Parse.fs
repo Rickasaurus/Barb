@@ -77,9 +77,13 @@ let whitespace = [| " "; "\r"; "\n"; "\t"; |]
 
 let (|Num|_|) (text: StringWindow) : MatchReturn =
     let isnumchar c = c >= '0' && c <= '9' 
+    let isnegative c = c = '-'
     let textStartAt = text.Offset
     let sb = new StringBuilder()
-    if isnumchar text.[0u] || (text.[0u] = '.' && text.Length >= 2u && isnumchar text.[1u]) then
+    if isnumchar text.[0u]  
+       || (text.[0u] = '.' && text.Length >= 2u && isnumchar text.[1u])  
+       || (isnegative text.[0u] && text.Length >= 2u && isnumchar text.[1u])
+       then
         let rec inner = 
             function
             | i, dot when i >= text.Length -> i, dot
@@ -87,10 +91,17 @@ let (|Num|_|) (text: StringWindow) : MatchReturn =
             | i, false when text.[i] = '.' -> sb.Append(text.[i]) |> ignore; inner (i+1u, true)
             | i, dotSeen when isnumchar text.[i] -> sb.Append(text.[i]) |> ignore; inner (i+1u, dotSeen)
             | i, dot -> i, dot
-        let resi, dot = inner (0u, false)
+        let isNegative = isnegative text.[0u]
+        let resi, dot = 
+            if isnegative text.[0u] then 
+                sb.Append(text.[0u]) |> ignore
+                inner (1u, false)
+            else inner (0u, false)
         let tokenStr = 
             let resultStr = sb.ToString()
-            if dot then match Double.TryParse(resultStr) with | true, num -> Obj num | _ -> Obj resultStr
+            if dot then match Double.TryParse(resultStr) with 
+                              | true, num -> Obj num 
+                              | _ -> Obj resultStr
             else match Int64.TryParse(resultStr) with | true, num -> Obj num | _ -> Obj resultStr
         let rest = text.Subwindow(resi)
         Some (Some (tokenStr), rest)
