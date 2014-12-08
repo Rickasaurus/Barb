@@ -291,10 +291,14 @@ let rec convertToTargetType (ttype: Type) (param: obj) =
     | null when ttype.IsGenericType && ttype.GetGenericTypeDefinition() = typedefof<_ option> -> FSharpType.MakeOptionNone (ttype.GetGenericArguments().[0]) |> Some
     | null -> Some null
     // Special Case For speed
-    | :? (obj []) as objs when ttype = typeof<string[]> -> Array.ConvertAll(objs, fun v -> v :?> string) |> box |> Some 
-    | :? (obj []) as objs when ttype = typeof<char[]> -> Array.ConvertAll(objs, fun v -> v :?> char) |> box |> Some 
-    | :? (obj []) as objs when ttype = typeof<int64[]>  -> Array.ConvertAll(objs, fun v -> v :?> int64) |> box |> Some 
-    | :? (obj []) as objs when ttype = typeof<int32[]>  -> Array.ConvertAll(objs, fun v -> v :?> int64 |> int) |> box |> Some 
+    | :? (obj []) as objs when ttype = typeof<string[]> || ttype = typeof<string seq> -> 
+        Array.ConvertAll(objs, fun v -> v :?> string) |> box |> Some 
+    | :? (obj []) as objs when ttype = typeof<char[]>   || ttype = typeof<char seq> -> 
+        Array.ConvertAll(objs, fun v -> v :?> char) |> box |> Some 
+    | :? (obj []) as objs when ttype = typeof<int64[]>  || ttype = typeof<int64 seq> -> 
+        Array.ConvertAll(objs, fun v -> v :?> int64) |> box |> Some 
+    | :? (obj []) as objs when ttype = typeof<int32[]>  || ttype = typeof<int32 seq>  -> 
+        Array.ConvertAll(objs, fun v -> v :?> int64 |> int) |> box |> Some 
     | _ when ttype.IsGenericType && ttype.GetGenericTypeDefinition() = typedefof<_ option> -> 
         let innerType = ttype.GetGenericArguments().[0]
         match convertToTargetType innerType param with
@@ -328,7 +332,16 @@ let getMethodMatch (mi: MethodInfo) (prms: ParameterInfo []) (args: obj []) =
 let resolveGenericByName (prm: ParameterInfo) (arg: obj) = 
     let argType = arg.GetType()
     if prm.ParameterType.IsGenericParameter then // will be true for 'a (fully generic)               
-        [|prm.Name, argType|] 
+        [|prm.Name, argType|]              
+    elif prm.ParameterType.IsGenericType then 
+        let names = prm.ParameterType.GenericTypeArguments |> Array.map (fun v -> v.Name)        
+        let types = 
+            match arg with
+            | :? (obj []) as ar when ar.Length > 0 -> [|ar.[0].GetType()|]
+            | :? (obj []) as ar -> [|typeof<obj>|]
+            | _ when argType.IsArray -> [| argType.GetElementType() |]
+            | _ -> failwith "Unable to resolve generic parameter"
+        Array.zip names types
     elif prm.ParameterType.IsGenericType then // Will be true for 'a seq (nested generic)
         let names = prm.ParameterType.GenericTypeArguments |> Array.map (fun v -> v.Name)        
         let types = argType.GenericTypeArguments
@@ -367,7 +380,9 @@ let executeParameterizedMethod (o: obj) (sigs: MethodInfo list) (args: obj []) =
     let mi, newargs = 
         match orderedDispaches with
         | (mi, prms, MethodMatch.PerfectMatch) :: _ -> mi, args
-        | (mi, prms, MethodMatch.GenericMatch) :: _ -> resolveGenerics mi prms args, args
+        | (mi, prms, MethodMatch.GenericMatch) :: _ -> 
+            let nmi = resolveGenerics mi prms args
+            nmi, convertArgs (nmi.GetParameters()) args
         | (mi, prms, MethodMatch.LengthMatch) :: _ -> mi, convertArgs prms args
         | __ -> failwithf "No match found for the given operation on %s" (o.GetType().FullName)
 

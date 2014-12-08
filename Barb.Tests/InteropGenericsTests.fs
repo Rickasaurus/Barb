@@ -41,29 +41,55 @@ open System.Collections.Generic
 let isCountEqualTo (l: IEnumerable<'T>) (len: int) =
     (l |> Seq.length) = len
 
-//[<Fact>]
+[<Fact>]
 let ``Barb should be able to call a function with a multi parameter nested generic`` () =
     let namespaces = BarbSettings.Default.Namespaces |> Set.add "Barb.Tests.PredicateLanguageGenericInteropTests"
     let settings = { BarbSettings.Default with Namespaces = namespaces } 
 
-    let pred = "isCountEqualTo ((10, 20, 30, 40), 4)"
+    let pred = "isCountEqualTo [|10; 20; 30; 40|] 4"
 
     let func = new BarbFunc<unit,bool>(pred, settings)
     let res = func.Execute()
     Assert.Equal<bool>(true, res)
 
-let seqHead (l: IEnumerable<'T>) = l.GetEnumerator().Current
+let seqHead (l: IEnumerable<'T>) = Seq.head l
 
-//[<Fact>]
+[<Fact>]
 let ``Barb should be able to call a function with a single parameter nested generic`` () =
     let namespaces = BarbSettings.Default.Namespaces |> Set.add "Barb.Tests.PredicateLanguageGenericInteropTests"
     let settings = { BarbSettings.Default with Namespaces = namespaces } 
 
-    let pred = "seqHead (10, 20, 30, 40)"
+    let pred = "seqHead [|10; 20; 30; 40|]"
 
     let func = new BarbFunc<unit,int>(pred, settings)
     let res = func.Execute()
     Assert.Equal<int>(10, res)
+
+let seqLength (l: IEnumerable<'T>) = Seq.length l
+
+[<Fact>]
+let ``Barb should be able to call a function with a single parameter nested generic, twice empty`` () =
+    let namespaces = BarbSettings.Default.Namespaces |> Set.add "Barb.Tests.PredicateLanguageGenericInteropTests"
+    let settings = { BarbSettings.Default with Namespaces = namespaces } 
+
+    let pred = "seqLength [| |] + seqLength [|10; 20; 30; 40|] + seqLength [| |]"
+
+    let func = new BarbFunc<unit,int>(pred, settings)
+    let res = func.Execute()
+    Assert.Equal<int>(4, res)
+
+type slPrm<'a> = { Value: 'a [] }
+
+[<Fact>]
+let ``Barb should be able to call a function with an empty single parameter nested generic (typed by return value)`` () =
+    let namespaces = BarbSettings.Default.Namespaces |> Set.add "Barb.Tests.PredicateLanguageGenericInteropTests"
+    let settings = { BarbSettings.Default with Namespaces = namespaces } 
+
+    let pred = "seqLength Value"
+
+    let func = new BarbFunc<slPrm<int>,int>(pred, settings)
+    let res = func.Execute({ Value = Array.empty<int> })
+    Assert.Equal<int>(0, res)
 
 let KeyValuePair (k: 'k) (v: 'v) = new KeyValuePair<'k,'v>(k,v)
 
