@@ -342,10 +342,6 @@ let resolveGenericByName (prm: ParameterInfo) (arg: obj) =
             | _ when argType.IsArray -> [| argType.GetElementType() |]
             | _ -> failwith "Unable to resolve generic parameter"
         Array.zip names types
-    elif prm.ParameterType.IsGenericType then // Will be true for 'a seq (nested generic)
-        let names = prm.ParameterType.GenericTypeArguments |> Array.map (fun v -> v.Name)        
-        let types = argType.GenericTypeArguments
-        Array.zip names types
     else // Shouldn't get here
         failwith "Parameter was unexpectedly not Generic"
 
