@@ -93,10 +93,10 @@ let ``Barb should be able to call a function with an empty single parameter nest
 
 [<Fact>]
 let ``Barb should be able to call a function with an empty single parameter nested generic (typed by return value) via seq`` () =
-    let namespaces = BarbSettings.Default.Namespaces |> Set.add "Microsoft.FSharp.Collections.SeqModule"
+    let namespaces = BarbSettings.Default.Namespaces |> Set.add "Microsoft.FSharp.Collections"
     let settings = { BarbSettings.Default with Namespaces = namespaces } 
 
-    let pred = "Length Value"
+    let pred = "SeqModule.Length Value"
 
     let func = new BarbFunc<slPrm<int>,int>(pred, settings)
     let res = func.Execute({ Value = Array.empty<int> })
