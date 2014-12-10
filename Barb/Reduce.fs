@@ -146,8 +146,8 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                     | Lambda {Params = []; Contents = lambdaContents; Bindings = lambdaBindings } -> 
                         let totalBindings = Seq.concat [(Map.toSeq initialBindings); (Map.toSeq lambdaBindings)] |> Map.ofSeq
                         match reduceExpressions [] [lambdaContents] totalBindings |> fst with
-                        | {Expr = SubExpression (v :: [])} :: _ -> v |> Some
-                        | {Expr = SubExpression _ } :: _ -> None
+                        | {Expr = SubExpression (v :: [])} :: [] -> v |> Some
+                        | {Expr = SubExpression _ } :: [] -> None
                         | result :: [] -> result |> Some
                         | many -> None
                     | And (lExpr, rExpr) ->
