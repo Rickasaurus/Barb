@@ -17,11 +17,11 @@ let indexIntoTuple (elements: ExprTypes array) (index: obj) =
     | :? int64 as idx -> elements.[int idx] 
     | _ -> failwith (sprintf "Bad type for tuple index: %A" index)
 
-let argsFromTuple (tuple: ExprRep array) = 
+let exprRepsToObjsArray (tuple: ExprRep array) = 
     tuple |> Array.map (fun ex -> ex.Expr) 
     |> Array.map (function | Obj v -> v | other -> failwith (sprintf "Cannot resolve the given tuple-internal expression to a object type: %A" other))    
 
-let tupleToObj (tuple: ExprRep array) = 
+let exprRepsToObj (tuple: ExprRep array) = 
     tuple |> Array.map (fun ex -> ex.Expr) 
     |> Array.map (function | Obj v -> v | other -> failwith (sprintf "Cannot resolve the given tuple-internal expression to a object type: %A" other))
     |> box
@@ -29,7 +29,7 @@ let tupleToObj (tuple: ExprRep array) =
 let resolveExpressionResult (input: ExprRep list) =
     match input with
     | { Expr = Obj (res) } :: [] -> res
-    | { Expr = Tuple (items) } :: [] -> tupleToObj items
+    | { Expr = Tuple (items) } :: [] -> exprRepsToObj items
     | otherTokens -> failwith (otherTokens |> List.fold (fun s t -> s + (sprintf "Unexpected result: %A" t.Expr)) "")
 
 let applyArgToLambda (l: LambdaRecord) (arg: obj) =
@@ -76,16 +76,37 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         | true -> reducedTuples |> Tuple |> Resolved
                         | false -> reducedTuples |> Tuple |> Unresolved
                         |> wrapit |> Some           
-                    | ArrayBuilder ar ->
+                    | ArrayBuilder ar ->  
+                        // True when all contents are Obj or reducedArray is empty                      
+                        let allObj = ref true 
+                        let arrTyp = ref None
+                        let arrTypSame = ref true
                         let reducedArray = 
                             ar |> Array.map (fun t -> 
                                     match reduceExpressions [] [t] bindings |> fst  with 
-                                    | ({ Expr = Obj o } & oobj) :: [] -> oobj 
-                                    | res -> SubExpressionIfNeeded res |> wrapit)
-                        match reducedArray |> Array.forall (function | {Expr = Obj o} -> true | _ -> false) with
-                        | true -> reducedArray |> tupleToObj |> Obj
-                        | false when reducedArray.Length = 0 -> [||] |> box |> Obj
-                        | false -> reducedArray |> ArrayBuilder |> Unresolved
+                                    | ({ Expr = Obj o } & oobj) :: [] -> 
+                                        let oTyp = o.GetType()
+                                        if !arrTypSame then
+                                            match !arrTyp with
+                                            | None -> arrTyp := Some oTyp
+                                            | Some aTyp when aTyp = oTyp -> ()
+                                            | Some aTyp -> arrTyp := None; arrTypSame := false
+                                        oobj 
+                                    | res -> allObj := false; SubExpressionIfNeeded res |> wrapit)                         
+                        match !allObj, reducedArray |> Array.isEmpty, !arrTyp with
+                        | true, false, Some typ -> 
+                            // Create Typed Array
+                            let objArr = reducedArray |> exprRepsToObjsArray
+                            let newArr = Array.CreateInstance(typ, objArr.Length)
+                            do Array.Copy(objArr, newArr, objArr.Length) 
+                            newArr |> box |> Obj
+                        | true, false, None -> 
+                            // Create Untyped Array
+                            reducedArray |> exprRepsToObj |> Obj
+                        | false, false, _ -> 
+                            // Created unresolved expression
+                            reducedArray |> ArrayBuilder |> Unresolved
+                        | _ -> [||] |> box |> Obj
                         |> wrapit |> Some            
                     | Unknown unk -> 
                         match bindings |> Map.tryFind unk with

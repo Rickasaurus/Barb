@@ -290,30 +290,32 @@ let rec convertToTargetType (ttype: Type) (param: obj) =
     match param with
     | null when ttype.IsGenericType && ttype.GetGenericTypeDefinition() = typedefof<_ option> -> FSharpType.MakeOptionNone (ttype.GetGenericArguments().[0]) |> Some
     | null -> Some null
-    // Special Case For speed
-    | :? (obj []) as objs when ttype = typeof<string[]> || ttype = typeof<string seq> -> 
-        Array.ConvertAll(objs, fun v -> v :?> string) |> box |> Some 
-    | :? (obj []) as objs when ttype = typeof<char[]>   || ttype = typeof<char seq> -> 
-        Array.ConvertAll(objs, fun v -> v :?> char) |> box |> Some 
-    | :? (obj []) as objs when ttype = typeof<int64[]>  || ttype = typeof<int64 seq> -> 
-        Array.ConvertAll(objs, fun v -> v :?> int64) |> box |> Some 
-    | :? (obj []) as objs when ttype = typeof<int32[]>  || ttype = typeof<int32 seq>  -> 
-        Array.ConvertAll(objs, fun v -> v :?> int64 |> int) |> box |> Some 
-    | _ when ttype.IsGenericType && ttype.GetGenericTypeDefinition() = typedefof<_ option> -> 
-        let innerType = ttype.GetGenericArguments().[0]
-        match convertToTargetType innerType param with
-        | Some value -> FSharpType.MakeOptionSome innerType value |> Some
-        | None -> None
-    | DecomposeOption value -> convertToTargetType ttype param 
-    | _ when ttype.IsGenericTypeDefinition -> Some param   
-    | :? string when ttype = typeof<IEnumerable> -> Some ([| param |] |> box)
-    | _ when ttype.IsAssignableFrom(param.GetType()) -> Some param
-    | _ when ttype = typeof<IEnumerable> -> Some ([| param |] |> box)
-    | _ ->
-        let des = TypeDescriptor.GetConverter(ttype)
-        match des.CanConvertFrom(param.GetType()) with
-        | true -> Some <| des.ConvertFrom(param)
-        | false -> try Some <| System.Convert.ChangeType(param, ttype) with _ -> None
+    | _ -> 
+        let paramType = param.GetType()
+        match param with
+        | :? Array as objArr when ttype.IsArray ->  
+            let etype = ttype.GetElementType()
+            let newArr = Array.CreateInstance(etype, objArr.Length)
+            for i = 0 to objArr.Length - 1 do
+                match convertToTargetType etype (objArr.GetValue(i)) with
+                | Some nval -> newArr.SetValue(nval, i)
+                | None -> failwithf "Unable to convert output type from %s to %s" (paramType.Name) (ttype.Name)
+            Some (box newArr)
+        | _ when ttype.IsGenericType && ttype.GetGenericTypeDefinition() = typedefof<_ option> -> 
+            let innerType = ttype.GetGenericArguments().[0]
+            match convertToTargetType innerType param with
+            | Some value -> FSharpType.MakeOptionSome innerType value |> Some
+            | None -> None
+        | DecomposeOption value -> convertToTargetType ttype param 
+        | _ when ttype.IsGenericTypeDefinition -> Some param   
+        | :? string when ttype = typeof<IEnumerable> -> Some ([| param |] |> box)
+        | _ when ttype.IsAssignableFrom(paramType) -> Some param
+        | _ when ttype = typeof<IEnumerable> -> Some ([| param |] |> box)
+        | _ ->
+            let des = TypeDescriptor.GetConverter(ttype)
+            match des.CanConvertFrom(paramType) with
+            | true -> Some <| des.ConvertFrom(param)
+            | false -> try Some <| System.Convert.ChangeType(param, ttype) with _ -> None
 
 type MethodMatch =
     | PerfectMatch = 0 
@@ -495,8 +497,10 @@ let callIndexedProperty (target: obj) (indexArgs: obj []) =
         let ttype = target.GetType()
         match target, indexVal with
         | (:? Array as arr),          (:? int64 as idx) -> 
-            if idx < 0L || idx >= int64 arr.Length then Returned null |> Some
-            else arr.GetValue(idx) |> Returned |> Some
+            let v = 
+                if idx < 0L || idx >= int64 arr.Length then Returned null |> Some
+                else arr.GetValue(idx) |> Returned |> Some
+            v
         | (:? IEnumerable as enumer), (:? int64 as idx) -> 
             if idx < 0L then Returned null |> Some
             else enumer |> Seq.cast<obj> |> Seq.nth (int idx) |> Returned |> Some  
@@ -525,6 +529,7 @@ let rec objectsEqualInner (obj1: obj) (obj2: obj) =
         else Seq.zip seq1 seq2 |> Seq.forall (fun (o1, o2) -> objectsEqualInner o1 o2)
     | null, _ -> false
     | _, null -> false
+    | obj1, obj2 when obj1.GetType() = obj2.GetType() -> obj1 = obj2
     | obj1, obj2 -> compareAsSameType obj1 obj2 (fun o1 o2 -> o1.Equals(o2))
 
 let objectsEqual (obj1: obj) (obj2: obj) = 
