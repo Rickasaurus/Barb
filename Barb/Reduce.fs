@@ -17,19 +17,14 @@ let indexIntoTuple (elements: ExprTypes array) (index: obj) =
     | :? int64 as idx -> elements.[int idx] 
     | _ -> failwith (sprintf "Bad type for tuple index: %A" index)
 
-let exprRepsToObjsArray (tuple: ExprRep array) = 
+let exprRepsToObjs (tuple: ExprRep array) = 
     tuple |> Array.map (fun ex -> ex.Expr) 
     |> Array.map (function | Obj v -> v | other -> failwith (sprintf "Cannot resolve the given tuple-internal expression to a object type: %A" other))    
-
-let exprRepsToObj (tuple: ExprRep array) = 
-    tuple |> Array.map (fun ex -> ex.Expr) 
-    |> Array.map (function | Obj v -> v | other -> failwith (sprintf "Cannot resolve the given tuple-internal expression to a object type: %A" other))
-    |> box
 
 let resolveExpressionResult (input: ExprRep list) =
     match input with
     | { Expr = Obj (res) } :: [] -> res
-    | { Expr = Tuple (items) } :: [] -> exprRepsToObj items
+    | { Expr = Tuple (items) } :: [] -> exprRepsToObjs items |> box
     | otherTokens -> failwith (otherTokens |> List.fold (fun s t -> s + (sprintf "Unexpected result: %A" t.Expr)) "")
 
 let applyArgToLambda (l: LambdaRecord) (arg: obj) =
@@ -75,13 +70,13 @@ let resolveArrayBuilder arrayReducer wrapit builderReps =
     match !allObj, reducedArray |> Array.isEmpty, !arrTyp with
     | true, false, Some typ -> 
         // Create Typed Array
-        let objArr = reducedArray |> exprRepsToObjsArray
+        let objArr = reducedArray |> exprRepsToObjs
         let newArr = Array.CreateInstance(typ, objArr.Length)
         do Array.Copy(objArr, newArr, objArr.Length) 
         newArr |> box |> Obj
     | true, false, None -> 
         // Create Untyped Array
-        reducedArray |> exprRepsToObj |> Obj
+        reducedArray |> exprRepsToObjs |> box |> Obj
     | false, false, _ -> 
         // Created unresolved expression
         reducedArray |> ArrayBuilder |> Unresolved
@@ -151,6 +146,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         | result :: [] -> result |> Some
                         | many -> None
                     | And (lExpr, rExpr) ->
+                        let evaldR = lazy (reduceSubexpr rExpr)
                         // Left and side of the And 
                         match reduceSubexpr lExpr with
                         // False short curcuits 
