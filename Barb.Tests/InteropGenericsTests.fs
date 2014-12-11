@@ -96,7 +96,7 @@ let ``Barb should be able to call a function with an empty single parameter nest
     let namespaces = BarbSettings.Default.Namespaces |> Set.add "Microsoft.FSharp.Collections"
     let settings = { BarbSettings.Default with Namespaces = namespaces } 
 
-    let pred = "SeqModule.Length Value"
+    let pred = "Seq.length Value"
 
     let func = new BarbFunc<slPrm<int>,int>(pred, settings)
     let res = func.Execute({ Value = Array.empty<int> })

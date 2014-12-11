@@ -150,9 +150,15 @@ let tryGetIndexedProperty (getStatic: bool) (rtype: System.Type) (name: string) 
     | [||] -> []
     | ps -> ps |> Array.toList    
 
+let getFSharpFuncName (funType: MethodInfo) = 
+    let name = funType.Name
+    let craSeq = funType.GetCustomAttributes() |> Seq.choose (function | (:? CompilationSourceNameAttribute as cra) -> Some cra | _ -> None)
+    if Seq.isEmpty craSeq then name
+    else (Seq.head craSeq).SourceName
+
 let tryGetMethod (getStatic: bool) (rtype: Type) (name: string) : MethodInfo list =
     let bindingFlags = if getStatic then BindingFlags.Static ||| BindingFlags.Public else BindingFlags.Instance ||| BindingFlags.Public
-    let methodInfos = rtype.GetMethods(bindingFlags) |> Array.filter (fun mi -> mi.Name = name)
+    let methodInfos = rtype.GetMethods(bindingFlags) |> Array.filter (fun mi -> getFSharpFuncName mi = name)
     match methodInfos with
     | [||] -> []
     | ms -> ms |> Array.toList
@@ -244,15 +250,25 @@ let getContentsFromModule (modTyp: Type) =
             | _ -> ()
     }
 
+let getFSharpTypeName (modTyp: Type) = 
+    let name = modTyp.Name
+    let craSeq = modTyp.GetCustomAttributes() |> Seq.choose (function | (:? CompilationRepresentationAttribute as cra) -> Some cra | _ -> None)
+    if Seq.isEmpty craSeq then name
+    elif (Seq.head craSeq).Flags.HasFlag(CompilationRepresentationFlags.ModuleSuffix) && name.EndsWith("Module") then    
+        name.Substring(0, name.Length - 6)
+    else name
+         
 let getTypeByName (namespaces: string Set) (typename: string) = 
     let types =
         AppDomain.CurrentDomain.GetAssemblies()  
         |> Array.collect (fun a -> try a.GetTypes() with ex -> Array.empty) 
-        |> Array.filter (fun typ -> typ.Name = typename)
+        |> Array.filter (fun typ -> getFSharpTypeName typ = typename)
 
     types
     |> Array.filter (fun typ -> namespaces.Contains(typ.Namespace) || namespaces |> Set.exists (fun ns -> typ.FullName.StartsWith(ns + "+")))
     |> Array.toList
+
+
 
 let resolveStatic (namespaces: string Set) (rtypename: string) (memberName: string) : ExprTypes list =
     match getTypeByName namespaces rtypename with
