@@ -258,17 +258,20 @@ let getFSharpTypeName (modTyp: Type) =
         name.Substring(0, name.Length - 6)
     else name
          
+let removeTick (typeName: string) =
+    let idx = typeName.LastIndexOf('`')
+    if idx > 0 then typeName.Substring(0, idx)
+    else typeName
+
 let getTypeByName (namespaces: string Set) (typename: string) = 
     let types =
         AppDomain.CurrentDomain.GetAssemblies()  
         |> Array.collect (fun a -> try a.GetTypes() with ex -> Array.empty) 
-        |> Array.filter (fun typ -> getFSharpTypeName typ = typename)
+        |> Array.filter (fun typ -> removeTick <| getFSharpTypeName typ = typename)
 
     types
     |> Array.filter (fun typ -> namespaces.Contains(typ.Namespace) || namespaces |> Set.exists (fun ns -> typ.FullName.StartsWith(ns + "+")))
     |> Array.toList
-
-
 
 let resolveStatic (namespaces: string Set) (rtypename: string) (memberName: string) : ExprTypes list =
     match getTypeByName namespaces rtypename with
@@ -294,9 +297,47 @@ let cachedResolveStatic =
     let resolveMember (namespaces, typename, membername) = resolveStatic namespaces typename membername
     memoizeBy inputToKey resolveMember
 
+let resolveGenericParamByName (prm: ParameterInfo) (arg: obj) = 
+    let argType = arg.GetType()
+    if prm.ParameterType.IsGenericParameter then // will be true for 'a (fully generic)               
+        [|prm.ParameterType.Name, argType|]              
+    elif prm.ParameterType.IsGenericType then 
+        let names = prm.ParameterType.GenericTypeArguments |> Array.map (fun v -> v.Name)        
+        let types = 
+            match arg with
+            | :? (obj []) as ar when ar.Length > 0 -> [|ar.[0].GetType()|]
+            | :? (obj []) as ar -> [|typeof<obj>|]
+            | _ when argType.IsArray -> [| argType.GetElementType() |]
+            | _ -> failwith "Unable to resolve generic parameter"
+        Array.zip names types
+    else // Shouldn't get here
+        failwith "Parameter was unexpectedly not Generic"
+
 let executeConstructor (namespaces: string Set) (rtypename: string) (args: obj []) : ExprTypes option =
     match getTypeByName namespaces rtypename with
     | [] -> None
+    | rtype :: [] when rtype.IsGenericTypeDefinition -> 
+        let paramTypes = args |> Array.map (fun p -> p.GetType())
+        match rtype.GetConstructors() |> Array.filter (fun ctor -> ctor.GetParameters().Length = args.Length) with
+        | [||] -> None
+        | [| ctor |] -> 
+                        let genericArgs = rtype.GetGenericArguments()
+
+                        let gnamepos = genericArgs |> Array.map (fun gi -> gi.Name, gi.GenericParameterPosition) |> Map.ofArray
+                        let prms = ctor.GetParameters()
+                        let resolvedGenerics = 
+                            Array.zip prms args
+                            |> Array.choose (fun (p,a) -> match p.ParameterType.ContainsGenericParameters with 
+                                                          | true -> resolveGenericParamByName p a |> Some
+                                                          | false -> None)
+                            |> Array.collect id
+                            |> Seq.groupBy fst |> Seq.map (fun (name, ptyp) -> name, ptyp |> Seq.head |> snd) 
+                            |> Seq.sortBy (fun (n,t) -> gnamepos |> Map.find n)
+                            |> Seq.map (snd) |> Seq.toArray
+                        let realType = rtype.MakeGenericType(resolvedGenerics)
+                        Activator.CreateInstance(realType, args) |> Obj |> Some
+//            ctor.GetParameters()         
+        | manyctor -> failwith (sprintf "Type constructor was ambiguous: %s" rtypename)
     | rtype :: [] -> 
         let paramTypes = args |> Array.map (fun p -> p.GetType())
         rtype.GetConstructor paramTypes |> nullableToOption |> Option.map (fun ctor -> ctor.Invoke(args) |> Obj )         
@@ -347,35 +388,22 @@ let getMethodMatch (mi: MethodInfo) (prms: ParameterInfo []) (args: obj []) =
         else MethodMatch.LengthMatch
     else MethodMatch.NoMatch
 
-let resolveGenericByName (prm: ParameterInfo) (arg: obj) = 
-    let argType = arg.GetType()
-    if prm.ParameterType.IsGenericParameter then // will be true for 'a (fully generic)               
-        [|prm.Name, argType|]              
-    elif prm.ParameterType.IsGenericType then 
-        let names = prm.ParameterType.GenericTypeArguments |> Array.map (fun v -> v.Name)        
-        let types = 
-            match arg with
-            | :? (obj []) as ar when ar.Length > 0 -> [|ar.[0].GetType()|]
-            | :? (obj []) as ar -> [|typeof<obj>|]
-            | _ when argType.IsArray -> [| argType.GetElementType() |]
-            | _ -> failwith "Unable to resolve generic parameter"
-        Array.zip names types
-    else // Shouldn't get here
-        failwith "Parameter was unexpectedly not Generic"
-
-let resolveGenerics (mi: MethodInfo) (prms: ParameterInfo[]) (args: obj[]) =
-    let gnamepos = mi.GetGenericArguments() |> Array.map (fun gi -> gi.Name, gi.GenericParameterPosition) |> Map.ofArray
+let resolveGenericParams (typeParams: Type []) (prms: ParameterInfo[]) (args: obj[]) =
+    let gnamepos = typeParams |> Array.map (fun gi -> gi.Name, gi.GenericParameterPosition) |> Map.ofArray
 
     let resolvedGenerics = 
         Array.zip prms args
         |> Array.choose (fun (p,a) -> match p.ParameterType.ContainsGenericParameters with 
-                                      | true -> resolveGenericByName p a |> Some
+                                      | true -> resolveGenericParamByName p a |> Some
                                       | false -> None)
         |> Array.collect id
         |> Seq.groupBy fst |> Seq.map (fun (name, ptyp) -> name, ptyp |> Seq.head |> snd) 
         |> Seq.sortBy (fun (n,t) -> gnamepos |> Map.find n)
 
-    let resolvedPrms = resolvedGenerics |> Seq.map (snd) |> Seq.toArray
+    resolvedGenerics |> Seq.map (snd) |> Seq.toArray
+
+let resolveGenerics (mi: MethodInfo) (prms: ParameterInfo[]) (args: obj[]) =
+    let resolvedPrms = resolveGenericParams (mi.GetGenericArguments()) prms args
     mi.MakeGenericMethod(resolvedPrms)
 
 let convertArgs (prms: ParameterInfo[]) (args: obj[]) =

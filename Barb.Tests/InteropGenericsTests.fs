@@ -102,18 +102,26 @@ let ``Barb should be able to call a function with an empty single parameter nest
     let res = func.Execute({ Value = Array.empty<int> })
     Assert.Equal<int>(0, res)
 
-
-let KeyValuePair (k: 'k) (v: 'v) = new KeyValuePair<'k,'v>(k,v)
-
 [<Fact>]
 let ``Barb should be able to call a constructor with two generic args`` () =
     let namespaces = BarbSettings.Default.Namespaces 
                      |> Set.add "System.Collections.Generic"
-                     |> Set.add "Barb.Tests.PredicateLanguageGenericInteropTests"
     let settings = { BarbSettings.Default with Namespaces = namespaces } 
 
-    let pred = "KeyValuePair 'Hello' 'World'"
+    let pred = "new KeyValuePair ('Hello', 'World')" in
+        let func = new BarbFunc<unit,KeyValuePair<string, string>>(pred, settings) in 
+        let res = func.Execute()
+        Assert.Equal<KeyValuePair<string, string>>(new KeyValuePair<_,_>("Hello", "World"), res)  
 
-    let func = new BarbFunc<unit,KeyValuePair<string, string>>(pred, settings)
-    let res = func.Execute()
-    Assert.Equal<KeyValuePair<string, string>>(new KeyValuePair<_,_>("Hello", "World"), res)  
+let KeyValuePair (k: 'k) (v: 'v) = new KeyValuePair<'k,'v>(k,v)
+
+[<Fact>]
+let ``Barb should be able to call a constructing function with two generic args`` () =
+    let namespaces = BarbSettings.Default.Namespaces 
+                     |> Set.add "System.Collections.Generic"
+                     |> Set.add "Barb.Tests.PredicateLanguageGenericInteropTests"
+    let settings = { BarbSettings.Default with Namespaces = namespaces } 
+    let pred = "KeyValuePair 'Hello' 'World'" in
+        let func = new BarbFunc<unit,KeyValuePair<string, string>>(pred, settings) 
+        let res = func.Execute()
+        Assert.Equal<KeyValuePair<string, string>>(new KeyValuePair<_,_>("Hello", "World"), res)  
