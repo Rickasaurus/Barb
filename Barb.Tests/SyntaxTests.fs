@@ -456,6 +456,19 @@ let ``union operator should union arrays`` () =
     let result = predicate ()
     Assert.True(result)
 
+[<Fact>]
+let ``union operator should union arrays removing dupes`` () =
+    let predstr = @"[|1;2;3;3|] \/ [|3;4;4;5;6|] = [|1;2;3;4;5;6|]"
+    let predicate = buildExpr<unit, bool> predstr
+    let result = predicate ()
+    Assert.True(result)
+
+[<Fact>]
+let ``union operator should union arrays of booleans`` () =
+    let predstr = @"[|true|] \/ [|false|]"
+    let predicate = buildExpr<unit, bool []> predstr
+    let result = predicate ()
+    Assert.Equal<bool []>([|true; false|], result)
 
 [<Fact>]
 let ``union operator should union arrays with singltons on the right`` () =
