@@ -713,16 +713,6 @@ let ``should support multi-calls over two subtypes for a collection of values`` 
     let predicate = buildExpr<TestPerson2,bool> "let z = (Lib.flatten (Locations..City..ZipCodes)) in z /?\ [|\"00000\"|] and z /?\ [|\"12345\"|]" in 
         let result = predicate (p)
         Assert.True(result) 
-//
-// Wish List / Ideas
-//
-
-
-//[<Fact>] // Experimental
-let ``should support safe while syntax`` () = 
-    let predicate = buildExpr<unit,bool> "let x = 1 in { while x < 5 do x <- x + 1 } x = 4"
-    let result = predicate ()
-    Assert.True(result)  
 
 [<Fact>]
 let ``barb should support F#-like array syntax`` () = 
@@ -737,3 +727,14 @@ let ``barb should support F#-like array syntax`` () =
 let ``barb should properly support negative numbers`` () =
     let pred = buildExpr<unit, int>("-3")
     Assert.Equal(-3, pred())
+
+//
+// Wish List / Ideas
+//
+
+
+//[<Fact>] // Experimental
+let ``should support safe while syntax`` () = 
+    let predicate = buildExpr<unit,bool> "let x = 1 in { while x < 5 do x <- x + 1 } x = 4"
+    let result = predicate ()
+    Assert.True(result)  
