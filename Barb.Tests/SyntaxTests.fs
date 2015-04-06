@@ -534,8 +534,20 @@ let ``hasintersection operator should show if arrays have intersection`` () =
     Assert.True(result)
 
 [<Fact>]
+let ``hasintersection operator should show if bool arrays have intersection`` () =
+    let predicate = buildExpr<unit, bool> @"[|true|] /?\ [|true|]" 
+    let result = predicate ()
+    Assert.True(result)
+
+[<Fact>]
 let ``hasintersection operator should show if arrays don't have intersection`` () =
     let predicate = buildExpr<unit, bool> @"[|1;2;3|] /?\ [|4;5;6|]" 
+    let result = predicate ()
+    Assert.False(result)
+
+[<Fact>]
+let ``hasintersection operator should show if bool arrays don't have intersection`` () =
+    let predicate = buildExpr<unit, bool> @"[|true|] /?\ [|false|]" 
     let result = predicate ()
     Assert.False(result)
 
@@ -549,11 +561,30 @@ let ``hasintersection operator should work with single elements on the right`` (
     Assert.False(result)
 
 [<Fact>]
+let ``hasintersection operator should work with single boolean elements on the right`` () =
+    let predicate = buildExpr<unit, bool> @"[|true|] /?\ true" 
+    let result = predicate ()
+    Assert.True(result)
+    let predicate = buildExpr<unit, bool> @"[|true|] /?\ false" 
+    let result = predicate ()
+    Assert.False(result)
+
+[<Fact>]
 let ``hasintersection operator should work with single elements on the left`` () =
     let predicate = buildExpr<unit, bool> @"2 /?\ [|1;2;3|]" 
     let result = predicate ()
     Assert.True(result)
     let predicate = buildExpr<unit, bool> @"4 /?\ [|1;2;3|]" 
+    let result = predicate ()
+    Assert.False(result)
+
+
+[<Fact>]
+let ``hasintersection operator should work with single boolean elements on the left`` () =
+    let predicate = buildExpr<unit, bool> @"true /?\ [|true|]" 
+    let result = predicate ()
+    Assert.True(result)
+    let predicate = buildExpr<unit, bool> @"false /?\ [|true|]" 
     let result = predicate ()
     Assert.False(result)
 
