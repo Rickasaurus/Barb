@@ -590,7 +590,7 @@ let ``hasintersection operator should work with single boolean elements on the l
 
 [<Fact>]
 let ``hasintersection operator should consider null to be the empty set`` () =
-    let predicate = buildExpr<unit, bool> @"null /?\ [|1;2;3|]" 
+    let predicate = buildExpr<unit, bool> @"null /?\ [|1;2;3|]"
     let result = predicate ()
     Assert.False(result)
     let predicate = buildExpr<unit, bool> @"[|1;2;3|] /?\ null" 
@@ -599,6 +599,12 @@ let ``hasintersection operator should consider null to be the empty set`` () =
     let predicate = buildExpr<unit, bool> @"null /?\ null" 
     let result = predicate ()
     Assert.False(result)
+
+[<Fact>]
+let ``hasIntersection should behave properly with empty arrays`` () = 
+    let predicate = buildExpr<unit, bool> @"[| |] /?\ true" in
+        let result = predicate ()
+        Assert.False(result)
 
 [<Fact>]
 let ``issubset operator should work correctly in true cases`` () =
@@ -713,6 +719,31 @@ let ``should support multi-calls over two subtypes for a collection of values`` 
     let predicate = buildExpr<TestPerson2,bool> "let z = (Lib.flatten (Locations..City..ZipCodes)) in z /?\ [|\"00000\"|] and z /?\ [|\"12345\"|]" in 
         let result = predicate (p)
         Assert.True(result) 
+
+
+type TestBoolRec = { IsPerson: bool }
+type TestBoolCollectionRec = { ArePeople: TestBoolRec [] }
+
+[<Fact>]
+let ``should properly collapse down a collection of records with booleans`` () = 
+    let testRec = { ArePeople = [| { IsPerson = true }; { IsPerson = false } |] }   
+    let predicate = buildExpr<TestBoolCollectionRec, bool>("ArePeople..IsPerson /?\ true") in
+        let res = predicate testRec
+        Assert.True(res) 
+    let predicate = buildExpr<TestBoolCollectionRec, bool>("ArePeople..IsPerson /?\ false") in
+        let res = predicate testRec
+        Assert.True(res) 
+    let predicate = buildExpr<TestBoolCollectionRec, bool>("ArePeople..IsPerson /?\ true") in
+        let res = predicate { ArePeople = [||] }
+        Assert.False(res) 
+
+type TestArrayHolder = { A: bool [] }
+
+[<Fact>] 
+let ``returned empty arrays should be treated properly`` () = 
+    let pred = buildExpr<TestArrayHolder, bool>("A = [| |]") in
+        let res = pred { A = [||] }
+        Assert.True(res)
 
 [<Fact>]
 let ``barb should support F#-like array syntax`` () = 
