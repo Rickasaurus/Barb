@@ -110,7 +110,11 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         | None when finalReduction -> raise <| BarbExecutionException(sprintf "Specified unknown was unable to be resolved: %s" unk, (sprintf "%A" lists), exprOffset, exprLength)
                         | None -> None
                     | AppliedProperty(o, p) -> p.GetValue(o, [||]) |> Returned |> wrapit |> Some
-                    | AppliedMultiProperty(ops) -> [| for (o, pi) in ops -> pi.GetValue(o, [||]) |> Returned |> wrapit |] |> ArrayBuilder |> wrapit |> Some
+                    | AppliedMultiProperty(ops) -> 
+                        [| for (o, pi) in ops do 
+                            let v = pi.GetValue(o, [||])
+                            if v <> null then yield v |> Returned |> wrapit 
+                        |] |> ArrayBuilder |> wrapit |> Some
                     | Generator ({Expr = Obj(s)}, {Expr = Obj(i)}, {Expr = Obj(e)}) ->
                         match s, i, e with
                         | (:? int64 as s), (:? int64 as i), (:? int64 as e) -> Obj (seq {s .. i .. e }) |> wrapit |> Some

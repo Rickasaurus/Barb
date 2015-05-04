@@ -769,6 +769,15 @@ let ``barb should support calling Length on an empty array`` () =
         let res = predicate testRec
         Assert.True(res)     
 
+type TestOptStrRec = { Place: string option }
+type TestOptStrRecCollection = { Places: TestOptStrRec [] }
+
+[<Fact>]
+let ``barb should properly handle invocations into arrays of records with optionals`` () =
+    let testRec = { Places = [| { Place = None} |] }
+    let predicate = buildExpr<TestOptStrRecCollection, bool>("""Places..Place /?\ [|"NYC"|]""") in
+        let res = predicate testRec
+        Assert.False(res)    
 //
 // Wish List / Ideas
 //
