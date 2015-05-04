@@ -733,6 +733,9 @@ let ``should properly collapse down a collection of records with booleans`` () =
     let predicate = buildExpr<TestBoolCollectionRec, bool>("ArePeople..IsPerson /?\ false") in
         let res = predicate testRec
         Assert.True(res) 
+
+[<Fact>]
+let ``should properly do nothing when performing a nested invoke on an empty collection`` () = 
     let predicate = buildExpr<TestBoolCollectionRec, bool>("ArePeople..IsPerson /?\ true") in
         let res = predicate { ArePeople = [||] }
         Assert.False(res) 
@@ -758,6 +761,13 @@ let ``barb should support F#-like array syntax`` () =
 let ``barb should properly support negative numbers`` () =
     let pred = buildExpr<unit, int>("-3")
     Assert.Equal(-3, pred())
+
+[<Fact>]
+let ``barb should support calling Length on an empty array`` () =
+    let testRec = { ArePeople = [| |] }   
+    let predicate = buildExpr<TestBoolCollectionRec, bool>("ArePeople.Length = 0") in
+        let res = predicate testRec
+        Assert.True(res)     
 
 //
 // Wish List / Ideas

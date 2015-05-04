@@ -265,8 +265,8 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                 | Invoke, (ResolvedIndexArgs r) & rhs -> rhs |> Some
                 // Invoke on null should always be null
                 | Obj null, AppliedInvoke _ -> Obj null |> Some
-                // Invoke on an empty array should always be empty
-                | Obj (:? Array as arr), AppliedInvoke _ when arr.Length = 0 -> Obj (Array.empty<obj>) |> Some
+                // Nested Invoke on an empty array should always be empty
+                | Obj (:? Array as arr), AppliedInvoke (n,_) when n > 0 && arr.Length = 0 -> Obj (Array.empty<obj>) |> Some
                 // Finds and returns memebers of the given name of the given object
                 | Obj l, AppliedInvoke (0, r) -> 
                     try resolveInvokeByInstance l r
