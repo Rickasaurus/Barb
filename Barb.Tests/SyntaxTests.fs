@@ -3,6 +3,7 @@
 open Barb.Compiler
 
 open Xunit
+open System.Collections.Generic
 
 type DudeRecord = { Name: string; Sex: char }
 
@@ -778,10 +779,19 @@ let ``barb should properly handle invocations into arrays of records with option
     let predicate = buildExpr<TestOptStrRecCollection, bool>("""Places..Place /?\ [|"NYC"|]""") in
         let res = predicate testRec
         Assert.False(res)    
+
+type DictRec = { Dict: IDictionary<string,string> }
+
+[<Fact>]
+let ``barb should not throw an exception when indexing into a dictionary with a bad key`` () = 
+    let testRec = { Dict = [ ("hello", "world") ] |> dict }
+    let predicate = buildExpr<DictRec, string>("""Dict.["nope"]""") in
+        let res = predicate testRec
+        Assert.Null(res)
+
 //
 // Wish List / Ideas
 //
-
 
 //[<Fact>] // Experimental
 let ``should support safe while syntax`` () = 

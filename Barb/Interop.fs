@@ -505,7 +505,7 @@ let executeIndexer (o: obj) (sigs: PropertyInfo list) (prms: obj []) =
     |> Option.map (fun (mi, converted) -> mi.GetValue(o, [| converted |]))
     |> Option.map Returned
 
-let resolveObjectIndexer (rtype: System.Type) =
+let resolveObjectIndexer (rtype: Type) =
     let indexers =
         seq {
             for itype in seq { yield rtype; yield! rtype.GetInterfaces() } do
@@ -523,9 +523,13 @@ let resolveObjectIndexer (rtype: System.Type) =
                let pi = typ.GetProperty(memberName) in Some (pi, pi.GetIndexParameters())
 
 let cachedResolveObjectIndexer = 
-    let inputToKey (rtype: System.Type) = rtype.FullName
+    let inputToKey (rtype: Type) = rtype.FullName
     let resolveValue rtype = resolveObjectIndexer rtype
     memoizeBy inputToKey resolveValue
+
+let genericIDictionaryIndxerCache = new CachingReflectiveIDictionaryLookup()
+let isGenericIDictionary (ttype: Type) = ttype.IsGenericType && ttype.GetInterface("IDictionary`2") <> null
+    
 
 let callIndexedProperty (target: obj) (indexArgs: obj []) =
     let indexVal = 
@@ -547,6 +551,11 @@ let callIndexedProperty (target: obj) (indexArgs: obj []) =
         | (:? IDictionary as dict),  key -> 
             if not <| dict.Contains(key) then Some <| Obj null
             else dict.[key] |> Returned |> Some
+        | container, indexer when isGenericIDictionary ttype ->
+            let ktype, vtype = ttype.GenericTypeArguments.[0], ttype.GenericTypeArguments.[1]
+            let lookupFun = genericIDictionaryIndxerCache.GetTypedIDictionaryIndexer(ktype, vtype)
+            lookupFun (container, indexer)
+            |> Returned |> Some
         | _ ->
             match cachedResolveObjectIndexer ttype with
             | None -> None

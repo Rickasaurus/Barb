@@ -74,6 +74,26 @@ type CachingReflectiveArrayBuilder () =
            do builderMap := Map.add lType.FullName builder currentMap
            builder    
 
+type CachingReflectiveIDictionaryLookup () = 
+    let builderMap = ref Map.empty<string, (obj * obj) -> obj>
+    static member ReturnTypedIDictionaryLookup<'k,'v> () : (obj * obj) -> obj =
+        (fun (dict, key) -> let idict = dict :?> IDictionary<'k,'v>
+                            let key = key :?> 'k
+                            if idict.ContainsKey(key) then idict.[key] |> box else null)
+    member this.GetTypedIDictionaryIndexer (kType: Type, vType: Type) =
+        let currentMap = !builderMap
+        let cacheKey = kType.FullName + "_" + vType.FullName
+        if Map.containsKey cacheKey currentMap then
+            currentMap.[cacheKey]
+        else
+           let builder = typeof<CachingReflectiveIDictionaryLookup>
+                            .GetMethod("ReturnTypedIDictionaryLookup", BindingFlags.Public ||| BindingFlags.Static)
+                            .MakeGenericMethod([|kType; vType|])
+                            .Invoke(null, null) 
+                            :?> (obj * obj) -> obj
+           do builderMap := Map.add cacheKey builder currentMap
+           builder    
+
 module FSharpExpr =            
     let getMethod = 
         function

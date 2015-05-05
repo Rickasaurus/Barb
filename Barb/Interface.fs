@@ -93,6 +93,7 @@ module Compiler =
 
         fun input -> 
             match calculateResult input with
+            | null -> null
             | result when result.GetType() = data.OutputType -> result
             | result ->
                 result
