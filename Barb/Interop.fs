@@ -287,8 +287,6 @@ let resolveStatic (namespaces: string Set) (rtypename: string) (memberName: stri
                             yield AppliedIndexedProperty(null, pi)
             yield! tryGetEnum rtype memberName |> Option.map Obj |> Option.toArray
         ]
-//        |> Option.tryResolve (fun () -> rtype.GetField(memberName) |> nullableToOption |> Option.map fieldToExpr)
-//        |> function | Some (objToExpr) -> Some (objToExpr null) | None -> failwith (sprintf "Member name of %s was ambiguous: %s" rtypename memberName)            
     | manytype -> failwith (sprintf "Type name was ambiguous: %s" rtypename) 
 
 // Note: may not properly fail if types are loaded later, but I'm willing to sacrifice this for now in the name of complexity reduction
@@ -336,7 +334,6 @@ let executeConstructor (namespaces: string Set) (rtypename: string) (args: obj [
                             |> Seq.map (snd) |> Seq.toArray
                         let realType = rtype.MakeGenericType(resolvedGenerics)
                         Activator.CreateInstance(realType, args) |> Obj |> Some
-//            ctor.GetParameters()         
         | manyctor -> failwith (sprintf "Type constructor was ambiguous: %s" rtypename)
     | rtype :: [] -> 
         let paramTypes = args |> Array.map (fun p -> p.GetType())
@@ -465,7 +462,6 @@ let rec resolveMembers (rtype: System.Type) (bindingflags: BindingFlags) =
             | prms -> yield prop.Name, fun o -> AppliedIndexedProperty(o, [prop])
         for (name, methods) in methodCollections do 
             yield name, fun o -> let mis = methods |> Seq.toList in InvokableExpr <| AppliedMethod(o, mis) 
-        //for field in fields do yield field.Name, fieldToExpr field
     }     
 
 let rec inline convertSequence seq1 seq2 = 
@@ -548,6 +544,9 @@ let callIndexedProperty (target: obj) (indexArgs: obj []) =
         | (:? IEnumerable as enumer), (:? int64 as idx) -> 
             if idx < 0L then Returned null |> Some
             else enumer |> Seq.cast<obj> |> Seq.nth (int idx) |> Returned |> Some  
+        | (:? IDictionary as dict),  key -> 
+            if not <| dict.Contains(key) then Some <| Obj null
+            else dict.[key] |> Returned |> Some
         | _ ->
             match cachedResolveObjectIndexer ttype with
             | None -> None
