@@ -12,6 +12,7 @@ type BarbException (message, offset: uint32, length: uint32) =
 type BarbExecutionException (message, trace: string, offset, length) =
     inherit BarbException (message, offset, length)
     member t.Trace = trace
+    override t.ToString() = message + Environment.NewLine + trace
 
 type BarbSettings = 
     {
@@ -73,6 +74,7 @@ and ExprTypes =
     | Resolved of ExprTypes
     // Has Unknowns
     | Unresolved of ExprTypes
+    with override t.ToString () = sprintf "(%A)" t
 
 and ExprRep =
     {

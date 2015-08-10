@@ -67,7 +67,7 @@ type CachingReflectiveArrayBuilder () =
             currentMap.[lType.FullName]
         else
            let builder = typeof<CachingReflectiveArrayBuilder>
-                            .GetMethod("ReturnTypedArrayBuilder", BindingFlags.Public ||| BindingFlags.Static)
+                            .GetMethod("ReturnTypedArrayBuilder", BindingFlags.Public ||| BindingFlags.NonPublic ||| BindingFlags.Static)
                             .MakeGenericMethod([|lType|])
                             .Invoke(null, null) 
                             :?> obj -> obj
@@ -87,7 +87,7 @@ type CachingReflectiveIDictionaryLookup () =
             currentMap.[cacheKey]
         else
            let builder = typeof<CachingReflectiveIDictionaryLookup>
-                            .GetMethod("ReturnTypedIDictionaryLookup", BindingFlags.Public ||| BindingFlags.Static)
+                            .GetMethod("ReturnTypedIDictionaryLookup", BindingFlags.Public ||| BindingFlags.NonPublic ||| BindingFlags.Static)
                             .MakeGenericMethod([|kType; vType|])
                             .Invoke(null, null) 
                             :?> (obj * obj) -> obj

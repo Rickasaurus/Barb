@@ -299,7 +299,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
             | :? BarbException as ex -> reraise ()  
             | ex ->
                 let totalLength = (rOffset - lOffset) + rLength 
-                raise <| new BarbExecutionException (sprintf "Unexpected exception in tuple reduction: %s" ex.Message, sprintf "%A" (l,r), lOffset, totalLength)
+                raise <| new BarbExecutionException (sprintf "Unexpected exception in tuple reduction: %s" ex.Message, sprintf "(%s, %s)" (l.ToString()) (r.ToString()), lOffset, totalLength)
         | _ -> None
     
     and (|ResolveTriple|_|) =
