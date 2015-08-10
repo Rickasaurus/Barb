@@ -159,6 +159,12 @@ let ``should propertly call IDictionary ContainsKey`` () =
     Assert.True(result)
 
 [<Fact>]
+let ``indexing a null should return null`` () = 
+    let predicate = buildExpr<unit,bool> "null['two'] = null"
+    let result = predicate ()
+    Assert.True(result)
+
+[<Fact>]
 let ``should support using the results of calls to build incremental arrays`` () = 
     let testRecord = { Name = "Dude Duderson"; Index = 1 }
     let predicate = buildExpr<IndexedName,bool> "{Index .. 3} = [|1; 2; 3|]"
