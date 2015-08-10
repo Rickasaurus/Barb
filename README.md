@@ -1,3 +1,5 @@
+[![Build status](https://ci.appveyor.com/api/projects/status/54xfuh39o4aubmln?svg=true)](https://ci.appveyor.com/project/Rickasaurus/barb)
+
 Barb is a small dynamic scripting language for .NET with the following properties:
 
 - Syntax that makes both F# and C# devs feel at home
