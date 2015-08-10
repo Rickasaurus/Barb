@@ -1,4 +1,4 @@
-﻿module Barb.Reduce
+﻿module internal Barb.Reduce
 
 open System
 open System.Collections
@@ -7,10 +7,6 @@ open System.Reflection
 
 open Barb.Interop
 open Barb.Representation
-
-type BarbExecutionException (message, trace: string, offset, length) =
-    inherit BarbException (message, offset, length)
-    member t.Trace = trace
 
 let indexIntoTuple (elements: ExprTypes array) (index: obj) = 
     match index with 

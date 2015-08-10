@@ -1,4 +1,4 @@
-﻿module Barb.Helpers
+﻿module internal Barb.Helpers
 
 open System
 open System.Text

@@ -1,4 +1,4 @@
-﻿module Barb.Interop
+﻿module internal Barb.Interop
 
 open System
 open System.Text

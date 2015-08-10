@@ -1,6 +1,7 @@
 ﻿module Barb.Tests.PredicateLanguage
 
 open Barb.Compiler
+open Barb.Representation
 
 open Xunit
 open System.Collections.Generic
@@ -256,7 +257,7 @@ let ``should allow simple variable binding with var`` () =
 [<Fact>]
 let ``should follow scoping rules for bound variables`` () = 
     let testRecord = { HasHat = true; Name = "Don" }
-    Assert.Throws<Barb.Reduce.BarbExecutionException>((fun () -> 
+    Assert.Throws<BarbExecutionException>((fun () -> 
         let func = buildExpr<BoolRec,bool> "(let x = true in x = HasHat) && x = true"
         let res = func(testRecord)
         res |> ignore))

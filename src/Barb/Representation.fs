@@ -9,6 +9,10 @@ type BarbException (message, offset: uint32, length: uint32) =
     member t.Offset = offset
     member t.Length = length
 
+type BarbExecutionException (message, trace: string, offset, length) =
+    inherit BarbException (message, offset, length)
+    member t.Trace = trace
+
 type BarbSettings = 
     {
         BindGlobalsWhenReducing: bool
