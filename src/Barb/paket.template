@@ -1,0 +1,23 @@
+type project
+owners
+    Rick Minerich
+authors 
+    Rick Minerich
+projectUrl
+    http://github.com/Rickasaurus/Barb
+iconUrl
+    https://raw.githubusercontent.com/Rickasaurus/Barb/master/docs/files/img/logo.png
+licenseUrl
+    http://github.com/Rickasaurus/Barb/blob/master/LICENSE.txt
+requireLicenseAcceptance
+    false
+copyright
+    Copyright 2015
+tags
+    fsharp language languages scripting script barb data
+summary
+    A Simple Dynamic Scripting Language for .NET
+description
+    A Simple Dynamic Scripting Language for .NET designed for interacting with data
+
+
