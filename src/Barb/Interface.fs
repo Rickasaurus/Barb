@@ -109,6 +109,7 @@ module CompilerParts =
                    | Some (typedRes) -> typedRes       
                    | None -> result
 
+/// The functions and classes you use to make a Barb function
 module Compiler = 
     open CompilerParts
 

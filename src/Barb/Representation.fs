@@ -1,4 +1,5 @@
-﻿module Barb.Representation
+﻿/// Internal representation bits.
+module Barb.Representation
 
 open System
 open System.Collections.Generic

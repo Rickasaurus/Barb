@@ -39,6 +39,7 @@ module internal LibInternals =
 
 open System.Collections
 
+/// Library functions callable in Barb
 module Lib = 
     /// Finds the union of two IEnumerables
     let union (t1: IEnumerable) (t2: IEnumerable) = Seq.append (t1 |> Seq.cast<obj>) (t2 |> Seq.cast<obj>) |> Seq.toArray
