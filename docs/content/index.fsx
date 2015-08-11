@@ -27,7 +27,7 @@ Getting started with Barb is easy!
 #r "Barb.dll"
 open Barb.Compiler
 
-let func = buildExpr<unit,string> "Hello World!"
+let func = buildExpr<unit,string> "'Hello World!'"
 
 printfn "%s" (func ())
 
