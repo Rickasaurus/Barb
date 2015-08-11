@@ -61,11 +61,14 @@
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L125-125" class="github-link">
+            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L139-139" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          
+          <p>Creates an untyped Barb Expression (F# Expr) with the given settings</p>
+
+
+
         </td>
       </tr>
       <tr>
@@ -79,11 +82,14 @@
                           <strong>Type parameters:</strong> 'I, 'O          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L122-122" class="github-link">
+            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L135-135" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          
+          <p>Creates a typed Barb function with the default settings</p>
+
+
+
         </td>
       </tr>
       <tr>
@@ -97,11 +103,14 @@
                           <strong>Type parameters:</strong> 'I, 'O          </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L118-118" class="github-link">
+            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L130-130" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          
+          <p>Creates a typed Barb function expression with the given settings</p>
+
+
+
         </td>
       </tr>
       <tr>
@@ -115,119 +124,14 @@
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L105-105" class="github-link">
+            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L116-116" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
+          <p>Creates an untyped Barb function (obj -&gt; obj) with the given settings</p>
 
-          <code onmouseout="hideTip(event, '5', 5)" onmouseover="showTip(event, '5', 5)">
-            parse settings predicate
-          </code>
-          <div class="tip" id="5">
-            <strong>Signature:</strong> settings:BarbSettings -&gt; predicate:string -&gt; BarbData<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L26-26" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
 
-          <code onmouseout="hideTip(event, '6', 6)" onmouseover="showTip(event, '6', 6)">
-            reduce data
-          </code>
-          <div class="tip" id="6">
-            <strong>Signature:</strong> data:BarbData -&gt; BarbData<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L37-37" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
 
-          <code onmouseout="hideTip(event, '7', 7)" onmouseover="showTip(event, '7', 7)">
-            reduceFinal context parsed
-          </code>
-          <div class="tip" id="7">
-            <strong>Signature:</strong> context:Bindings -&gt; parsed:BarbData -&gt; ExprRep list * Bindings<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L65-65" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '8', 8)" onmouseover="showTip(event, '8', 8)">
-            setInput inputType data
-          </code>
-          <div class="tip" id="8">
-            <strong>Signature:</strong> inputType:Type -&gt; data:BarbData -&gt; BarbData<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L68-68" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '9', 9)" onmouseover="showTip(event, '9', 9)">
-            setOutput outputType data
-          </code>
-          <div class="tip" id="9">
-            <strong>Signature:</strong> outputType:Type -&gt; data:BarbData -&gt; BarbData<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L71-71" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '10', 10)" onmouseover="showTip(event, '10', 10)">
-            toFunction data
-          </code>
-          <div class="tip" id="10">
-            <strong>Signature:</strong> data:BarbData -&gt; obj -&gt; obj<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L74-74" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
         </td>
       </tr>
     </tbody>

@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8"/>
-    <title>Lib - Barb</title>
+    <title>CompilerParts - Barb</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
     <meta name="description" content=""/>
     <meta name="author" content="Rick Minerich"/>
@@ -35,11 +35,14 @@
 
 
 
-<h1>Lib</h1>
+<h1>CompilerParts</h1>
 <p>
-  <span>Namespace: Barb.Lib</span><br />
+  <span>Namespace: Barb</span><br />
 </p>
 <div class="xmldoc">
+<p>Internal compiler parts used by the REPL</p>
+
+
 </div>
 
 <!-- Render nested types and modules, if there are any -->
@@ -53,19 +56,19 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '11', 11)" onmouseover="showTip(event, '11', 11)">
-            flatten t1
+          <code onmouseout="hideTip(event, '5', 5)" onmouseover="showTip(event, '5', 5)">
+            parse settings predicate
           </code>
-          <div class="tip" id="11">
-            <strong>Signature:</strong> t1:IEnumerable -&gt; obj []<br />
+          <div class="tip" id="5">
+            <strong>Signature:</strong> settings:BarbSettings -&gt; predicate:string -&gt; BarbData<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Lib.fs#L61-61" class="github-link">
+            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L28-28" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>Flattens an IEnumerable of IEnumerables</p>
+          <p>Parses the input string</p>
 
 
 
@@ -74,19 +77,19 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '12', 12)" onmouseover="showTip(event, '12', 12)">
-            hasIntersection t1 t2
+          <code onmouseout="hideTip(event, '6', 6)" onmouseover="showTip(event, '6', 6)">
+            reduce data
           </code>
-          <div class="tip" id="12">
-            <strong>Signature:</strong> t1:IEnumerable -&gt; t2:IEnumerable -&gt; bool<br />
+          <div class="tip" id="6">
+            <strong>Signature:</strong> data:BarbData -&gt; BarbData<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Lib.fs#L55-55" class="github-link">
+            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L40-40" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>Find if two IEnumerables have an intersection</p>
+          <p>Reduces/optimizes the expression tree</p>
 
 
 
@@ -95,19 +98,19 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '13', 13)" onmouseover="showTip(event, '13', 13)">
-            intersection t1 t2
+          <code onmouseout="hideTip(event, '7', 7)" onmouseover="showTip(event, '7', 7)">
+            reduceFinal context parsed
           </code>
-          <div class="tip" id="13">
-            <strong>Signature:</strong> t1:IEnumerable -&gt; t2:IEnumerable -&gt; obj []<br />
+          <div class="tip" id="7">
+            <strong>Signature:</strong> context:Bindings -&gt; parsed:BarbData -&gt; ExprRep list * Bindings<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Lib.fs#L47-47" class="github-link">
+            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L69-69" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>Finds the intersection of two IEnumerables</p>
+          <p>Performs the 'final reduction'. This is the execution phase.</p>
 
 
 
@@ -116,19 +119,61 @@
       <tr>
         <td class="member-name">
 
-          <code onmouseout="hideTip(event, '14', 14)" onmouseover="showTip(event, '14', 14)">
-            union t1 t2
+          <code onmouseout="hideTip(event, '8', 8)" onmouseover="showTip(event, '8', 8)">
+            setInput inputType data
           </code>
-          <div class="tip" id="14">
-            <strong>Signature:</strong> t1:IEnumerable -&gt; t2:IEnumerable -&gt; obj []<br />
+          <div class="tip" id="8">
+            <strong>Signature:</strong> inputType:Type -&gt; data:BarbData -&gt; BarbData<br />
                       </div>
         </td>
         <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Lib.fs#L44-44" class="github-link">
+            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L73-73" class="github-link">
               <img src="../content/img/github.png" class="normal" />
               <img src="../content/img/github-blue.png" class="hover" />
             </a>
-          <p>Finds the union of two IEnumerables</p>
+          <p>Sets the input type of the Barb function</p>
+
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '9', 9)" onmouseover="showTip(event, '9', 9)">
+            setOutput outputType data
+          </code>
+          <div class="tip" id="9">
+            <strong>Signature:</strong> outputType:Type -&gt; data:BarbData -&gt; BarbData<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L77-77" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Sets the output type of the Barb function</p>
+
+
+
+        </td>
+      </tr>
+      <tr>
+        <td class="member-name">
+
+          <code onmouseout="hideTip(event, '10', 10)" onmouseover="showTip(event, '10', 10)">
+            toFunction data
+          </code>
+          <div class="tip" id="10">
+            <strong>Signature:</strong> data:BarbData -&gt; obj -&gt; obj<br />
+                      </div>
+        </td>
+        <td class="xmldoc">
+            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Interface.fs#L81-81" class="github-link">
+              <img src="../content/img/github.png" class="normal" />
+              <img src="../content/img/github-blue.png" class="hover" />
+            </a>
+          <p>Converts the Barb representation to an actual function callable in .NET</p>
 
 
 

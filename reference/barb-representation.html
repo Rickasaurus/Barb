@@ -54,31 +54,46 @@
           <td class="type-name">
             <a href="barb-representation-barbdata.html">BarbData</a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>The internal datatype used for the compilation/interpretation pipeline.</p>
+
+
+</td>
         </tr>
         <tr>
           <td class="type-name">
             <a href="barb-representation-barbexception.html">BarbException</a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>The base Barb exception type</p>
+
+
+</td>
         </tr>
         <tr>
           <td class="type-name">
             <a href="barb-representation-barbexecutionexception.html">BarbExecutionException</a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>For Barb exceptions that happen after the parse stage</p>
+
+
+</td>
         </tr>
         <tr>
           <td class="type-name">
             <a href="barb-representation-barbsettings.html">BarbSettings</a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>The settings used by Barb in execution</p>
+
+
+</td>
         </tr>
         <tr>
           <td class="type-name">
             <a href="barb-representation-bindingcontents.html">BindingContents</a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>Representation of potential variable bindings in Barb</p>
+
+
+</td>
         </tr>
         <tr>
           <td class="type-name">
@@ -90,25 +105,37 @@
           <td class="type-name">
             <a href="barb-representation-exprrep.html">ExprRep</a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>The internal Barb type used for tracking where each subexpression came from in the original input string.</p>
+
+
+</td>
         </tr>
         <tr>
           <td class="type-name">
             <a href="barb-representation-exprtypes.html">ExprTypes</a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>The internal Barb expression tree. Public for debugging purposes.</p>
+
+
+</td>
         </tr>
         <tr>
           <td class="type-name">
             <a href="barb-representation-invokableexpr.html">InvokableExpr</a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>The internal Barb potential method call representations</p>
+
+
+</td>
         </tr>
         <tr>
           <td class="type-name">
             <a href="barb-representation-lambdarecord.html">LambdaRecord</a>
           </td>
-          <td class="xmldoc"></td>
+          <td class="xmldoc"><p>Internal representation of a Barb lambda expression (Mutable so we can update the bindings with itself for easy recursion.)</p>
+
+
+</td>
         </tr>
         <tr>
           <td class="type-name">
@@ -121,184 +148,6 @@
 
   </div>
 
-  <h3>Functions and values</h3>
-  <table class="table table-bordered member-list">
-    <thead>
-      <tr><td>Function or value</td><td>Description</td></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '11', 11)" onmouseover="showTip(event, '11', 11)">
-            exprExists pred expr
-          </code>
-          <div class="tip" id="11">
-            <strong>Signature:</strong> pred:(ExprTypes -&gt; bool) -&gt; expr:ExprTypes -&gt; bool<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Representation.fs#L115-115" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '12', 12)" onmouseover="showTip(event, '12', 12)">
-            exprExistsInRep pred rep
-          </code>
-          <div class="tip" id="12">
-            <strong>Signature:</strong> pred:(ExprTypes -&gt; bool) -&gt; rep:ExprRep -&gt; bool<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Representation.fs#L113-113" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '13', 13)" onmouseover="showTip(event, '13', 13)">
-            exprRepListOffsetLength exprs
-          </code>
-          <div class="tip" id="13">
-            <strong>Signature:</strong> exprs:seq&lt;ExprRep&gt; -&gt; uint32 * uint32<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Representation.fs#L103-103" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '14', 14)" onmouseover="showTip(event, '14', 14)">
-            listToSubExpression exprs
-          </code>
-          <div class="tip" id="14">
-            <strong>Signature:</strong> exprs:ExprRep list -&gt; ExprRep<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Representation.fs#L109-109" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '15', 15)" onmouseover="showTip(event, '15', 15)">
-            wrapExistingBinding expr
-          </code>
-          <div class="tip" id="15">
-            <strong>Signature:</strong> expr:ExprTypes -&gt; BindingContents<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Representation.fs#L153-153" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '16', 16)" onmouseover="showTip(event, '16', 16)">
-            wrapResolved rep
-          </code>
-          <div class="tip" id="16">
-            <strong>Signature:</strong> rep:ExprRep -&gt; ExprRep<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Representation.fs#L133-133" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '17', 17)" onmouseover="showTip(event, '17', 17)">
-            wrapUnresolved rep
-          </code>
-          <div class="tip" id="17">
-            <strong>Signature:</strong> rep:ExprRep -&gt; ExprRep<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Representation.fs#L134-134" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-        </td>
-      </tr>
-    </tbody>
-  </table>
-  <h3>Active patterns</h3>
-  <table class="table table-bordered member-list">
-    <thead>
-      <tr><td>Active pattern</td><td>Description</td></tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '18', 18)" onmouseover="showTip(event, '18', 18)">
-            ( |ResolvedIndexArgs|_| ) v
-          </code>
-          <div class="tip" id="18">
-            <strong>Signature:</strong> v:ExprTypes -&gt; obj [] option<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Representation.fs#L144-144" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-        </td>
-      </tr>
-      <tr>
-        <td class="member-name">
-
-          <code onmouseout="hideTip(event, '19', 19)" onmouseover="showTip(event, '19', 19)">
-            ( |ResolvedTuple|_| ) v
-          </code>
-          <div class="tip" id="19">
-            <strong>Signature:</strong> v:ExprTypes -&gt; obj [] option<br />
-                      </div>
-        </td>
-        <td class="xmldoc">
-            <a href="http://github.com/Rickasaurus/Barb/tree/master/src/Barb/Representation.fs#L136-136" class="github-link">
-              <img src="../content/img/github.png" class="normal" />
-              <img src="../content/img/github-blue.png" class="hover" />
-            </a>
-          
-        </td>
-      </tr>
-    </tbody>
-  </table>
 
         </div>
         <div class="span3">
