@@ -42,6 +42,9 @@ Samples & documentation
    and functions in the library. This includes additional brief samples on using most of the
    functions.
  
+ * For now, our [GitHub Page](https://github.com/Rickasaurus/Barb) has more in depth information, but we're doing
+   our best to move this information here and improve it. 
+
 Contributing and copyright
 --------------------------
 
@@ -54,9 +57,9 @@ The library is available under the Apache 2.0 license, which allows modification
 redistribution for both commercial and non-commercial purposes. For more information see the 
 [License file][license] in the GitHub repository. 
 
-  [content]: https://github.com/fsprojects/Barb/tree/master/docs/content
-  [gh]: https://github.com/fsprojects/Barb
-  [issues]: https://github.com/fsprojects/Barb/issues
-  [readme]: https://github.com/fsprojects/Barb/blob/master/README.md
-  [license]: https://github.com/fsprojects/Barb/blob/master/LICENSE.txt
+  [content]: https://github.com/Rickasaurus/Barb/tree/master/docs/content
+  [gh]: https://github.com/Rickasaurus/Barb
+  [issues]: https://github.com/Rickasaurus/Barb/issues
+  [readme]: https://github.com/Rickasaurus/Barb/blob/master/README.md
+  [license]: https://github.com/Rickasaurus/Barb/blob/master/LICENSE.txt
 *)
