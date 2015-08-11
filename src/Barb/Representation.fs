@@ -4,21 +4,31 @@ open System
 open System.Collections.Generic
 open System.Reflection
 
+/// The base Barb exception type
 type BarbException (message, offset: uint32, length: uint32) = 
     inherit Exception (message)
+    /// Offset of the substring of the Barb input string at which the error occured.
     member t.Offset = offset
+    /// Length of the substring of the Barb input string at which the error occured.
     member t.Length = length
 
+/// For Barb exceptions that happen after the parse stage
 type BarbExecutionException (message, trace: string, offset, length) =
     inherit BarbException (message, offset, length)
+    /// The reduction being processed when the error occured.
     member t.Trace = trace
     override t.ToString() = message + Environment.NewLine + trace
 
+/// The settings used by Barb in execution
 type BarbSettings = 
     {
+        /// Turning this off will cause Barb to not pull in globals in the optimization stage. 
         BindGlobalsWhenReducing: bool
+        /// This is for debugging purposes only and turning it off may cause infinite loops. 
         FailOnCatchAll: bool
+        /// Namespaces that will be open to Barb functions
         Namespaces: string Set
+        /// Additional variable bindings for Barb
         AdditionalBindings: IDictionary<string,obj>
     }
     with static member Default = 
@@ -31,13 +41,15 @@ type BarbSettings =
 
 type MethodSig = ((obj array -> obj) * Type array) list
 
-// Mutable so we can update the bindings with itself for easy recursion.
+/// Internal representation of a Barb lambda expression (Mutable so we can update the bindings with itself for easy recursion.)
 type LambdaRecord = { Params: string list; mutable Bindings: Bindings; Contents: ExprRep }
 
+/// The internal Barb potential method call representations
 and InvokableExpr =
     | AppliedMultiMethod of (obj * MethodInfo list) list
     | AppliedMethod of obj * MethodInfo list    
 
+/// The internal Barb expression tree. Public for debugging purposes.
 and ExprTypes = 
     (* Units *)
     | Unit
@@ -76,6 +88,7 @@ and ExprTypes =
     | Unresolved of ExprTypes
     with override t.ToString () = sprintf "(%A)" t
 
+/// The internal Barb type used for tracking where each subexpression came from in the original input string.
 and ExprRep =
     {
         Offset: uint32
@@ -84,6 +97,7 @@ and ExprRep =
     }
     with override t.ToString() = sprintf "{ Off = %i; Len = %i; %A }" t.Offset t.Length t.Expr
 
+/// Representation of potential variable bindings in Barb
 and BindingContents = 
     | ComingLater
     /// Offset -> Length -> ExprRep
@@ -91,6 +105,7 @@ and BindingContents =
 
 and Bindings = (String, BindingContents) Map 
 
+/// The internal datatype used for the compilation/interpretation pipeline. 
 type BarbData = 
     {
         InputType: Type 
@@ -100,19 +115,19 @@ type BarbData =
     }
     with static member Default = { InputType = typeof<unit>; OutputType = typeof<unit>; Contents = []; Settings = BarbSettings.Default }
 
-let exprRepListOffsetLength (exprs: ExprRep seq) =
+let internal exprRepListOffsetLength (exprs: ExprRep seq) =
     let offsets = exprs |> Seq.map (fun e -> e.Offset)
     let max = offsets |> Seq.max 
     let min = offsets |> Seq.min
     min, max - min
 
-let listToSubExpression (exprs: ExprRep list) =
+let internal listToSubExpression (exprs: ExprRep list) =
     let offset, length = exprRepListOffsetLength exprs
     { Offset = offset; Length = length; Expr = SubExpression exprs }
 
-let rec exprExistsInRep (pred: ExprTypes -> bool)  (rep: ExprRep) =
+let rec internal exprExistsInRep (pred: ExprTypes -> bool)  (rep: ExprRep) =
     exprExists pred rep.Expr
-and exprExists (pred: ExprTypes -> bool) (expr: ExprTypes) =
+and internal exprExists (pred: ExprTypes -> bool) (expr: ExprTypes) =
     match expr with
     | _ when pred expr -> true 
     | SubExpression (repList) -> repList |> List.exists (exprExistsInRep pred)
@@ -130,10 +145,10 @@ and exprExists (pred: ExprTypes -> bool) (expr: ExprTypes) =
     // Nothing found
     | _ -> false
 
-let wrapResolved (rep: ExprRep) = { rep with Expr = Resolved rep.Expr }
-let wrapUnresolved (rep: ExprRep) = { rep with Expr = Unresolved rep.Expr }
+let internal wrapResolved (rep: ExprRep) = { rep with Expr = Resolved rep.Expr }
+let internal wrapUnresolved (rep: ExprRep) = { rep with Expr = Unresolved rep.Expr }
 
-let (|ResolvedTuple|_|) (v: ExprTypes) =
+let internal (|ResolvedTuple|_|) (v: ExprTypes) =
     match v with 
     | Resolved(Tuple tc) -> 
         tc |> Array.map (fun ex -> ex.Expr) 
@@ -141,7 +156,7 @@ let (|ResolvedTuple|_|) (v: ExprTypes) =
         |> Some
     | _ -> None
 
-let (|ResolvedIndexArgs|_|) (v: ExprTypes) =
+let internal (|ResolvedIndexArgs|_|) (v: ExprTypes) =
     match v with 
     | Resolved(IndexArgs tc) -> 
         tc |> Array.map (fun ex -> ex.Expr) 
@@ -150,4 +165,4 @@ let (|ResolvedIndexArgs|_|) (v: ExprTypes) =
     | _ -> None
 
 
-let wrapExistingBinding expr = (fun off len -> {Offset = off; Length = len; Expr = expr}) |> Existing
+let internal wrapExistingBinding expr = (fun off len -> {Offset = off; Length = len; Expr = expr}) |> Existing

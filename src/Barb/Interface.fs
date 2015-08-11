@@ -21,8 +21,10 @@ open Barb.Reduce
 open Helpers
 open Helpers.FSharpExpr
 
-module Compiler =
+/// Internal compiler parts used by the REPL
+module CompilerParts =
 
+    /// Parses the input string 
     let parse (settings: BarbSettings) (predicate: string) : BarbData = 
         
         let parsedTokens = parseProgram predicate
@@ -34,6 +36,7 @@ module Compiler =
 
         { BarbData.Default with Contents = [parsedTokens]; Settings = settings }
 
+    /// Reduces/optimizes the expression tree
     let reduce (data: BarbData) : BarbData =        
         let memberMap =
             resolveMembers data.InputType (BindingFlags.Instance ||| BindingFlags.Static ||| BindingFlags.NonPublic ||| BindingFlags.Public)
@@ -62,15 +65,19 @@ module Compiler =
         
         { data with Contents = reducedExpression }
 
+    /// Performs the 'final reduction'. This is the execution phase.
     let reduceFinal (context: Bindings) (parsed: BarbData) : ExprRep list * Bindings =
         resolveExpression parsed.Contents context parsed.Settings true
 
+    /// Sets the input type of the Barb function
     let setInput (inputType: Type) (data: BarbData) : BarbData =
         { data with InputType = inputType }
 
+    /// Sets the output type of the Barb function
     let setOutput (outputType: Type) (data: BarbData) : BarbData =
         { data with OutputType = outputType }
 
+    /// Converts the Barb representation to an actual function callable in .NET
     let toFunction (data: BarbData) : (obj -> obj) =
         let memberMap =
             resolveMembers data.InputType (BindingFlags.Instance ||| BindingFlags.Static ||| BindingFlags.NonPublic ||| BindingFlags.Public)
@@ -102,6 +109,10 @@ module Compiler =
                    | Some (typedRes) -> typedRes       
                    | None -> result
 
+module Compiler = 
+    open CompilerParts
+
+    /// Creates an untyped Barb function (obj -> obj) with the given settings
     let buildUntypedExprWithSettings inputType outputType settings predicate = 
         let buildFunction = parse settings >> reduce >> setInput inputType >> setOutput outputType >> toFunction
         let expression = buildFunction predicate 
@@ -115,13 +126,16 @@ module Compiler =
                                | Some (typedRes) -> typedRes           
                                | None -> failwith (sprintf "Unexpected output type/format: %A/%s" untypedRes (untypedRes.GetType().Name))
 
+    /// Creates a typed Barb function expression with the given settings
     let buildExprWithSettings<'I, 'O> settings predicate =
         let utfun = buildUntypedExprWithSettings typeof<'I> typeof<'O> settings predicate 
         fun (input: 'I) -> (utfun input) :?> 'O
 
+    /// Creates a typed Barb function with the default settings
     let buildExpr<'I,'O> predicate =
         buildExprWithSettings<'I,'O> BarbSettings.Default predicate  
 
+    /// Creates an untyped Barb Expression (F# Expr) with the given settings
     let buildAsExprWithSettings intype outtype settings predicate = 
         let utfun = buildUntypedExprWithSettings intype outtype settings predicate         
         let arg = Var("x", intype, false)
@@ -129,12 +143,14 @@ module Compiler =
         let contents = useArg |> coerse typeof<obj> |> application <@ utfun @> |> coerse outtype
         Expr.Lambda(arg, contents)
 
+/// A helper class to make creating Typed Barb functions easy in C#
 type BarbFunc<'I,'O> (predicate, ?settings) =
     let settings = defaultArg settings BarbSettings.Default
     let func : 'I -> 'O = Compiler.buildExprWithSettings settings (predicate)
     member t.Execute (record: 'I) =     
         func record
 
+/// A helper class to make creating Untyped Barb functions easy in C#
 type BarbFuncUntyped (inputType, outputType, predicate, ?settings) =
     let settings = defaultArg settings BarbSettings.Default
     let func : obj -> obj = Compiler.buildUntypedExprWithSettings inputType outputType settings (predicate)

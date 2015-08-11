@@ -40,9 +40,10 @@ module internal LibInternals =
 open System.Collections
 
 module Lib = 
-    // Tuple Stuff
+    /// Finds the union of two IEnumerables
     let union (t1: IEnumerable) (t2: IEnumerable) = Seq.append (t1 |> Seq.cast<obj>) (t2 |> Seq.cast<obj>) |> Seq.toArray
 
+    /// Finds the intersection of two IEnumerables
     let intersection (t1: IEnumerable) (t2: IEnumerable) = 
         seq {
             for i1 in t1 do
@@ -50,11 +51,13 @@ module Lib =
                     if Barb.Interop.objectsEqualInner i1 i2 then yield i1
         } |> Seq.toArray
 
+    /// Find if two IEnumerables have an intersection
     let hasIntersection (t1: IEnumerable) (t2: IEnumerable) =
         let t1obj = t1 |> Seq.cast<obj>
         let t2obj = t2 |> Seq.cast<obj>
         t1obj |> Seq.exists (fun i1 -> t2obj |> Seq.exists (fun i2 -> Barb.Interop.objectsEqualInner i1 i2))
 
+    /// Flattens an IEnumerable of IEnumerables
     let flatten (t1: IEnumerable) =
         [|
             for set in t1 do
@@ -63,7 +66,9 @@ module Lib =
                 | o -> yield o
         |]
 
+/// Table based operations
 module Table =
+    /// For loading TSV tables in Barb
     let loadTSV (filename: string) : string [] [] = 
         File.ReadLines filename
         |> Seq.map (LibInternals.tokenizeSVLine '\t')
@@ -71,18 +76,23 @@ module Table =
         |> Seq.filter (fun l -> l |> Array.length > 0)
         |> Seq.toArray
 
+    /// Finds the first row containing some string element in Barb 
     let firstRowContaining (table: IEnumerable) (element: string) : string [] = 
         table
         |> Seq.cast<string []>
         |> Seq.tryFind (fun row -> row |> Array.exists (fun e -> Barb.Interop.objectsEqualInner e element))
         |> function | Some (row) -> row | None -> [| |]
 
+    /// Finds all rows containing some string element in Barb 
     let allRowsContaining (table: IEnumerable) (element: string) : string [] [] = 
         table
         |> Seq.cast<string []>
         |> Seq.filter (fun row -> row |> Array.exists (fun e -> Barb.Interop.objectsEqualInner e element))
         |> Seq.toArray
 
+/// Minor barb helpers for F# support
 module TopLevel = 
+    /// Creates a Some instance
     let Some (v: 'a) = Some v
+    /// Creates a None instance
     let None = None

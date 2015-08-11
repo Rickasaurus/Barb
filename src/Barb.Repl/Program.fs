@@ -1,5 +1,6 @@
 ﻿open System
 open Barb.Representation
+open Barb.CompilerParts
 open Barb.Compiler
 
 let printHighlightedError (input: string) (ex: BarbException) =
