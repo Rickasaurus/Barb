@@ -106,7 +106,74 @@ let (|Num|_|) (text: StringWindow) : MatchReturn =
         let rest = text.Subwindow(resi)
         Some (Some (tokenStr), rest)
     else None
-        
+
+let (|WhileNum|_|) (text: StringWindow) : MatchReturn =
+    let inline isnumchar c = c >= '0' && c <= '9'
+    let isnegative = text.[0u] = '-'
+    let textStartAt = text.Offset
+    if isnumchar text.[0u]
+       || (text.[0u] = '.' && text.Length >= 2u && isnumchar text.[1u])
+       || (isnegative && text.Length >= 2u && isnumchar text.[1u])
+       then
+        let inline getnum i = int64 text.[i] - 48L
+        let mutable i = if isnegative then 1u else 0u
+        let mutable p = 0L
+        let mutable q = 1L
+        let mutable dot = false
+        let mutable stop = false
+        while not stop do
+            if i >= text.Length then
+                stop <- true
+            elif dot && text.[i] = '.' then
+                stop <- true
+            elif not dot && text.[i] = '.' then
+                dot <- true
+            elif dot && isnumchar text.[i] then
+                p <- p * 10L + getnum i
+                q <- q * 10L
+            elif not dot && isnumchar text.[i] then
+                p <- p * 10L + getnum i
+            else
+                stop <- true
+            if not stop then i <- i+1u
+        //let p = if isnegative then int64 p * -1L else int64 p
+        if isnegative then p <- p * -1L
+        let rest = text.Subwindow(i)
+        if dot then
+            Some (Some (Obj (double p / double q)), rest)
+        else
+            Some (Some (Obj p), rest)
+    else None
+
+let (|RecNum|_|) (text: StringWindow) : MatchReturn =
+    let inline isnumchar c = c >= '0' && c <= '9'
+    let isnegative = text.[0u] = '-'
+    let textStartAt = text.Offset
+    if isnumchar text.[0u]
+       || (text.[0u] = '.' && text.Length >= 2u && isnumchar text.[1u])
+       || (isnegative && text.Length >= 2u && isnumchar text.[1u])
+       then
+        let inline getnum i = int64 text.[i] - 48L
+        let rec inner' =
+            function
+            | i, p, q, dot when i >= text.Length -> i, p, q, dot
+            | i, p, q, true when text.[i] = '.' -> i, p, q, true
+            | i, p, q, false when text.[i] = '.' -> inner' (i+1u, p, 1L, true)
+            | i, p, q, true when isnumchar text.[i] -> inner' (i+1u, (p * 10L + getnum i), (q * 10L), true)
+            | i, p, q, false when isnumchar text.[i] -> inner' (i+1u, (p * 10L + getnum i), q, false)
+            | i, p, q, dot -> i, p, q, dot
+        let resi, p, q, dot =
+            if isnegative then
+                inner' (1u, 0L, 0L, false)
+            else inner' (0u, 0L, 0L, false)
+        let p = if isnegative then int64 p * -1L else int64 p
+        let rest = text.Subwindow(resi)
+        if dot then
+            Some (Some (Obj (double p / double q)), rest)
+        else
+            Some (Some (Obj p), rest)
+    else None
+
 let (|CaptureString|_|) (b: char) (text: StringWindow) : MatchReturn = 
     if text.[0u] = b then 
         let sb = new StringBuilder()
