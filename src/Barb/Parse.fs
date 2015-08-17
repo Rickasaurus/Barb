@@ -1,4 +1,4 @@
-﻿module internal Barb.Parse
+﻿module Barb.Parse
 
 // TODO: 
 // Do ascii lookup for Num, instead of a dumb list
@@ -24,7 +24,7 @@ open Checked
 type BarbParsingException (message, offset, length) =
     inherit BarbException (message, offset, length)
 
-type internal StringWindow =
+type StringWindow =
     struct
         // These are mutable to prevent property generation.
         val mutable Text: string 
