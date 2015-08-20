@@ -9,6 +9,7 @@ Barb is a small dynamic scripting language for .NET with the following propertie
 
 This makes Barb an easy to learn language which you can give to your users for safely scripting over data in your application.  Best of all, you'll be able to use it without learning a bunch of new syntax.
 
+[See our tutorials](http://rickasaurus.github.io/Barb/) to get a feel for how Barb works.
 
 Why Barb?
 ---------
