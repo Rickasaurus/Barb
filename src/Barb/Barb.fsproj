@@ -9,7 +9,7 @@
     <OutputType>Library</OutputType>
     <RootNamespace>Barb</RootNamespace>
     <AssemblyName>Barb</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <Name>Barb</Name>
     <SccProjectName>SAK</SccProjectName>
     <SccProvider>SAK</SccProvider>
