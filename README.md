@@ -141,35 +141,36 @@ Except in the case of nested invocation the '...' here indicates an unbounded ex
 *The var keyword may be used in the future to allow for locally mutable variables.
 
 #### Operators and Keywords ####
-
-	()	 	Unit
-	new <name>	Creates a new .NET instance of Class "name"
-	.		Invocation or Decimal Point within a Number
-	..              Invoke on each in a set and collect
-	null 		Creates an instance of null
-	true		Creates a boolean of value true
-	false		Creates a boolean of value false
-	== or =		Equals Operator
-	<> or !=	Not-Equals Operator
-	>		Greater than
-	>=		Greater than or equal to
-	<		Less than
-	<=		Less than or equal to
-	! or not	Invert Boolean
-	&, && or and	Boolean And
-	|, || or or	Boolean Or
-	/		Arithmetic Divide
-	*		Arithmetic Multiply
-	+		Arithmetic Add
-	-		Arithmetic Subtract
-	\/		Set Union
-	/\		Set Intersection
-	/?\		Set Has Intersection
-	=)              Is Superset
-	(=              Is Subset
-        -)		Left Difference
-	(-		Right Difference
-	--		Symmetric Difference
+| Op/Keyword | Description                                                    |
+| ---------- | -------------------------------------------------------------- |
+| ()         | Unit                                                           |
+| new <name> | Creates a new .NET instance of Class "name"                    |
+| .	         | Invocation or Decimal Point within a Number                    |
+| ..         | Invoke on each in a set and collect                            |
+| null       | Creates an instance of null                                    |
+| true       | Creates a boolean of value true                                |
+| false      | Creates a boolean of value false                               |
+| == =       | Equals Operator                                                |
+| <> !=      | Not-Equals Operator                                            |
+| >          | Greater than                                                   |
+| >=         | Greater than or equal to                                       |
+| <          | Less than                                                      |
+| <=         | Less than or equal to                                          |
+| ! not	     | Invert Boolean                                                 |
+| & && and   | Boolean And                                                    |
+| | || or    | Boolean Or                                                     |
+| /	         | Arithmetic Divide                                              |
+| *          | Arithmetic Multiply                                            |
+| +          | Arithmetic Add                                                 |
+| -	         | Arithmetic Subtract                                            |
+| \/         | Set Union                                                      |
+| /\         | Set Intersection                                               |
+| /?\        | Set Has Intersection                                           |
+| =)         | Is Superset                                                    |
+| (=         | Is Subset                                                      |
+| -)         | Left (Standard) Set Difference                                 |
+| (-         | Right Set Difference                                           |
+| --         | Symmetric Set Difference                                       |
 
 #### Strings and Chars ####
 
