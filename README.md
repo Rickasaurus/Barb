@@ -158,8 +158,8 @@ Except in the case of nested invocation the '...' here indicates an unbounded ex
 | <=         | Less than or equal to                                          |
 | ! not	     | Invert Boolean                                                 |
 | & && and   | Boolean And                                                    |
-| | || or    | Boolean Or                                                     |
-| /	         | Arithmetic Divide                                              |
+| \| \|\| or    | Boolean Or                                                     |
+| \/	         | Arithmetic Divide                                              |
 | *          | Arithmetic Multiply                                            |
 | +          | Arithmetic Add                                                 |
 | -	         | Arithmetic Subtract                                            |
