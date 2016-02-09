@@ -145,7 +145,7 @@ Except in the case of nested invocation the '...' here indicates an unbounded ex
 	()	 			Unit
 	new <name>		Creates a new .NET instance of Class "name"
 	.				Invocation or Decimal Point within a Number
-    ..              Invoke on each in a set and collect
+	..              Invoke on each in a set and collect
 	null 			Creates an instance of null
 	true			Creates a boolean of value true
 	false			Creates a boolean of value false
@@ -165,8 +165,11 @@ Except in the case of nested invocation the '...' here indicates an unbounded ex
 	\/				Set Union
 	/\				Set Intersection
 	/?\				Set Has Intersection
-    =)              Is Superset
-    (=              Is Subset
+	=)              Is Superset
+	(=              Is Subset
+        -)		Left Difference
+	(-		Right Difference
+	--		Symmetric Difference
 
 #### Strings and Chars ####
 

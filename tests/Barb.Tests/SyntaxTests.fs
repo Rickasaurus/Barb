@@ -474,7 +474,7 @@ let ``union operator should union arrays of booleans`` () =
 
 [<Fact>]
 let ``union operator should union arrays with singltons on the right`` () =
-    let predstr = @"[|1;2;3|] \/ 5 = [|1;2;3;5|]"
+    let predstr = @"[|1;2;3|] \/ [|1;2;3;5|]"
     let predicate = buildExpr<unit, bool> predstr
     let result = predicate ()
     Assert.True(result)
@@ -672,6 +672,41 @@ let ``issuperset operator should work correctly in parens`` () =
     let result = predicate ()
     Assert.True(result)
 
+[<Fact>]
+let ``symmetric difference operator should work correctly`` () = 
+    let cases = [
+            @"[|1;2;3|] -- [|1;2|] = [|3|]"
+            @"[|1;2|] -- [|1;2;3|] = [|3|]"
+            @"[|2;3;4|] -- [|1;2;3|] = [|4;1|]"
+        ]
+    for predstr in cases do     
+        let predicate = buildExpr<unit, bool> predstr
+        let result = predicate ()
+        Assert.True(result, predstr)
+
+[<Fact>]
+let ``left difference operator should work correctly`` () = 
+    let cases = [
+            @"[|1;2;3|] -) [|1;2|] = [|3|]"
+            @"[|1;2|] -) [|1;2;3|] = [||]"
+            @"[|2;3;4|] -) [|1;2;3|] = [|4|]"
+        ]
+    for predstr in cases do     
+        let predicate = buildExpr<unit, bool> predstr
+        let result = predicate ()
+        Assert.True(result, predstr)
+
+[<Fact>]
+let ``right difference operator should work correctly`` () = 
+    let cases = [
+            @"[|1;2;3|] (- [|1;2|] = [||]"
+            @"[|1;2|] (- [|1;2;3|] = [|3|]"
+            @"[|2;3;4|] (- [|1;2;3|] = [|1|]"
+        ]
+    for predstr in cases do     
+        let predicate = buildExpr<unit, bool> predstr
+        let result = predicate ()
+        Assert.True(result, predstr)
 
 [<Fact>] 
 let ``Any indexing on null should return null`` () =

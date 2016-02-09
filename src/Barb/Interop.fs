@@ -680,3 +680,20 @@ let isSubsetOf (obj1: obj) (obj2: obj) =
 let isSupersetOf (obj1: obj) (obj2: obj) = 
     (objToEnumerable obj2, objToEnumerable obj1)
     |> (fun (t1, t2) -> t1 |> Seq.forall (fun i1 -> t2 |> Seq.exists (fun i2 -> objectsEqualInner i1 i2))) |> box
+
+let leftDifference (obj1: obj) (obj2: obj) = 
+    let enum1 = objToEnumerable obj1
+    let enum2 = objToEnumerable obj2    
+    enum1 |> Seq.filter (fun v -> enum2 |> Seq.exists (fun v' -> objectsEqualInner v v') |> not) |> Seq.toArray |> emptySingletonArray
+
+let rightDifference (obj1: obj) (obj2: obj) = 
+    let enum1 = objToEnumerable obj1
+    let enum2 = objToEnumerable obj2    
+    enum2 |> Seq.filter (fun v -> enum1 |> Seq.exists (fun v' -> objectsEqualInner v v') |> not) |> Seq.toArray |> emptySingletonArray
+
+let symmetricDifference (obj1: obj) (obj2: obj) =
+    let enum1 = objToEnumerable obj1
+    let enum2 = objToEnumerable obj2    
+    let onlyIn1 = enum1 |> Seq.filter (fun v -> enum2 |> Seq.exists (fun v' -> objectsEqualInner v v') |> not)
+    let onlyIn2 = enum2 |> Seq.filter (fun v -> enum1 |> Seq.exists (fun v' -> objectsEqualInner v v') |> not)
+    Seq.append onlyIn1 onlyIn2 |> Seq.toArray |> emptySingletonArray
