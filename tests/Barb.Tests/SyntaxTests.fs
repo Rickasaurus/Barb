@@ -193,11 +193,11 @@ let ``or operators on null should return null`` () =
 
 [<Fact>]
 let ``set operators should have correct behavior with nulls`` () =
-    let opsAns = [| "\\/", false; "/\\", true; "/?\\", false|]
+    let opsAns = [| "\\/", "[|10|]"; "/\\", "[||]"; "/?\\", "false"|]
     for op, ans in opsAns do
-        let predicate = buildExpr<unit,bool> ("(10 " + op + " null) = null")
+        let predicate = buildExpr<unit,bool> ("(10 " + op + " null) = " + ans)
         let res = predicate()
-        Assert.True((ans = res), "failed on: " + op + " with " + res.ToString())    
+        Assert.True(res, "failed on: " + op + " with " + res.ToString())    
 
 [<Fact>]
 let ``equality and comparison operators should return true or false for nulls`` () =
@@ -516,16 +516,16 @@ let ``intersection operator should find the intersection of arrays`` () =
 
 [<Fact>]
 let ``intersection operator should find the intersection of arrays with a singleton`` () =
-    let predicate = buildExpr<unit, bool> @"[|2;3;4|] /\ 3 = 3" 
+    let predicate = buildExpr<unit, bool> @"[|2;3;4|] /\ 3 = [|3|]" 
     let result = predicate ()
     Assert.True(result)
 
 [<Fact>]
 let ``intersection operator on null should return null`` () =
-    let predicate = buildExpr<unit, bool> @"[|2;3;4|] /\ null = null" 
+    let predicate = buildExpr<unit, bool> @"[|2;3;4|] /\ null = [||]" 
     let result = predicate ()
     Assert.True(result)
-    let predicate = buildExpr<unit, bool> @"null /\ [|2;3;4|] = null" 
+    let predicate = buildExpr<unit, bool> @"null /\ [|2;3;4|] = [||]" 
     let result = predicate ()
     Assert.True(result)
 

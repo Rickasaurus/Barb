@@ -658,11 +658,8 @@ let objToEnumerable (obj: obj) =
     | (:? IEnumerable as en1) -> en1 |> Seq.cast<obj>
     | o -> [| o |] :> IEnumerable<obj>
 
-let emptySingletonArray (enum: obj array) =
-    match enum.Length with
-    | 0 -> null |> box
-    | 1 -> enum.[0] |> box
-    | _ -> enum |> box
+let inline emptySingletonArray (enum: obj array) =
+    enum |> box
 
 let unionObjects (obj1: obj) (obj2: obj) = 
     (objToEnumerable obj1, objToEnumerable obj2)
