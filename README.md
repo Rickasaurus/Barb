@@ -11,6 +11,8 @@ This makes Barb an easy to learn language which you can give to your users for s
 
 [See our tutorials](http://rickasaurus.github.io/Barb/) to get a feel for how Barb works.
 
+Or, [Watch my talk](https://vimeo.com/39381728)
+
 Why Barb?
 ---------
 
