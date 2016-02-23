@@ -338,8 +338,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         do newLambda.Bindings <- newLambda.Bindings |> Map.add bindName (newLambda |> Lambda |> wrapExistingBinding)
                         { lmbExpr with Expr = Lambda newLambda }
                     let newbindings = bindings |> Map.add bindName (wrapExistingBinding recLambda.Expr)
-                    let res = { bindExpr with Expr = reduceExpressions [] [boundScope] newbindings |> fst |> SubExpressionIfNeeded }
-                    reduceExpressions left (res :: rt) newbindings
+                    reduceExpressions left (boundScope :: rt) newbindings
             // Normal Value Binding
             | rexpr -> 
                 let newbindings = bindings |> Map.add bindName (wrapExistingBinding (SubExpressionIfNeeded rexpr)) in
