@@ -126,3 +126,23 @@ module FSharpType =
     let MakeOptionNone (stype: System.Type) =
         let ctor = optionCtorCachedBuilder(stype, typedefof<option<_>>,"None")
         ctor [| |]
+
+type ContinuationBuilder() = 
+    member this.Return(x) = (fun k -> k x) 
+    member this.ReturnFrom(x) = x 
+    member this.Bind(m,f) = (fun k -> m (fun a -> f a k)) 
+    member this.Delay(f) = f() 
+//    member this.Zero () = id
+let Cont = new ContinuationBuilder()
+
+type MaybeContinuationBuilder() = 
+    member this.Return(x) = Some (fun k -> k x) 
+    member this.ReturnFrom(x) = x 
+    member this.Bind(m,f) = 
+        match m with 
+        | Some m -> Some (fun k -> m (fun a -> f a k)) 
+        | None -> None
+    member this.Delay(f) = f()
+     
+//    member this.Zero () = id
+let MaybeCont = new ContinuationBuilder()

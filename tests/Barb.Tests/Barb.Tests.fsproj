@@ -61,6 +61,7 @@
   <Import Project="$(FSharpTargetsPath)" Condition="Exists('$(FSharpTargetsPath)')" />
   <ItemGroup>
     <Compile Include="ParseTests.fs" />
+    <Compile Include="ReduceTests.fs" />
     <Compile Include="SyntaxTests.fs" />
     <Compile Include="InteropTests.fs" />
     <Compile Include="FSharpInteropTests.fs" />
