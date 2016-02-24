@@ -7,6 +7,7 @@ open System.Reflection
 
 open Barb.Interop
 open Barb.Representation
+open Barb.Helpers
 
 let indexIntoTuple (elements: ExprTypes array) (index: obj) = 
     match index with 
@@ -83,115 +84,156 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
 
     let rec (|ResolveSingle|_|) bindings lists =
             let inline reduceSubexpr subExpr = reduceExpressions [] [subExpr] bindings |> fst
-            let inline reduceSubexprs subExpr = reduceExpressions [] subExpr bindings |> fst |> List.rev 
+            let inline reduceSubexprCont subExpr f = f <| (reduceExpressions [] [subExpr] bindings |> fst)
+            let inline reduceExpressionsCont (lleft: ExprRep list) (lright: ExprRep list) (bindings: Bindings) f = 
+                reduceExpressions lleft lright bindings |> fst |> f
+            let inline reduceSubexprsCont subExpr f = reduceExpressions [] subExpr bindings |> fst |> List.rev |> f 
             match lists with 
             | left, ({ Expr = rExpr; Offset = exprOffset; Length = exprLength } & erep) :: rt ->
-                try 
-                    let wrapit e = { erep with Expr = e }
+//                try 
+                    let wrapErep e = { erep with Expr = e }
+                    let wrapit e = { erep with Expr = e }, left, rt
+                    let wrapRep e = e, left, rt
                     match rExpr with
-                    | Returned o -> resolveResultType o |> wrapit |> Some
+                    | Returned o -> Cont { return resolveResultType o |> wrapit |> Some } |> Some
                     | SubExpression exp ->
-                        match reduceSubexprs exp with
-                        | single :: [] -> single
-                        | many -> SubExpression many |> Unresolved |> wrapit
-                        |> Some
-                    | IndexArgs tc -> tc |> resolveToObjs (fun t -> reduceSubexpr t) wrapit IndexArgs
-                    | Tuple tc -> tc |> resolveToObjs (fun t -> reduceSubexpr t) wrapit Tuple       
-                    | ArrayBuilder ar -> ar |> resolveArrayBuilder (fun t -> reduceSubexpr t) wrapit                                   
+                        Cont {
+                            let! redExpr = reduceSubexprsCont exp
+                            return match redExpr with
+                                   | single :: [] -> single |> wrapRep |> Some
+                                   | many -> SubExpression many |> Unresolved |> wrapit  |> Some 
+                        } |> Some
+                    | IndexArgs tc -> 
+                            // Need to make this a proper continuation 
+                            Cont { return tc |> resolveToObjs (fun t -> reduceSubexpr t) wrapErep IndexArgs |> Option.map wrapRep } |> Some
+                    | Tuple tc -> 
+                            // Need to make this a proper continuation 
+                            Cont { return tc |> resolveToObjs (fun t -> reduceSubexpr t) wrapErep Tuple |> Option.map wrapRep } |> Some
+                    | ArrayBuilder ar -> 
+                            // Need to make this a proper continuation
+                            Cont { return ar |> resolveArrayBuilder (fun t -> reduceSubexpr t) wrapErep |> Option.map wrapRep } |> Some
                     | Unknown unk -> 
-                        match bindings |> Map.tryFind unk with
-                        | Some ComingLater when finalReduction -> raise <| BarbExecutionException(sprintf "Expected value not bound: %s" unk, (sprintf "%A" lists), exprOffset, exprLength)
-                        | Some ComingLater -> None
-                        | Some (Existing v) -> v exprOffset exprLength |> Some
-                        | None when finalReduction -> raise <| BarbExecutionException(sprintf "Specified unknown was unable to be resolved: %s" unk, (sprintf "%A" lists), exprOffset, exprLength)
-                        | None -> None
-                    | AppliedProperty(o, p) -> p.GetValue(o, [||]) |> Returned |> wrapit |> Some
+                        Cont {
+                            return match bindings |> Map.tryFind unk with
+                                    | Some ComingLater when finalReduction -> raise <| BarbExecutionException(sprintf "Expected value not bound: %s" unk, (sprintf "%A" lists), exprOffset, exprLength)
+                                    | Some ComingLater -> None 
+                                    | Some (Existing v) -> v exprOffset exprLength |> wrapRep |> Some 
+                                    | None when finalReduction -> raise <| BarbExecutionException(sprintf "Specified unknown was unable to be resolved: %s" unk, (sprintf "%A" lists), exprOffset, exprLength)
+                                    | None -> None 
+                        } |> Some
+                    | AppliedProperty(o, p) -> Cont { return p.GetValue(o, [||]) |> Returned |> wrapit |> Some } |> Some
                     | AppliedMultiProperty(ops) -> 
-                        [| for (o, pi) in ops do 
-                            let v = pi.GetValue(o, [||])
-                            if v <> null then yield v |> Returned |> wrapit 
-                        |] |> ArrayBuilder |> wrapit |> Some
+                        Cont {
+                            return [| for (o, pi) in ops do 
+                                        let v = pi.GetValue(o, [||])
+                                        if v <> null then yield v |> Returned |> wrapErep 
+                                        |] |> ArrayBuilder |> wrapit  |> Some
+                        } |> Some
                     | Generator ({Expr = Obj(s)}, {Expr = Obj(i)}, {Expr = Obj(e)}) ->
-                        match s, i, e with
-                        | (:? int64 as s), (:? int64 as i), (:? int64 as e) -> Obj (seq {s .. i .. e }) |> wrapit |> Some
-                        | (:? float as s), (:? float as i), (:? float as e) -> Obj (seq {s .. i .. e }) |> wrapit |> Some
-                        | _ -> raise <| BarbExecutionException("Unexpected Generator Paramters", (sprintf "%A, %A, %A" s i e), exprOffset, exprLength)
-                    | Generator (sexpr, iexpr, eexpr) ->
-                        match reduceSubexpr sexpr, reduceSubexpr iexpr, reduceSubexpr eexpr with
-                        | (({Expr = Obj(s)} :: []), ({Expr = Obj(i)} :: []), ({Expr = Obj(e)} :: [])) -> 
-                            Generator ({sexpr with Expr = Obj(s)}, {iexpr with Expr = Obj(i)}, {eexpr with Expr = Obj(e)}) |> wrapit |> Some
-                        | s, i, e when not finalReduction -> 
-                            let gen = {sexpr with Expr = SubExpressionIfNeeded s}, {iexpr with Expr = SubExpressionIfNeeded i}, {eexpr with Expr = SubExpressionIfNeeded e}
-                            Generator gen |> Unresolved |> wrapit |> Some
-                        | rs, ri, re -> raise <| BarbExecutionException("One or more generator expressions could not be resolved", (sprintf "%A, %A, %A" rs ri re), exprOffset, exprLength)
+                        Cont {
+                            return match s, i, e with
+                                   | (:? int64 as s), (:? int64 as i), (:? int64 as e) -> Obj (seq {s .. i .. e }) |> wrapit |> Some
+                                   | (:? float as s), (:? float as i), (:? float as e) -> Obj (seq {s .. i .. e }) |> wrapit |> Some
+                                   | _ -> raise <| BarbExecutionException("Unexpected Generator Paramters", (sprintf "%A, %A, %A" s i e), exprOffset, exprLength)
+                        } |> Some
+                    | Generator (sexpr, iexpr, eexpr) -> 
+                        Cont {
+                            let! redSExpr = reduceSubexprCont sexpr
+                            let! redIExpr = reduceSubexprCont iexpr
+                            let! redEexpr = reduceSubexprCont eexpr
+                            match redSExpr, redIExpr, redEexpr with
+                            | (({Expr = Obj(s)} :: []), ({Expr = Obj(i)} :: []), ({Expr = Obj(e)} :: [])) -> 
+                                return Generator ({sexpr with Expr = Obj(s)}, {iexpr with Expr = Obj(i)}, {eexpr with Expr = Obj(e)}) |> wrapit |> Some
+                            | s, i, e when not finalReduction -> 
+                                let gen = {sexpr with Expr = SubExpressionIfNeeded s}, {iexpr with Expr = SubExpressionIfNeeded i}, {eexpr with Expr = SubExpressionIfNeeded e}
+                                return Generator gen |> Unresolved |> wrapit |> Some
+                            | rs, ri, re -> return raise <| BarbExecutionException("One or more generator expressions could not be resolved", (sprintf "%A, %A, %A" rs ri re), exprOffset, exprLength)
+                        } |> Some
                     | IfThenElse (ifexpr, thenexpr, elseexpr) ->
-                        match reduceSubexpr ifexpr with
-                        // If fully resolved in initial reduction, resolve and return the result clause
-                        | {Expr = Obj (:? bool as res)} :: [] -> 
-                            if res then reduceSubexpr thenexpr else reduceSubexpr elseexpr
-                            |> fun resExpr -> resExpr |> SubExpressionIfNeeded |> wrapit |> Some
-                        // If not fully resolved in initial reduction, reduce both clauses and return the result
-                        // Note: If in the future globally scoped Variables are added, resolving them here will cause problems with inner non-pure calls
-                        | rif -> 
-                            let repIf = { ifexpr with Expr = rif |> List.rev |> SubExpressionIfNeeded }
-                            let repThen = { thenexpr with Expr = reduceSubexpr thenexpr |> List.rev |> SubExpressionIfNeeded }
-                            let repElse = { elseexpr with Expr = reduceSubexpr elseexpr |> List.rev |> SubExpressionIfNeeded }
-                            IfThenElse (repIf, repThen, repElse) |> Unresolved |> wrapit |> Some
+                        Cont {
+                            let! rIfexpr = reduceSubexprCont ifexpr
+                            match rIfexpr with
+                            // If fully resolved in initial reduction, resolve and return the result clause
+                            | {Expr = Obj (:? bool as res)} :: [] -> 
+                                let branchExpr = if res then thenexpr else elseexpr
+                                let! rBranchExpr = reduceSubexprCont branchExpr
+                                return rBranchExpr |> SubExpressionIfNeeded |> wrapit |> Some
+                            // If not fully resolved in initial reduction, reduce both clauses and return the result
+                            // Note: If in the future globally scoped Variables are added, resolving them here will cause problems with inner non-pure calls
+                            | rif -> 
+                                let repIf = { ifexpr with Expr = rif |> List.rev |> SubExpressionIfNeeded }
+                                let! rThenExpr = reduceSubexprCont thenexpr
+                                let repThen = { thenexpr with Expr = rThenExpr |> List.rev |> SubExpressionIfNeeded }
+                                let! rElseExpr = reduceSubexprCont elseexpr
+                                let repElse = { elseexpr with Expr = rElseExpr |> List.rev |> SubExpressionIfNeeded }
+                                return IfThenElse (repIf, repThen, repElse) |> Unresolved |> wrapit |> Some
+                        } |> Some
                     // Execute Lambda when fully applied but abort if it doesn't fully reduce
                     | Lambda {Params = []; Contents = lambdaContents; Bindings = lambdaBindings } -> 
-                        let totalBindings = Seq.concat [(Map.toSeq initialBindings); (Map.toSeq lambdaBindings)] |> Map.ofSeq
-                        match reduceExpressions [] [lambdaContents] totalBindings |> fst with
-                        | {Expr = SubExpression (v :: [])} :: [] -> v |> Some
-                        | {Expr = SubExpression _ } :: [] -> None
-                        | result :: [] -> result |> Some
-                        | many -> None
+                        Cont {
+                            let totalBindings = Seq.concat [(Map.toSeq initialBindings); (Map.toSeq lambdaBindings)] |> Map.ofSeq
+                            let! redLambda = reduceExpressionsCont [] [lambdaContents] totalBindings
+                            match redLambda with
+                            | {Expr = SubExpression (v :: [])} :: [] -> return Some (wrapRep v)
+                            | {Expr = SubExpression _ } :: [] -> return None
+                            | result :: [] -> return Some (wrapRep result) 
+                            | many -> return None
+                        } |> Some
                     | And (lExpr, rExpr) ->
-                        let evaldR = lazy (reduceSubexpr rExpr)
-                        // Left and side of the And 
-                        match reduceSubexpr lExpr with
-                        // False short curcuits 
-                        | { Expr = Obj (null) } :: [] -> Obj null |> wrapit |> Some
-                        | { Expr = Obj (:? bool as res)} :: [] when res = false -> Obj res |> wrapit |> Some
-                        | { Expr = Obj (:? bool as res)} :: [] when res = true ->
-                            // Evaluate right hand side of the And
-                            match reduceSubexpr rExpr with
-                            | { Expr = Obj (null) } :: [] -> Obj null |> wrapit |> Some
-                            | { Expr = Obj (:? bool as res)} :: [] -> Obj res |> wrapit |> Some
-                            | res when not finalReduction -> And ({lExpr with Expr = Obj true}, {rExpr with Expr = res |> List.rev |> SubExpressionIfNeeded}) |> Unresolved |> wrapit |> Some
-                            | res -> raise <| BarbExecutionException("Right hand side of And did not evaluate properly", sprintf "%A" rExpr, exprOffset, exprLength)
-                        // Left hand side did not evaluate fully, try to reduce both and return
-                        | res when not finalReduction -> 
-                            let repL = { lExpr with Expr = res |> List.rev |> SubExpressionIfNeeded }
-                            let repR = { rExpr with Expr = reduceSubexpr rExpr |> List.rev |> SubExpressionIfNeeded }
-                            And (repL, repR) |> Unresolved |> wrapit |> Some
-                        | res -> raise <| BarbExecutionException("Left hand side of And did not evaluate properly", sprintf "%A" lExpr, exprOffset, exprLength)
-                    | Or (lExpr, rExpr) ->
-                        // Left and side of the Or 
-                        match reduceSubexpr lExpr with
-                        // True short curcuits 
-                        | { Expr = Obj (null)} :: [] -> Obj null |> wrapit |> Some
-                        | { Expr = Obj (:? bool as res)} :: [] when res = true -> Obj res |> wrapit |> Some
-                        | { Expr = Obj (:? bool as res)} :: [] when res = false ->
-                            // Evaluate right hand side of the Or
-                            match reduceSubexpr rExpr with
-                            | { Expr = Obj (null) } :: [] -> Obj null |> wrapit |> Some
-                            | { Expr = Obj (:? bool as res)} :: [] -> Obj res |> wrapit |> Some
+                        Cont {
+                            // Left and side of the And 
+                            let! redLExpr = reduceSubexprCont lExpr 
+                            match redLExpr with
+                            // False short curcuits 
+                            | { Expr = Obj (null) } :: [] -> return Obj null |> wrapit |> Some
+                            | { Expr = Obj (:? bool as res)} :: [] when res = false -> return Obj res |> wrapit |> Some
+                            | { Expr = Obj (:? bool as res)} :: [] when res = true ->
+                                // Evaluate right hand side of the And
+                                let! redRExpr = reduceSubexprCont rExpr
+                                match redRExpr with
+                                | { Expr = Obj (null) } :: [] -> return Obj null |> wrapit |> Some
+                                | { Expr = Obj (:? bool as res)} :: [] -> return Obj res |> wrapit |> Some
+                                | res when not finalReduction -> return And ({lExpr with Expr = Obj true}, {rExpr with Expr = res |> List.rev |> SubExpressionIfNeeded}) |> Unresolved |> wrapit |> Some
+                                | res -> return raise <| BarbExecutionException("Right hand side of And did not evaluate properly", sprintf "%A" rExpr, exprOffset, exprLength)
+                            // Left hand side did not evaluate fully, try to reduce both and return
                             | res when not finalReduction -> 
-                                let orExpr = Or ({lExpr with Expr = Obj false}, {rExpr with Expr = res |> List.rev |> SubExpressionIfNeeded}) 
-                                orExpr |> Unresolved |> wrapit |> Some
-                            | res -> raise <| BarbExecutionException("Right hand side of Or did not evaluate properly", sprintf "%A" rExpr, exprOffset, exprLength)
-                        // Left hand side did not evaluate fully, try to reduce both and return
-                        | res when not finalReduction -> 
-                            let repL = { lExpr with Expr = res |> List.rev |> SubExpressionIfNeeded }
-                            let repR = { rExpr with Expr = reduceSubexpr rExpr |> List.rev |> SubExpressionIfNeeded }
-                            Or (repL, repR) |> Unresolved |> wrapit |> Some
-                        | res -> raise <| BarbExecutionException("Left hand side of Or did not evaluate properly", sprintf "%A" lExpr, exprOffset, exprLength)
+                                let repL = { lExpr with Expr = res |> List.rev |> SubExpressionIfNeeded }
+                                let! redRExpr = reduceSubexprCont rExpr
+                                let repR = { rExpr with Expr = redRExpr |> List.rev |> SubExpressionIfNeeded }
+                                return And (repL, repR) |> Unresolved |> wrapit |> Some
+                            | res -> return raise <| BarbExecutionException("Left hand side of And did not evaluate properly", sprintf "%A" lExpr, exprOffset, exprLength)
+                        } |> Some
+                    | Or (lExpr, rExpr) ->
+                        Cont {
+                            // Left and side of the Or 
+                            let! redLExpr = reduceSubexprCont lExpr
+                            match redLExpr with
+                            // True short curcuits 
+                            | { Expr = Obj (null)} :: [] -> return Obj null |> wrapit |> Some
+                            | { Expr = Obj (:? bool as res)} :: [] when res = true -> return Obj res |> wrapit |> Some
+                            | { Expr = Obj (:? bool as res)} :: [] when res = false ->                               
+                                // Evaluate right hand side of the Or
+                                let! redRExpr = reduceSubexprCont rExpr
+                                match redRExpr with
+                                | { Expr = Obj (null) } :: [] -> return Obj null |> wrapit |> Some
+                                | { Expr = Obj (:? bool as res)} :: [] -> return Obj res |> wrapit |> Some
+                                | res when not finalReduction -> 
+                                    let orExpr = Or ({lExpr with Expr = Obj false}, {rExpr with Expr = res |> List.rev |> SubExpressionIfNeeded}) 
+                                    return orExpr |> Unresolved |> wrapit |> Some
+                                | res -> return raise <| BarbExecutionException("Right hand side of Or did not evaluate properly", sprintf "%A" rExpr, exprOffset, exprLength)
+                            // Left hand side did not evaluate fully, try to reduce both and return
+                            | res when not finalReduction -> 
+                                let repL = { lExpr with Expr = res |> List.rev |> SubExpressionIfNeeded }
+                                let! redRExpr = reduceSubexprCont rExpr
+                                let repR = { rExpr with Expr = redRExpr |> List.rev |> SubExpressionIfNeeded }
+                                return Or (repL, repR) |> Unresolved |> wrapit |> Some
+                            | res -> return raise <| BarbExecutionException("Left hand side of Or did not evaluate properly", sprintf "%A" lExpr, exprOffset, exprLength)
+                        } |> Some
                     | _ -> None
-                    |> Option.map (fun res -> res, left, rt)
-                with
-                | :? BarbException as ex -> reraise () 
-                | ex -> raise <| new BarbExecutionException(ex.Message, sprintf "%A" lists, exprOffset, exprLength)
-            | _ -> None
+//                with
+//                | :? BarbException as ex -> reraise () 
+//                | ex -> raise <| new BarbExecutionException(ex.Message, sprintf "%A" lists, exprOffset, exprLength)
+            | _ ->  None 
 
     and (|ResolveTuple|_|) bindings =
         function 
@@ -316,41 +358,65 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                     Some ({lInfix with Expr = Obj (lfun l r)}, lt, [])
             | _ -> None
 
+    and reduceExpressions (lleft: ExprRep list) (lright: ExprRep list) (bindings: Bindings) : ExprRep list * Bindings =
+       reduceExpressionsCont lleft lright bindings id
+
     // Tries to merge/convert local tokens, if it can't it moves to the right
-    and reduceExpressions (lleft: ExprRep list) (lright: ExprRep list) (bindings: Bindings) : ExprRep list * Bindings=
+    and reduceExpressionsCont (lleft: ExprRep list) (lright: ExprRep list) (bindings: Bindings) cont : ExprRep list * Bindings =
         match lleft, lright with
         // Eliminate any single case subexpression
-        | left, (rExpr & {Expr = SubExpression(expr :: [])}) :: rt -> reduceExpressions left (expr :: rt) bindings
-        | (lExpr & {Expr = SubExpression(expr::[])}) :: lt, right -> reduceExpressions (expr :: lt) right bindings
+        | left, (rExpr & {Expr = SubExpression(expr :: [])}) :: rt -> Cont { let! res = reduceExpressionsCont left (expr :: rt) bindings
+                                                                             return res } 
+        | (lExpr & {Expr = SubExpression(expr::[])}) :: lt, right -> Cont { let! res = reduceExpressionsCont (expr :: lt) right bindings
+                                                                            return res } 
         // Move unresolved expressions to the left hand list
         | left, (rExpr & {Expr = Unresolved(expr)}) :: rt -> 
-            reduceExpressions ({rExpr with Expr = expr} :: left) rt bindings
+            Cont { let! res = reduceExpressionsCont ({rExpr with Expr = expr} :: left) rt bindings 
+                   return res }
         // Binding
         | left, (({Expr = BVar (bindName, bindInnerExpr, boundScope)} & bindExpr) :: rt)  ->
-            match reduceExpressions [] [bindInnerExpr] bindings |> fst with
-            // Recursive Lambda Binding
-            | lmbExpr :: [] & {Expr = Lambda(lambda)} :: [] when not finalReduction ->
-                    // Bindings with the same name as lambda arguments must be removed so that names are not incorrectly bound to same-name variables in scope
-                    let cleanBinds = lambda.Params |> List.fold (fun bnds pn -> if bnds |> Map.containsKey pn then bnds |> Map.remove pn else bnds) bindings         
-                    let reducedExpr, _ = reduceExpressions [] [lambda.Contents] cleanBinds
-                    let recLambda = 
-                        let newLambda = {lambda with Contents = { lambda.Contents with Expr = SubExpressionIfNeeded reducedExpr }}   
-                        do newLambda.Bindings <- newLambda.Bindings |> Map.add bindName (newLambda |> Lambda |> wrapExistingBinding)
-                        { lmbExpr with Expr = Lambda newLambda }
-                    let newbindings = bindings |> Map.add bindName (wrapExistingBinding recLambda.Expr)
-                    reduceExpressions left (boundScope :: rt) newbindings
-            // Normal Value Binding
-            | rexpr -> 
-                let newbindings = bindings |> Map.add bindName (wrapExistingBinding (SubExpressionIfNeeded rexpr)) in
-                    let res = { bindExpr with Expr = reduceExpressions [] [boundScope] newbindings |> fst |> SubExpressionIfNeeded }
-                    reduceExpressions left (res :: rt) bindings
-        | ResolveSingle bindings (res, lt, rt)
+            Cont {
+                let! (resInnerExpr, _) = reduceExpressionsCont [] [bindInnerExpr] bindings
+                match resInnerExpr with
+                // Recursive Lambda Binding
+                | lmbExpr :: [] & {Expr = Lambda(lambda)} :: [] when not finalReduction ->
+                        // Bindings with the same name as lambda arguments must be removed so that names are not incorrectly bound to same-name variables in scope
+                        let cleanBinds = lambda.Params |> List.fold (fun bnds pn -> if bnds |> Map.containsKey pn then bnds |> Map.remove pn else bnds) bindings 
+                        let! (reducedExpr, _) = reduceExpressionsCont [] [lambda.Contents] cleanBinds
+                        let recLambda = 
+                            let newLambda = {lambda with Contents = { lambda.Contents with Expr = SubExpressionIfNeeded reducedExpr }}   
+                            do newLambda.Bindings <- newLambda.Bindings |> Map.add bindName (newLambda |> Lambda |> wrapExistingBinding)
+                            { lmbExpr with Expr = Lambda newLambda }
+                        let newbindings = bindings |> Map.add bindName (wrapExistingBinding recLambda.Expr)
+                        let! (reduced, binds) = reduceExpressionsCont left (boundScope :: rt) newbindings
+                        return reduced, binds
+                // Normal Value Binding
+                | rexpr ->
+                        let newbindings = bindings |> Map.add bindName (wrapExistingBinding (SubExpressionIfNeeded rexpr)) 
+                        let! (resExpr, _) = reduceExpressionsCont [] [boundScope] newbindings
+                        let res = { bindExpr with Expr = resExpr |> SubExpressionIfNeeded }
+                        return! reduceExpressionsCont left (res :: rt) bindings
+            } 
+
         | ResolveTuple bindings (res, lt, rt) 
-        | ResolveTriple (res, lt, rt) -> reduceExpressions lt (res :: rt) bindings
+        | ResolveTriple (res, lt, rt) -> Cont { let! res = reduceExpressionsCont lt (res :: rt) bindings
+                                                return res } 
+        | (ResolveSingle bindings fx) & (l,  r :: rt) -> 
+            Cont { 
+               let! mb = fx 
+               match mb with
+               | Some (res, lt, rrt) -> 
+                   let! fres = reduceExpressionsCont lt (res :: rrt) bindings
+                   return fres
+               | None -> 
+                  let! res = reduceExpressionsCont (r :: l) rt bindings 
+                  return res 
+            }
         // Continue
-        | l,  r :: rt -> reduceExpressions (r :: l) rt bindings
+        | l,  r :: rt -> Cont { let! res = reduceExpressionsCont (r :: l) rt bindings 
+                                return res } 
         // Single Element, Done Reducing
-        | l :: [], [] -> [l], bindings
+        | l :: [], [] -> Cont { return [l], bindings }
         // Unexpected case, fail with  error message
         | ((lh :: lr) & left, (rh :: rr) & right) when finalReduction -> 
             let offset, length = 
@@ -363,7 +429,8 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
             let trace = sprintf "%A" (left, right)
             raise <| new BarbExecutionException (message, trace, offset, length)
         // Multiple Elements, Done Reducing
-        | left, [] -> left, bindings
+        | left, [] -> Cont { return left, bindings }
+        <| cont
 
     reduceExpressions [] exprs initialBindings
 
