@@ -84,10 +84,16 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
 
     let rec (|ResolveSingle|_|) bindings lists =
             let inline reduceSubexpr subExpr = reduceExpressions [] [subExpr] bindings |> fst
-            let inline reduceSubexprCont subExpr f = f <| (reduceExpressions [] [subExpr] bindings |> fst)
-            let inline reduceExpressionsCont (lleft: ExprRep list) (lright: ExprRep list) (bindings: Bindings) f = 
-                reduceExpressions lleft lright bindings |> fst |> f
-            let inline reduceSubexprsCont subExpr f = reduceExpressions [] subExpr bindings |> fst |> List.rev |> f 
+            let inline reduceSubexprCont subExpr  = 
+                Cont {
+                    let! res = reduceExpressionsCont [] [subExpr] bindings
+                    return res |> fst 
+                }
+            let inline reduceSubexprsCont subExpr = 
+                Cont {
+                    let! res = reduceExpressionsCont [] subExpr bindings
+                    return res |> fst |> List.rev
+                }
             match lists with 
             | left, ({ Expr = rExpr; Offset = exprOffset; Length = exprLength } & erep) :: rt ->
 //                try 
@@ -173,7 +179,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                         Cont {
                             let totalBindings = Seq.concat [(Map.toSeq initialBindings); (Map.toSeq lambdaBindings)] |> Map.ofSeq
                             let! redLambda = reduceExpressionsCont [] [lambdaContents] totalBindings
-                            match redLambda with
+                            match redLambda |> fst with
                             | {Expr = SubExpression (v :: [])} :: [] -> return Some (wrapRep v)
                             | {Expr = SubExpression _ } :: [] -> return None
                             | result :: [] -> return Some (wrapRep result) 
