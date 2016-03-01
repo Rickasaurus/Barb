@@ -36,34 +36,28 @@ let inline SubExpressionIfNeeded (input: ExprRep list): ExprTypes =
     | h :: [] -> h.Expr
     | list -> SubExpression list
 
-let resolveToObjs reducer wrapit resultCtor reps = 
-    let reducedReps = 
-        reps |> Array.map (fun t -> 
-                match reducer t with 
-                | res -> SubExpressionIfNeeded res |> wrapit)
+let wasReducedToObjs reducedReps wrapit resultCtor = 
     match reducedReps |> Array.forall (function | {Expr = Obj o} -> true | _ -> false) with
     | true -> reducedReps |> resultCtor |> Resolved
     | false -> reducedReps |> resultCtor |> Unresolved
-    |> wrapit |> Some         
+    |> wrapit |> Some             
 
-let resolveArrayBuilder arrayReducer wrapit builderReps = 
-    // True when all contents are Obj or reducedArray is empty                      
+let resolveArrayBuilderResults arrayElements wrapit =
     let allObj = ref true 
     let arrTyp = ref None
     let arrTypSame = ref true
     let reducedArray = 
-        builderReps
-        |> Array.map (fun t -> 
-                    match arrayReducer t with
-                    | ({ Expr = Obj o } & oobj) :: [] -> 
-                        let oTyp = o.GetType()
-                        if !arrTypSame then
-                            match !arrTyp with
-                            | None -> arrTyp := Some oTyp
-                            | Some aTyp when aTyp = oTyp -> ()
-                            | Some aTyp -> arrTyp := None; arrTypSame := false
-                        oobj 
-                    | res -> allObj := false; SubExpressionIfNeeded res |> wrapit)                         
+        arrayElements 
+        |> Array.map (function 
+                        | ({ Expr = Obj o } & oobj) :: [] -> 
+                            let oTyp = o.GetType()
+                            if !arrTypSame then
+                                match !arrTyp with
+                                | None -> arrTyp := Some oTyp
+                                | Some aTyp when aTyp = oTyp -> ()
+                                | Some aTyp -> arrTyp := None; arrTypSame := false
+                            oobj 
+                        | res -> allObj := false; SubExpressionIfNeeded res |> wrapit)
     match !allObj, reducedArray |> Array.isEmpty, !arrTyp with
     | true, false, Some typ -> 
         // Create Typed Array
@@ -83,7 +77,6 @@ let resolveArrayBuilder arrayReducer wrapit builderReps =
 let resolveExpression exprs initialBindings settings (finalReduction: bool) = 
 
     let rec (|ResolveSingle|_|) bindings lists =
-            let inline reduceSubexpr subExpr = reduceExpressions [] [subExpr] bindings |> fst
             let inline reduceSubexprCont subExpr  = 
                 Cont {
                     let! res = reduceExpressionsCont [] [subExpr] bindings
@@ -110,14 +103,26 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
                                    | many -> SubExpression many |> Unresolved |> wrapit  |> Some 
                         } |> Some
                     | IndexArgs tc -> 
-                            // Need to make this a proper continuation 
-                            Cont { return tc |> resolveToObjs (fun t -> reduceSubexpr t) wrapErep IndexArgs |> Option.map wrapRep } |> Some
+                            Cont {
+                                let! reducedExprs = reduceEachExpression (tc |> Array.toList) bindings
+                                let arrayExprs = reducedExprs |> List.map (SubExpressionIfNeeded >> wrapErep) |> List.toArray
+                                let wr = wasReducedToObjs arrayExprs wrapErep IndexArgs
+                                return wr |> Option.map wrapRep
+                            } |> Some
                     | Tuple tc -> 
-                            // Need to make this a proper continuation 
-                            Cont { return tc |> resolveToObjs (fun t -> reduceSubexpr t) wrapErep Tuple |> Option.map wrapRep } |> Some
+                            Cont {
+                                let! reducedExprs = reduceEachExpression (tc |> Array.toList) bindings
+                                let arrayExprs = reducedExprs |> List.map (SubExpressionIfNeeded >> wrapErep) |> List.toArray
+                                let wr = wasReducedToObjs arrayExprs wrapErep Tuple
+                                return wr |> Option.map wrapRep
+                            } |> Some
                     | ArrayBuilder ar -> 
-                            // Need to make this a proper continuation
-                            Cont { return ar |> resolveArrayBuilder (fun t -> reduceSubexpr t) wrapErep |> Option.map wrapRep } |> Some
+                            Cont {
+                                let! reducedExprs = reduceEachExpression (ar |> Array.toList) bindings
+                                let arrayExprs = reducedExprs |> List.toArray
+                                let res = resolveArrayBuilderResults arrayExprs wrapErep
+                                return res |> Option.map wrapRep
+                            } |> Some
                     | Unknown unk -> 
                         Cont {
                             return match bindings |> Map.tryFind unk with
@@ -367,6 +372,18 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
     and reduceExpressions (lleft: ExprRep list) (lright: ExprRep list) (bindings: Bindings) : ExprRep list * Bindings =
        reduceExpressionsCont lleft lright bindings id
 
+    and reduceEachExpression exprs bindings =
+        Cont {
+            match exprs with
+            | h :: t -> 
+                let! res = reduceExpressionsCont [] [h] bindings
+                let res = res |> fst
+                let! rest = reduceEachExpression t bindings
+                let comb = res :: rest
+                return comb 
+            | [] -> return []
+        }
+
     // Tries to merge/convert local tokens, if it can't it moves to the right
     and reduceExpressionsCont (lleft: ExprRep list) (lright: ExprRep list) (bindings: Bindings) cont : ExprRep list * Bindings =
         match lleft, lright with
@@ -439,6 +456,7 @@ let resolveExpression exprs initialBindings settings (finalReduction: bool) =
         <| cont
 
     reduceExpressions [] exprs initialBindings
+
 
 
 
