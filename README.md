@@ -161,7 +161,7 @@ Except in the case of nested invocation the '...' here indicates an unbounded ex
 | ! not	     | Invert Boolean                                                 |
 | & && and   | Boolean And                                                    |
 | \| \|\| or    | Boolean Or                                                     |
-| \/	         | Arithmetic Divide                                              |
+| /	         | Arithmetic Divide                                              |
 | *          | Arithmetic Multiply                                            |
 | +          | Arithmetic Add                                                 |
 | -	         | Arithmetic Subtract                                            |
