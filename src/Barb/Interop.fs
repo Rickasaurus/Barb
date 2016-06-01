@@ -372,16 +372,24 @@ let rec convertToTargetType (ttype: Type) (param: obj) =
             | false -> try Some <| System.Convert.ChangeType(param, ttype) with _ -> None
 
 type MethodMatch =
-    | PerfectMatch = 0 
+    | PerfectMatch = 0
     | GenericMatch = 1
-    | LengthMatch = 2
+    | PartialMatch = 2
+    | LengthMatch = 3
     | NoMatch = 255
 
-let getMethodMatch (mi: MethodInfo) (prms: ParameterInfo []) (args: obj []) =
-    if prms.Length = args.Length then
-        let zipped = Array.zip prms args
-        if zipped |> Seq.forall (fun (t,a) -> a = null || t.ParameterType = a.GetType()) then MethodMatch.PerfectMatch
-        elif mi.IsGenericMethod then MethodMatch.GenericMatch             
+
+let getMethodMatch (mi: MethodInfo) (prms: ParameterInfo []) (args: obj []) (argTypes: Type []) =
+    if prms.Length = args.Length then   
+        let numSame =
+            let mutable numSame = 0
+            for i = 0 to prms.Length - 1 do
+                if args.[i] = null || prms.[i].ParameterType = argTypes.[i] then numSame <- numSame + 1
+            numSame
+
+        if numSame = prms.Length then MethodMatch.PerfectMatch
+        elif mi.IsGenericMethod then MethodMatch.GenericMatch   
+        elif numSame > 0 then MethodMatch.PartialMatch             
         else MethodMatch.LengthMatch
     else MethodMatch.NoMatch
 
@@ -409,10 +417,11 @@ let convertArgs (prms: ParameterInfo[]) (args: obj[]) =
 
 let executeParameterizedMethod (o: obj) (sigs: MethodInfo list) (args: obj []) =
     let methodsWithParamArgs = sigs |> List.map (fun mi -> mi, mi.GetParameters())
-    
+    let argsTypes = args |> Array.map (fun o -> if o = null then null else o.GetType())
+
     let orderedDispaches = 
         methodsWithParamArgs
-        |> List.map (fun (mi, prms) -> mi, prms, getMethodMatch mi prms args)
+        |> List.map (fun (mi, prms) -> mi, prms, getMethodMatch mi prms args argsTypes)
         |> List.sortBy (fun (_,_,cls) -> int cls) // Lowest Is Bestest
 
     // Punt for now and only look at the top winner
@@ -422,6 +431,7 @@ let executeParameterizedMethod (o: obj) (sigs: MethodInfo list) (args: obj []) =
         | (mi, prms, MethodMatch.GenericMatch) :: _ -> 
             let nmi = resolveGenerics mi prms args
             nmi, convertArgs (nmi.GetParameters()) args
+        | (mi, prms, MethodMatch.PartialMatch) :: _ -> mi, convertArgs prms args
         | (mi, prms, MethodMatch.LengthMatch) :: _ -> mi, convertArgs prms args
         | __ -> failwithf "No match found for the given operation on %s" (o.GetType().FullName)
 

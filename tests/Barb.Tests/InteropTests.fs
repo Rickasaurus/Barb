@@ -365,3 +365,10 @@ let ``should properly be able to call a method of that takes an array of chars w
    let pred = buildExpr<TestVal<string>,string []> "V.Split([|` `|])"
    let res = pred bb 
    Assert.True((res = [|"The"; "Dude"|]))
+
+[<Fact>]
+let ``should be able to call the (string, int) version of String.IndexOf``() =
+    let bb = { V = "The Dude" }
+    let pred = buildExpr<TestVal<string>, int> "V.IndexOf('The', 0)"
+    let res = pred bb
+    Assert.Equal(res, 0) 
