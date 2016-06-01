@@ -274,6 +274,12 @@ let allSimpleMappings =
 
 let whitespaceVocabulary = [" "; "\t"; "\r"; "\n"] 
 
+let startsWithAndWhitespace (sw: StringWindow) (token: string) =
+    if Char.IsLetter(token.[0]) && sw.StartsWith(token) then
+        whitespaceVocabulary |> List.exists (fun ws -> sw.Subwindow(uint32 token.Length).StartsWith(ws))
+    elif sw.StartsWith(token) then true
+    else false
+
 let endUnknownChars = 
     seq {
         for c in whitespaceVocabulary do
@@ -323,8 +329,8 @@ let (|NewExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringW
         [ 
             for ct in allExpressionTypes do 
                 match ct.Pattern with
-                | (SCap h) :: rest when text.StartsWith(h) -> yield h, { ct with Pattern = rest }
-                | (RCap h) :: rest when text.StartsWith(h) -> yield h, ct
+                | (SCap h) :: rest when startsWithAndWhitespace text h -> yield h, { ct with Pattern = rest }
+                | (RCap h) :: rest when startsWithAndWhitespace text h -> yield h, ct
                 | _ -> ()    
         ] 
         |> List.allMaxBy (fun (m, rest) -> m.Length)
@@ -340,9 +346,9 @@ let (|NewExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringW
 let (|OngoingExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringWindow) =
     let (|MatchOngoingExpression|_|) (current: SubexpressionType) = 
         match current.Pattern with
-        | (SCap h) :: rest when text.StartsWith(h) -> Some (h, { current with Pattern = rest })
-        | (RCap h) :: rest when text.StartsWith(h) -> Some (h, current)
-        | (RCap _) :: (SCap h) :: rest when text.StartsWith(h) -> Some (h, { current with Pattern = rest })
+        | (SCap h) :: rest when startsWithAndWhitespace text h -> Some (h, { current with Pattern = rest })
+        | (RCap h) :: rest when startsWithAndWhitespace text h -> Some (h, current)
+        | (RCap _) :: (SCap h) :: rest when startsWithAndWhitespace text h -> Some (h, { current with Pattern = rest })
         | _ -> None
 
     match typesStack with

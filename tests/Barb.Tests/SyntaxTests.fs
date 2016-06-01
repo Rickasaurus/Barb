@@ -825,6 +825,12 @@ let ``barb should not throw an exception when indexing into a dictionary with a 
         let res = predicate testRec
         Assert.Null(res)
 
+[<Fact>]
+let ``barb should terminate a bound lamba at the in after it`` () =
+    let pred = buildExpr<unit,bool>("let getit = fun info -> if info then info else info in getit true")
+    let res = pred()
+    Assert.True(res)
+
 //
 // Wish List / Ideas
 //
