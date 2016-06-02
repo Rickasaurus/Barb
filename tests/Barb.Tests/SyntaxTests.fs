@@ -825,7 +825,7 @@ let ``barb should not throw an exception when indexing into a dictionary with a 
         let res = predicate testRec
         Assert.Null(res)
 
-[<Fact>]
+//[<Fact>] // Would be nice to have, but we would need a way for "in" to terminate an inner open expression
 let ``barb should terminate a bound lamba at the in after it`` () =
     let pred = buildExpr<unit,bool>("let getit = fun info -> if info then info else info in getit true")
     let res = pred()
