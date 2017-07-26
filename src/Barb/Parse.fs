@@ -21,9 +21,6 @@ open Barb.Representation
 open Checked
 #endif
 
-type BarbParsingException (message, offset, length) =
-    inherit BarbException (message, offset, length)
-
 type internal StringWindow =
     struct
         // These are mutable to prevent property generation.

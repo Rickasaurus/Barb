@@ -20,6 +20,9 @@ type BarbExecutionException (message, trace: string, offset, length) =
     member t.Trace = trace
     override t.ToString() = message + Environment.NewLine + trace
 
+type BarbParsingException (message, offset, length) =
+    inherit BarbException (message, offset, length)
+
 /// The settings used by Barb in execution
 type BarbSettings = 
     {
