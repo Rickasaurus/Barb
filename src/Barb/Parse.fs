@@ -75,7 +75,6 @@ let whitespace = [| " "; "\r"; "\n"; "\t"; |]
 let (|Num|_|) (text: StringWindow) : MatchReturn =
     let isnumchar c = c >= '0' && c <= '9' 
     let isnegative c = c = '-'
-    let textStartAt = text.Offset
     let sb = new StringBuilder()
     if isnumchar text.[0u]  
        || (text.[0u] = '.' && text.Length >= 2u && isnumchar text.[1u])  
@@ -88,7 +87,6 @@ let (|Num|_|) (text: StringWindow) : MatchReturn =
             | i, false when text.[i] = '.' -> sb.Append(text.[i]) |> ignore; inner (i+1u, true)
             | i, dotSeen when isnumchar text.[i] -> sb.Append(text.[i]) |> ignore; inner (i+1u, dotSeen)
             | i, dot -> i, dot
-        let isNegative = isnegative text.[0u]
         let resi, dot = 
             if isnegative text.[0u] then 
                 sb.Append(text.[0u]) |> ignore
@@ -108,7 +106,7 @@ let (|CaptureString|_|) (b: char) (text: StringWindow) : MatchReturn =
     if text.[0u] = b then 
         let sb = new StringBuilder()
         let rec findSafeIndex i =
-            if i >= text.Length then failwith "Quotes not matched"
+            if i >= text.Length then raise <| new BarbParsingException("Quotes not matched", text.Offset, text.Length) 
             elif text.[i] = '\\' then findSafeIndex(i + 1u)
             elif text.[i] = b && text.[i - 1u] <> '\\' then 
                 let tokenStr = Some (Obj (sb.ToString()))
@@ -120,7 +118,7 @@ let (|CaptureString|_|) (b: char) (text: StringWindow) : MatchReturn =
 
 let (|CaptureChar|_|) (b: char) (text: StringWindow) : MatchReturn = 
     if text.[0u] = b then 
-        if text.[2u] <> b then failwith "Incorrect character syntax."
+        if text.[2u] <> b then raise <| new BarbParsingException("Incorrect character syntax.", text.Offset, min text.Length 3u)
         Some (Some <| Obj text.[1u], text.Subwindow(3u))
     else None  
 
@@ -141,6 +139,14 @@ let (|CaptureUnknown|_|) (endTokens: string list) (text: StringWindow) : MatchRe
             Some (Some (Unknown tokenText), remainder) 
         else None
 
+let getTextOffset (exprs: ExprRep list) = 
+    exprs |> List.map (fun e -> e.Offset) |> List.min
+
+let getTextLength (exprs: ExprRep list) = 
+    let minExpr = exprs |> List.minBy (fun e -> e.Offset)
+    let maxExpr = exprs |> List.maxBy (fun e -> e.Offset)
+    (maxExpr.Offset - minExpr.Offset) + maxExpr.Length
+
 let makeTuple (exprs: ExprRep list) : ExprRep = 
     let offset, length = exprRepListOffsetLength exprs in 
         { Offset = offset; Length = length; Expr = Tuple (exprs |> List.toArray) }
@@ -152,14 +158,18 @@ let makeArray (exprs: ExprRep list) : ExprRep =
             { Offset = offset; Length = length; Expr = ArrayBuilder [||] }    
         | exprs ->
             { Offset = offset; Length = length; Expr = ArrayBuilder (exprs |> List.toArray) }    
-    
+
+
 let makeLambda (exprs: ExprRep list) : ExprRep = 
     match exprs with 
     | { Expr = SubExpression(names) } :: contents :: [] ->
         let offset, length = exprRepListOffsetLength exprs
-        let prms = names |> List.map (function | { Expr = Unknown n } -> n | other -> failwithf "Unexpected construct in lambda argument list: %A" other)
+        let prms = names |> List.map (function | { Expr = Unknown n } -> n 
+                                               | other -> let etext = sprintf "Unexpected construct in lambda argument list: %A" other
+                                                          raise <| new BarbParsingException(etext, getTextOffset exprs, getTextLength exprs))
         { Offset = offset; Length = length; Expr = Lambda { Params = prms; Bindings = Map.empty; Contents = contents } }
-    | list -> failwithf "Incorrect lambda binding syntax: %A" list
+    | list -> let etext = sprintf "Incorrect lambda binding syntax: %A" list
+              raise <| new BarbParsingException(etext, getTextOffset exprs, getTextLength exprs)
 
 let makeIfThenElse (exprs: ExprRep list) : ExprRep = 
     match exprs with
@@ -168,7 +178,8 @@ let makeIfThenElse (exprs: ExprRep list) : ExprRep =
       ({ Expr = SubExpression(elseexpr) } & elseRep) :: [] -> 
         let offset, length = exprRepListOffsetLength exprs
         { Offset = offset; Length = length; Expr = IfThenElse (ifRep, thenRep, elseRep) }
-    | list -> failwithf "Incorrect if-then-else syntax: %A" list
+    | list -> let etext = sprintf "Incorrect if-then-else syntax: %A" list
+              raise <| new BarbParsingException(etext, getTextOffset exprs, getTextLength exprs)
 
 let makeUnitOrSubExpression: ExprRep list -> ExprRep =  
     function
@@ -179,8 +190,8 @@ let makeUnitOrSubExpression: ExprRep list -> ExprRep =
                { Offset = offset; Length = length; Expr = SubExpression exprs } 
 
 
-let makeNumIterator: ExprRep list -> ExprRep =  
-    function
+let makeNumIterator (exprs: ExprRep list) : ExprRep =  
+    match exprs with
     | startRep :: endRep :: []
       & { Expr = SubExpression(_) } :: { Expr = SubExpression(_) } :: [] -> 
         let length = (endRep.Offset + endRep.Length) - startRep.Offset
@@ -191,31 +202,35 @@ let makeNumIterator: ExprRep list -> ExprRep =
       & { Expr = SubExpression(_) } :: { Expr = SubExpression(_) } :: { Expr = SubExpression(_) } :: [] -> 
         let length = (endRep.Offset + endRep.Length) - startRep.Offset
         { Offset = startRep.Offset; Length = length; Expr = Generator (startRep, midRep, endRep) }
-    | list -> failwith (sprintf "Incorrect generator syntax: %A" list)
+    | list -> let etext = sprintf "Incorrect generator syntax: %A" list
+              raise <| new BarbParsingException(etext, getTextOffset exprs, getTextLength exprs)
 
 let makeIndexArgs (exprs: ExprRep list) : ExprRep = 
     let offset, length = exprRepListOffsetLength exprs in 
         { Offset = offset; Length = length; Expr = IndexArgs (exprs |> List.toArray) }
 
-let makeBind : ExprRep list -> ExprRep = 
-    function
+let makeBind (exprs: ExprRep list) : ExprRep = 
+    match exprs with
     | exprs & { Offset = offset; Length = length; Expr = SubExpression([{ Expr = Unknown(name) }]) } :: bindExpr :: scopeExpr :: [] -> 
         { Offset = offset; Length = length; Expr = BVar (name, bindExpr, scopeExpr) }
-    | list -> failwith (sprintf "Incorrect binding syntax: %A" list)
+    | list -> let etext = sprintf "Incorrect binding syntax: %A" list
+              raise <| new BarbParsingException(etext, getTextOffset exprs, getTextLength exprs)
 
 let makeAnd (exprs: ExprRep list) : ExprRep = 
     match exprs with
     | firstExpr :: secondExpr :: [] ->
         let offset, length = exprRepListOffsetLength exprs
         { Offset = offset; Length = length; Expr = And (firstExpr, secondExpr) }
-    | list -> failwith (sprintf "Incorrect and syntax: %A" list)
+    | list -> let etext = sprintf "Incorrect and syntax: %A" list
+              raise <| new BarbParsingException(etext, getTextOffset exprs, getTextLength exprs)
 
 let makeOr (exprs: ExprRep list) : ExprRep = 
     match exprs with
     | firstExpr :: secondExpr :: [] ->
         let offset, length = exprRepListOffsetLength exprs
         { Offset = offset; Length = length; Expr = Or (firstExpr, secondExpr) }
-    | list -> failwith (sprintf "Incorrect and syntax: %A" list)
+    | list -> let etext = sprintf "Incorrect and syntax: %A" list
+              raise <| new BarbParsingException(etext, getTextOffset exprs, getTextLength exprs)
 
 
 let allExpressionTypes = 
@@ -361,7 +376,7 @@ let (|OngoingExpression|_|) (typesStack: SubexpressionAndOffset list) (text: Str
         | List.AllMaxBy (getMatchLen) (longest, strlen) -> 
             let exprs = longest |> List.map snd
             (((USubExpr exprs, offset) :: parents), text.Subwindow(uint32 strlen)) |> Some
-        | failed -> failwithf "Error in implementation of List.AllMaxBy. Example: %A" failed 
+        | failed -> raise <| new BarbParsingException(sprintf "Error in implementation of List.AllMaxBy. Example: %A" failed, offset, 0u)
     | _ -> None
 
 let (|RefineOpenExpression|_|) (typesStack: SubexpressionAndOffset list) (text: StringWindow) =
@@ -406,66 +421,69 @@ let (|FinishOpenExpression|_|) (typesStack: SubexpressionAndOffset list) (text: 
 
 let parseProgram (startText: string) = 
     let rec parseProgramInner (str: StringWindow) (result: ExprRep list) (currentCaptures: SubexpressionAndOffset list) : (StringWindow * ExprRep) =
-        try
-            match result with
-            | { Offset = cSubExprOffset; Expr = SubExpression cSubExpr } :: rSubExprs -> 
-                let getCurrentSubexpression () = SubExpression (cSubExpr |> List.rev)
-                match str with
-                | FinishOpenExpression currentCaptures (subtype, expressionStartOffset, crem) ->
-                    let length = (uint32 str.Offset) - expressionStartOffset
-                    let innerResult = { Offset = expressionStartOffset; Length = length; Expr = getCurrentSubexpression () } :: rSubExprs  
-                    let value = innerResult |> List.rev |> subtype.Func in 
-                        crem, value
-                | _ when str.Length = 0u -> 
-                    // End of the road, wrap unclosed expressions in a subexpression
-                    let cSubExprRevOffset = (cSubExpr |> List.rev).Head.Offset
-                    let newSubExpr = { Offset = str.Offset; Length = str.Offset - cSubExprRevOffset; Expr = getCurrentSubexpression () } 
-                    str, listToSubExpression (newSubExpr :: rSubExprs)            
-                | OngoingExpression currentCaptures (captures, crem) ->
-                    match captures with
-                    // Resolved Expression is Finished (No more pattern to match)
-                    | (RSubExpr { Pattern = []; Func = func }, offset) :: parents -> 
-                        let subExprRep = { Offset = offset; Length = crem.Offset - cSubExprOffset; Expr = getCurrentSubexpression () }
-                        let innerResult = subExprRep :: rSubExprs  
-                        let value = innerResult |> List.rev |> func in 
-                            crem, value   
-                    // Expression Continues (more pattern to go)
-                    | (_, prevOffset) :: parents -> 
-                        let fresh = { Offset = str.Offset; Length = UInt32.MaxValue; Expr = SubExpression [] }
-                        let stale = { Offset = prevOffset; Length = str.Offset - prevOffset; Expr = getCurrentSubexpression () }
-                        parseProgramInner crem (fresh :: stale :: rSubExprs) captures
-                    | [] -> failwith "Unexpected output from OngoingExpression"
-                | RefineOpenExpression currentCaptures (subtype, crem) ->
-                    // Mid-Expression we find evidence that further restricts the kind of expression it is
+        match result with
+        | { Offset = cSubExprOffset; Expr = SubExpression cSubExpr } :: rSubExprs -> 
+            let getCurrentSubexpression () = SubExpression (cSubExpr |> List.rev)
+            match str with
+            | FinishOpenExpression currentCaptures (subtype, expressionStartOffset, crem) ->
+                let length = (uint32 str.Offset) - expressionStartOffset
+                let innerResult = { Offset = expressionStartOffset; Length = length; Expr = getCurrentSubexpression () } :: rSubExprs  
+                let value = innerResult |> List.rev |> subtype.Func in 
+                    crem, value
+            | _ when str.Length = 0u -> 
+                // End of the road, wrap unclosed expressions in a subexpression
+                let cSubExprRevOffset = (cSubExpr |> List.rev).Head.Offset
+                let newSubExpr = { Offset = str.Offset; Length = str.Offset - cSubExprRevOffset; Expr = getCurrentSubexpression () } 
+                str, listToSubExpression (newSubExpr :: rSubExprs)            
+            | OngoingExpression currentCaptures (captures, crem) ->
+                match captures with
+                // Resolved Expression is Finished (No more pattern to match)
+                | (RSubExpr { Pattern = []; Func = func }, offset) :: parents -> 
+                    let subExprRep = { Offset = offset; Length = crem.Offset - cSubExprOffset; Expr = getCurrentSubexpression () }
+                    let innerResult = subExprRep :: rSubExprs  
+                    let value = innerResult |> List.rev |> func in 
+                        crem, value   
+                // Expression Continues (more pattern to go)
+                | (_, prevOffset) :: parents -> 
                     let fresh = { Offset = str.Offset; Length = UInt32.MaxValue; Expr = SubExpression [] }
-                    // stale is the first finished chunk as defined by the first delimiter of the open expression
-                    let stale = { Offset = cSubExprOffset; Length = crem.Offset - cSubExprOffset; Expr = getCurrentSubexpression () }
-                    let rem, value = parseProgramInner crem (fresh :: stale :: []) ((RSubExpr subtype, str.Offset) :: currentCaptures) 
-                    // Return when the refined expression has finished.
-                    let finalExpr = {value with Expr = SubExpression [value]}
-                    parseProgramInner rem (finalExpr :: rSubExprs) currentCaptures    
-                | NewExpression currentCaptures (subtype, crem) ->
-                    let newExpr = { Offset = str.Offset; Length = UInt32.MaxValue; Expr = SubExpression [] }   
-                    let rem, value = parseProgramInner crem [newExpr] ((subtype, str.Offset) :: currentCaptures)  
-                    // Return when the new expression has finished.
-                    let finalExpr = { Offset = crem.Offset; Length = rem.Offset - str.Offset; Expr = SubExpression (value :: cSubExpr)}   
-                    parseProgramInner rem (finalExpr :: rSubExprs) currentCaptures
-                | Skip whitespaceVocabulary res
-                | Num res
-                | MapSymbol res
-                | CaptureChar '`' res
-                | CaptureString '"' res
-                | CaptureString ''' res 
-                | CaptureUnknown endUnknownChars res ->
-                    let v, rem = res 
-                    match v with
-                    | Some value -> 
-                        let newExpr = { Offset = str.Offset; Length = rem.Offset - str.Offset; Expr = value }
-                        let newExprs = { Offset = cSubExprOffset; Length = rem.Offset - cSubExprOffset; Expr = SubExpression (newExpr :: cSubExpr) }
-                        parseProgramInner rem (newExprs :: rSubExprs) currentCaptures
-                    | None -> parseProgramInner rem result currentCaptures
-                | str -> parseProgramInner (str.Subwindow(1u)) result currentCaptures
-            | _ -> failwith "Expected a SubExpression"
-        with | :? BarbParsingException as ex -> raise ex
-             | ex -> raise <| new BarbParsingException(ex.Message, str.Offset, str.Length)
-    let _, res = parseProgramInner (StringWindow(startText, 0u)) [{ Offset = 0u; Length = 0u; Expr = SubExpression [] }] [] in res
+                    let stale = { Offset = prevOffset; Length = str.Offset - prevOffset; Expr = getCurrentSubexpression () }
+                    parseProgramInner crem (fresh :: stale :: rSubExprs) captures
+                | [] -> raise <| new BarbParsingException("Internal Failure: Unexpected output from OngoingExpression", str.Offset, 0u)
+            | RefineOpenExpression currentCaptures (subtype, crem) ->
+                // Mid-Expression we find evidence that further restricts the kind of expression it is
+                let fresh = { Offset = str.Offset; Length = UInt32.MaxValue; Expr = SubExpression [] }
+                // stale is the first finished chunk as defined by the first delimiter of the open expression
+                let stale = { Offset = cSubExprOffset; Length = crem.Offset - cSubExprOffset; Expr = getCurrentSubexpression () }
+                let rem, value = parseProgramInner crem (fresh :: stale :: []) ((RSubExpr subtype, str.Offset) :: currentCaptures) 
+                // Return when the refined expression has finished.
+                let finalExpr = {value with Expr = SubExpression [value]}
+                parseProgramInner rem (finalExpr :: rSubExprs) currentCaptures    
+            | NewExpression currentCaptures (subtype, crem) ->
+                let newExpr = { Offset = str.Offset; Length = UInt32.MaxValue; Expr = SubExpression [] }   
+                let rem, value = parseProgramInner crem [newExpr] ((subtype, str.Offset) :: currentCaptures)  
+                // Return when the new expression has finished.
+                let finalExpr = { Offset = crem.Offset; Length = rem.Offset - str.Offset; Expr = SubExpression (value :: cSubExpr)}   
+                parseProgramInner rem (finalExpr :: rSubExprs) currentCaptures
+            | Skip whitespaceVocabulary res
+            | Num res
+            | MapSymbol res
+            | CaptureChar '`' res
+            | CaptureString '"' res
+            | CaptureString ''' res 
+            | CaptureUnknown endUnknownChars res ->
+                let v, rem = res 
+                match v with
+                | Some value -> 
+                    let newExpr = { Offset = str.Offset; Length = rem.Offset - str.Offset; Expr = value }
+                    let newExprs = { Offset = cSubExprOffset; Length = rem.Offset - cSubExprOffset; Expr = SubExpression (newExpr :: cSubExpr) }
+                    parseProgramInner rem (newExprs :: rSubExprs) currentCaptures
+                | None -> parseProgramInner rem result currentCaptures
+            | str -> parseProgramInner (str.Subwindow(1u)) result currentCaptures
+        | _ -> raise <| new BarbParsingException("Internal Failure: Expected a SubExpression", str.Offset, 0u)  
+
+    let _, res = 
+        try
+          parseProgramInner (StringWindow(startText, 0u)) [{ Offset = 0u; Length = 0u; Expr = SubExpression [] }] [] 
+        with | :? BarbParsingException as ex -> reraise ()
+             | ex -> raise <| new BarbParsingException(ex.Message, 0u, 0u)
+    res
