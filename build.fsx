@@ -342,10 +342,10 @@ Target "All" DoNothing
   ==> "Build"
   ==> "CopyBinaries"
   ==> "RunTests"
-  ==> "GenerateReferenceDocs"
-  ==> "GenerateDocs"
+//  ==> "GenerateReferenceDocs"
+//  ==> "GenerateDocs"
   ==> "All"
-  =?> ("ReleaseDocs",isLocalBuild)
+//  =?> ("ReleaseDocs",isLocalBuild)
 
 "All" 
 #if MONO
